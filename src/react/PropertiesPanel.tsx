@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { KEY_COLUMN_ID, isCellSelection } from "../model/types.js";
+import { formatDisplayValue, resolveCellFormat } from "../model/numberFormat.js";
+import { KEY_COLUMN_ID, isCellSelection, selectedCellRefs, sharedOrStar } from "../model/types.js";
+import { blurOnEnter } from "./blurOnEnter.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 import { WorkbookInspector } from "./inspectors/WorkbookInspector.js";
 import { SheetInspector } from "./inspectors/SheetInspector.js";
@@ -35,7 +37,6 @@ export function PropertiesPanel({
   workbookLabel?: string;
 }) {
   const { session } = useWorkbook();
-  const snapshot = useSnapshot();
   const selection = session.selection;
 
   return (
@@ -69,9 +70,35 @@ export function PropertiesPanel({
         <CellInspector tableId={selection.tableId} rowId={selection.rowId} columnId={selection.columnId} />
       ) : null}
       {!selection ? <p className="wk-muted">Select a sheet, table, or cell.</p> : null}
-      <p className="wk-muted">{snapshot.name}</p>
     </aside>
   );
+}
+
+function cellCommitted(session: ReturnType<typeof useWorkbook>["session"], snapshot: ReturnType<typeof useSnapshot>, ref: { tableId: string; rowId: string; columnId: string }) {
+  const table = snapshot.tables.find((t) => t.id === ref.tableId);
+  const row = table?.rows.find((r) => r.id === ref.rowId);
+  if (!table || !row) return "";
+  if (ref.columnId === KEY_COLUMN_ID) return row.key;
+  try {
+    const cell = session.getCell(table.name, row.key, ref.columnId);
+    return cell.kind === "formula" ? (cell.formula ?? "") : rawInput(cell.input);
+  } catch {
+    const source = row.cells[ref.columnId];
+    return source?.kind === "formula" ? (source.formula ?? "") : rawInput(source?.value);
+  }
+}
+
+function cellEvaluated(session: ReturnType<typeof useWorkbook>["session"], snapshot: ReturnType<typeof useSnapshot>, ref: { tableId: string; rowId: string; columnId: string }) {
+  const table = snapshot.tables.find((t) => t.id === ref.tableId);
+  const row = table?.rows.find((r) => r.id === ref.rowId);
+  if (!table || !row || ref.columnId === KEY_COLUMN_ID) return "";
+  try {
+    const cell = session.getCell(table.name, row.key, ref.columnId);
+    if (cell.computed === null || cell.computed === undefined) return "";
+    return formatDisplayValue(cell.computed, resolveCellFormat(table, ref.columnId, row.cells[ref.columnId]));
+  } catch {
+    return "";
+  }
 }
 
 function FormulaField() {
@@ -80,26 +107,16 @@ function FormulaField() {
   const edit = session.formulaEdit;
   const selection = session.selection;
   const cellSel = isCellSelection(selection) ? selection : null;
+  const refs = selectedCellRefs(selection);
   const table = snapshot.tables.find((t) => t.id === (edit?.tableId ?? cellSel?.tableId));
   const row = table?.rows.find((r) => r.id === (edit?.rowId ?? cellSel?.rowId));
-  let committed = "";
-  let evaluated: string | undefined;
-  if (table && row && (edit || cellSel)) {
-    const columnId = edit?.columnId ?? cellSel!.columnId;
-    if (columnId === KEY_COLUMN_ID) {
-      committed = row.key;
-    } else {
-      try {
-        const cell = session.getCell(table.name, row.key, columnId);
-        committed = cell.kind === "formula" ? (cell.formula ?? "") : rawInput(cell.input);
-        if (cell.computed !== null && cell.computed !== undefined) evaluated = String(cell.computed);
-      } catch {
-        committed = "";
-      }
-    }
-  }
+  const committedValues = refs.map((ref) => cellCommitted(session, snapshot, ref));
+  const evaluatedValues = refs.map((ref) => cellEvaluated(session, snapshot, ref));
+  const committed = refs.length ? sharedOrStar(committedValues) : "";
+  const firstCommitted = committedValues[0] ?? "";
+  const evaluated = refs.length ? sharedOrStar(evaluatedValues) : undefined;
   const display = edit?.draft ?? committed;
-  const resetKey = `${edit?.tableId ?? cellSel?.tableId}:${edit?.rowId}:${version}:${committed}`;
+  const resetKey = `${refs.map((ref) => `${ref.tableId}:${ref.rowId}:${ref.columnId}`).join(",")}:${version}:${committed}`;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -127,8 +144,9 @@ function FormulaField() {
   return (
     <FormulaDraft
       committed={display}
+      firstValue={firstCommitted}
       evaluated={evaluated}
-      disabled={!table || !row}
+      disabled={!refs.length}
       resetKey={resetKey}
       onChange={(next) => {
         if (edit) {
@@ -139,17 +157,20 @@ function FormulaField() {
         session.beginFormulaEdit(table.id, row.id, cellSel.columnId, next);
       }}
       onCommit={(next) => {
-        if (!table || !row || !cellSel) return;
-        if (cellSel.columnId === KEY_COLUMN_ID) {
-          tryCall(() => session.renameRow(table.id, row.id, next));
-          return;
-        }
-        if (edit) {
-          session.setFormulaEditDraft(next);
-          session.commitFormulaEdit();
-          return;
-        }
-        tryCall(() => session.writeCell(table.name, row.key, cellSel.columnId, next));
+        if (!refs.length) return;
+        if (next === "*" && committed === "*") return;
+        tryCall(() => {
+          session.transact(() => {
+            if (session.formulaEdit) session.cancelFormulaEdit();
+            for (const ref of refs) {
+              const targetTable = snapshot.tables.find((candidate) => candidate.id === ref.tableId);
+              const targetRow = targetTable?.rows.find((candidate) => candidate.id === ref.rowId);
+              if (!targetTable || !targetRow) continue;
+              if (ref.columnId === KEY_COLUMN_ID) session.renameRow(targetTable.id, targetRow.id, next);
+              else session.writeCell(targetTable.name, targetRow.key, ref.columnId, next);
+            }
+          });
+        });
       }}
       onCancel={() => session.cancelFormulaEdit()}
     />
@@ -158,6 +179,7 @@ function FormulaField() {
 
 function FormulaDraft({
   committed,
+  firstValue,
   evaluated,
   disabled,
   resetKey,
@@ -166,6 +188,7 @@ function FormulaDraft({
   onCancel,
 }: {
   committed: string;
+  firstValue: string;
   evaluated?: string;
   disabled: boolean;
   resetKey: string;
@@ -194,20 +217,20 @@ function FormulaDraft({
         disabled={disabled}
         placeholder={disabled ? "Select a cell" : undefined}
         value={draft}
+        onFocus={() => {
+          if (draft === "*") setDraft(firstValue);
+        }}
         onChange={(e) => {
           setDraft(e.target.value);
           onChange(e.target.value);
         }}
         onBlur={() => onCommit(draft)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            onCommit(draft);
-          }
           if (e.key === "Escape") onCancel();
+          else blurOnEnter(e);
         }}
       />
-      {evaluated !== undefined ? <span className="wk-evaluated">Evaluated: {evaluated}</span> : null}
+      {evaluated !== undefined ? <span className="wk-evaluated">{evaluated}</span> : null}
     </label>
   );
 }

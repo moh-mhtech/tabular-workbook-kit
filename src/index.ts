@@ -7,6 +7,7 @@ export type {
   EvaluatedColumn,
   EvaluatedRow,
   EvaluatedTable,
+  CellRef,
   Primitive,
   RowSnapshot,
   ScenarioSnapshot,
@@ -23,6 +24,8 @@ export {
   looseCellKey,
   overlayKey,
   parseLooseCellKey,
+  selectedCellRefs,
+  sharedOrStar,
 } from "./model/types.js";
 export {
   assertGlobalName,

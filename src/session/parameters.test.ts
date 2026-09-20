@@ -50,6 +50,15 @@ describe("parameters sheet and table", () => {
     expect(() => session.addColumn("Params")).toThrow(/extra columns/);
   });
 
+  it("does not change stored values or formula results when a compact format is applied", async () => {
+    const session = await open();
+    const start = session.getCell("Params", "Start", "Value").computed;
+    session.setColumnFormat("Params", "Value", "DKK G3A");
+    await session.recalculate();
+    expect(session.getCell("Params", "Årssalg", "Value").computed).toBe(8_000_000);
+    expect(session.getCell("Params", "Start", "Value").computed).toBeCloseTo(Number(start), 6);
+  });
+
   it("rejects parameter keys that collide with functions or tables", async () => {
     const session = await open();
     expect(() => session.renameRow("Params", "Vat", "SUM")).toThrow(/reserved/);

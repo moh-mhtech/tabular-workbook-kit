@@ -12,6 +12,7 @@ import DataEditor, {
 import "@glideapps/glide-data-grid/dist/index.css";
 import { effectiveCell } from "../engine/compileWorkbook.js";
 import {
+  cellsInProjectedRange,
   projectTable,
   projectedCell,
   selectionForProjectedCell,
@@ -241,7 +242,16 @@ function TableGrid({ tableId }: { tableId: string }) {
       if (!active) return;
       editingLocationRef.current = active;
       setActiveSheetId(projection.sheetId);
-      session.setSelection(selectionForProjectedCell(projection, layout, active[0], active[1]));
+      const activeSelection = selectionForProjectedCell(projection, layout, active[0], active[1]);
+      const range = next.current?.range
+        ? cellsInProjectedRange(projection, layout, next.current.range)
+        : [];
+      if (range.length) {
+        const primary = activeSelection.kind === "cell" ? activeSelection : range[0]!;
+        session.setSelection({ ...primary, range });
+        return;
+      }
+      session.setSelection(activeSelection);
     },
     [layout, projection, session, setActiveSheetId],
   );

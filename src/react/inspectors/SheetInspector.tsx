@@ -1,3 +1,4 @@
+import { blurOnEnter } from "../blurOnEnter.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
 
 function tryCall(fn: () => void) {
@@ -18,7 +19,11 @@ export function SheetInspector({ sheetId }: { sheetId: string }) {
       <h3>Sheet</h3>
       <label>
         Name
-        <input defaultValue={sheet.name} onBlur={(e) => tryCall(() => session.renameSheet(sheet.id, e.target.value))} />
+        <input
+          defaultValue={sheet.name}
+          onBlur={(e) => tryCall(() => session.renameSheet(sheet.id, e.target.value))}
+          onKeyDown={blurOnEnter}
+        />
       </label>
       {sheet.locked ? null : (
         <button type="button" onClick={() => tryCall(() => session.deleteSheet(sheet.id))}>

@@ -99,13 +99,26 @@ export interface EvaluatedTable {
   rows: EvaluatedRow[];
 }
 
+export type CellRef = { tableId: string; rowId: string; columnId: string };
+
 export type Selection =
   | { kind: "workbook" }
   | { kind: "sheet"; sheetId: string }
   | { kind: "table"; tableId: string }
   | { kind: "column"; tableId: string; columnId: string }
   | { kind: "row"; tableId: string; rowId: string }
-  | { kind: "cell"; tableId: string; rowId: string; columnId: string };
+  | { kind: "cell"; tableId: string; rowId: string; columnId: string; range?: CellRef[] };
+
+export function selectedCellRefs(selection: Selection | null): CellRef[] {
+  if (!isCellSelection(selection)) return [];
+  if (selection.range?.length) return selection.range;
+  return [{ tableId: selection.tableId, rowId: selection.rowId, columnId: selection.columnId }];
+}
+
+export function sharedOrStar(values: readonly string[]): string {
+  if (!values.length) return "";
+  return values.every((value) => value === values[0]) ? values[0]! : "*";
+}
 
 export function overlayKey(tableId: string, rowId: string, columnId: string): string {
   return `${tableId}\u001f${rowId}\u001f${columnId}`;

@@ -1,5 +1,7 @@
 import { KEY_COLUMN_ID } from "../../model/types.js";
+import { blurOnEnter } from "../blurOnEnter.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
+import { NumberFormatField } from "./NumberFormatField.js";
 
 function tryCall(fn: () => void) {
   try {
@@ -26,20 +28,14 @@ export function ColumnInspector({ tableId, columnId }: { tableId: string; column
           <input
             defaultValue={col.name}
             onBlur={(e) => tryCall(() => session.renameColumn(table.id, col.id, e.target.value))}
+            onKeyDown={blurOnEnter}
           />
         </label>
       ) : (
         <p>{period ? `Period ${columnId}` : "Key"}</p>
       )}
       {columnId !== KEY_COLUMN_ID ? (
-        <label>
-          Number format
-          <input
-            defaultValue={format}
-            placeholder="#,##0.00"
-            onBlur={(e) => tryCall(() => session.setColumnFormat(table.id, columnId, e.target.value))}
-          />
-        </label>
+        <NumberFormatField values={[format]} onCommit={(value) => session.setColumnFormat(table.id, columnId, value)} />
       ) : null}
     </section>
   );

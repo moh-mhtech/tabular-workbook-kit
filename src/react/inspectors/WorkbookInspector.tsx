@@ -1,3 +1,4 @@
+import { blurOnEnter } from "../blurOnEnter.js";
 import { useWorkbook, useSnapshot } from "../WorkbookProvider.js";
 
 function tryCall(fn: () => void) {
@@ -19,6 +20,7 @@ export function WorkbookInspector({ label }: { label: string }) {
         <input
           defaultValue={snapshot.name}
           onBlur={(e) => tryCall(() => session.renameWorkbook(e.target.value))}
+          onKeyDown={blurOnEnter}
         />
       </label>
       <label>
@@ -28,6 +30,7 @@ export function WorkbookInspector({ label }: { label: string }) {
           onBlur={(e) =>
             tryCall(() => session.setCalendar({ ...snapshot.calendar, startMonth: e.target.value }))
           }
+          onKeyDown={blurOnEnter}
         />
       </label>
       <label>
@@ -43,6 +46,7 @@ export function WorkbookInspector({ label }: { label: string }) {
               }),
             )
           }
+          onKeyDown={blurOnEnter}
         />
       </label>
     </section>

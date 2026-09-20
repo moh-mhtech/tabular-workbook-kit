@@ -1,3 +1,4 @@
+import { blurOnEnter } from "../blurOnEnter.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
 
 function tryCall(fn: () => void) {
@@ -19,7 +20,11 @@ export function RowInspector({ tableId, rowId }: { tableId: string; rowId: strin
       <h3>Row</h3>
       <label>
         Key
-        <input defaultValue={row.key} onBlur={(e) => tryCall(() => session.renameRow(table.id, row.id, e.target.value))} />
+        <input
+          defaultValue={row.key}
+          onBlur={(e) => tryCall(() => session.renameRow(table.id, row.id, e.target.value))}
+          onKeyDown={blurOnEnter}
+        />
       </label>
       <button type="button" onClick={() => tryCall(() => session.deleteRow(table.id, row.id))}>
         Delete row

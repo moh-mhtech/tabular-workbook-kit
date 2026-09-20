@@ -6,7 +6,7 @@ import {
   type HitTestResult,
   type SheetView,
 } from "../model/sheetView.js";
-import type { Selection } from "../model/types.js";
+import { overlayKey, type CellRef, type Selection } from "../model/types.js";
 
 export interface SheetGridColumn {
   id: string;
@@ -133,5 +133,25 @@ export function selectionForProjectedCell(
   }
   if (hit.kind === "key") return { kind: "row", tableId: hit.tableId, rowId: hit.rowId };
   return { kind: "column", tableId: hit.tableId, columnId: hit.columnId };
+}
+
+export function cellsInProjectedRange(
+  projection: SheetGridProjection,
+  layout: WorkbookLayout,
+  range: { x: number; y: number; width: number; height: number },
+): CellRef[] {
+  const cells: CellRef[] = [];
+  const seen = new Set<string>();
+  for (let row = range.y; row < range.y + range.height; row++) {
+    for (let col = range.x; col < range.x + range.width; col++) {
+      const selection = selectionForProjectedCell(projection, layout, col, row);
+      if (selection.kind !== "cell") continue;
+      const key = overlayKey(selection.tableId, selection.rowId, selection.columnId);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      cells.push({ tableId: selection.tableId, rowId: selection.rowId, columnId: selection.columnId });
+    }
+  }
+  return cells;
 }
 

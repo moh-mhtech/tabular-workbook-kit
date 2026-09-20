@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
 import {
+  cellsInProjectedRange,
   projectSheet,
   projectTable,
   projectedCell,
@@ -67,6 +68,16 @@ describe("sheet grid projection", () => {
       kind: "table",
       tableId: "tbl-params",
     });
+  });
+
+  it("collects data cells in a projected range in row-major order", () => {
+    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const projection = projectTable(layout, "tbl-params")!;
+    expect(cellsInProjectedRange(projection, layout, { x: 1, y: 1, width: 1, height: 3 })).toEqual([
+      { tableId: "tbl-params", rowId: "row-aarsalg", columnId: "Value" },
+      { tableId: "tbl-params", rowId: "row-vaekst", columnId: "Value" },
+      { tableId: "tbl-params", rowId: "row-vat", columnId: "Value" },
+    ]);
   });
 
   it("uses table column names as identifiers instead of ABC defaults", () => {

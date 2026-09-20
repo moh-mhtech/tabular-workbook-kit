@@ -1,3 +1,4 @@
+import { blurOnEnter } from "../blurOnEnter.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
 
 function tryCall(fn: () => void) {
@@ -18,7 +19,11 @@ export function TableInspector({ tableId }: { tableId: string }) {
       <h3>Table</h3>
       <label>
         Name
-        <input defaultValue={table.name} onBlur={(e) => tryCall(() => session.renameTable(table.id, e.target.value))} />
+        <input
+          defaultValue={table.name}
+          onBlur={(e) => tryCall(() => session.renameTable(table.id, e.target.value))}
+          onKeyDown={blurOnEnter}
+        />
       </label>
       {table.promoteRowKeys ? (
         <p className="wk-muted">Row keys are workbook names. Single data column.</p>

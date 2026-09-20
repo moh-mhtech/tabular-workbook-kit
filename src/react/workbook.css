@@ -3,7 +3,8 @@
   color: #1e3a5f;
   padding: 12px 8px;
   border-right: 1px solid #d7dee8;
-  min-width: 180px;
+  min-width: 0;
+  overflow: auto;
   background: #f4f7fa;
 }
 
@@ -321,14 +322,55 @@
 
 .wk-shell {
   display: grid;
-  grid-template-columns: 200px 1fr 260px;
+  grid-template-columns: var(--wk-explorer-width, 200px) 6px 1fr 6px var(--wk-properties-width, 260px);
   grid-template-rows: auto 1fr;
   height: 100vh;
   min-height: 0;
 }
 
 .wk-shell > * {
+  min-width: 0;
   min-height: 0;
+}
+
+.wk-col-resizer {
+  position: relative;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+}
+
+.wk-col-resizer::before {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+}
+
+.wk-col-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 2px;
+  background: transparent;
+}
+
+.wk-col-resizer:hover::after,
+.wk-col-resizer:focus-visible::after,
+.wk-col-resizer.is-active::after {
+  background: #2a6f97;
+}
+
+.wk-col-resizer:focus-visible {
+  outline: none;
+}
+
+.wk-shell.is-resizing,
+.wk-shell.is-resizing * {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .wk-shell-top {
@@ -364,6 +406,84 @@
   flex-direction: column;
   gap: 4px;
   margin: 8px 0;
+}
+
+.wk-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wk-help {
+  position: relative;
+  display: inline-flex;
+}
+
+.wk-help-icon {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid #2a6f97;
+  border-radius: 50%;
+  background: #fff;
+  color: #2a6f97;
+  font: 650 11px/14px "Segoe UI", sans-serif;
+  cursor: help;
+}
+
+.wk-help-pop {
+  position: fixed;
+  z-index: 30;
+  width: 360px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #c5d0dc;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(30, 58, 95, 0.12);
+  color: #1e3a5f;
+  font: 12px/1.4 "Segoe UI", sans-serif;
+}
+
+.wk-help-pop::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
+
+.wk-help-pop-title {
+  margin: 0 0 6px;
+  font-weight: 650;
+}
+
+.wk-help-pop ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wk-help-pop li {
+  display: grid;
+  grid-template-columns: 5.6rem 5.4rem 1fr;
+  align-items: baseline;
+  gap: 0 8px;
+  padding: 3px 0;
+  border-top: 1px solid #eef2f6;
+}
+
+.wk-help-pop code {
+  font: 12px/1.4 ui-monospace, Consolas, monospace;
+  color: #1c4e89;
+}
+
+.wk-help-pop em {
+  color: #7a8a99;
+  font-style: normal;
+  font-size: 11px;
 }
 
 .wk-properties input[type="text"],

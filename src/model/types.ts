@@ -1,0 +1,134 @@
+export const KEY_COLUMN_ID = "__key__";
+
+export type TimeGrain = "month" | "quarter" | "year";
+
+export type CellKind = "input" | "formula";
+
+export type Primitive = number | string | boolean | null;
+
+export interface CalendarSnapshot {
+  startMonth: string;
+  monthCount: number;
+}
+
+export interface ColumnSnapshot {
+  id: string;
+  name: string;
+  format?: string;
+}
+
+export interface CellSnapshot {
+  kind: CellKind;
+  value?: Primitive;
+  formula?: string;
+  format?: string;
+}
+
+export interface RowSnapshot {
+  id: string;
+  key: string;
+  cells: Record<string, CellSnapshot>;
+}
+
+export interface TableSnapshot {
+  id: string;
+  name: string;
+  attributeColumns: ColumnSnapshot[];
+  timeAxis: boolean;
+  rows: RowSnapshot[];
+  locked?: boolean;
+  /** Row keys of the single data column become workbook defined names. */
+  promoteRowKeys?: boolean;
+  /** Number formats for period (or other non-attribute) columns. */
+  columnFormats?: Record<string, string>;
+}
+
+export interface SheetSnapshot {
+  id: string;
+  name: string;
+  tableIds: string[];
+  locked?: boolean;
+  /** Values typed on the grid outside every table band, keyed by `looseCellKey`. */
+  looseCells?: Record<string, CellSnapshot>;
+}
+
+export interface ScenarioSnapshot {
+  id: string;
+  name: string;
+  overlays: Record<string, Primitive>;
+}
+
+export interface WorkbookSnapshot {
+  id: string;
+  name: string;
+  calendar: CalendarSnapshot;
+  sheets: SheetSnapshot[];
+  tables: TableSnapshot[];
+  scenarios: ScenarioSnapshot[];
+  activeScenarioId: string | null;
+}
+
+export interface EvaluatedCell {
+  kind: CellKind;
+  formula?: string;
+  input: Primitive;
+  overlay: boolean;
+  computed: Primitive;
+  error?: string;
+}
+
+export interface EvaluatedColumn {
+  id: string;
+  name: string;
+  kind: "key" | "attribute" | "period" | "quarter" | "year";
+  periodIds: string[];
+}
+
+export interface EvaluatedRow {
+  id: string;
+  key: string;
+  cells: Record<string, EvaluatedCell>;
+}
+
+export interface EvaluatedTable {
+  id: string;
+  name: string;
+  timeAxis: boolean;
+  timeGrain: TimeGrain;
+  columns: EvaluatedColumn[];
+  rows: EvaluatedRow[];
+}
+
+export type Selection =
+  | { kind: "workbook" }
+  | { kind: "sheet"; sheetId: string }
+  | { kind: "table"; tableId: string }
+  | { kind: "column"; tableId: string; columnId: string }
+  | { kind: "row"; tableId: string; rowId: string }
+  | { kind: "cell"; tableId: string; rowId: string; columnId: string };
+
+export function overlayKey(tableId: string, rowId: string, columnId: string): string {
+  return `${tableId}\u001f${rowId}\u001f${columnId}`;
+}
+
+export function looseCellKey(row: number, col: number): string {
+  return `${row}:${col}`;
+}
+
+export function parseLooseCellKey(key: string): { row: number; col: number } {
+  const [row, col] = key.split(":");
+  return { row: Number(row), col: Number(col) };
+}
+
+/** An empty loose cell is deleted, so presence alone does not prove the grid is occupied. */
+export function hasContent(cell: CellSnapshot | undefined): boolean {
+  if (!cell) return false;
+  if (cell.kind === "formula") return Boolean(cell.formula);
+  return cell.value !== null && cell.value !== undefined && cell.value !== "";
+}
+
+export function isCellSelection(
+  selection: Selection | null,
+): selection is Extract<Selection, { kind: "cell" }> {
+  return selection?.kind === "cell";
+}

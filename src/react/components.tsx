@@ -1,0 +1,135 @@
+import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
+import { SheetCanvas } from "./SheetCanvas.js";
+import "./workbook.css";
+
+export { SheetCanvas } from "./SheetCanvas.js";
+export { PropertiesPanel } from "./PropertiesPanel.js";
+
+function tryCall(fn: () => void) {
+  try {
+    fn();
+  } catch (err) {
+    window.alert(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export function Explorer({ workbookLabel = "Workbook" }: { workbookLabel?: string }) {
+  const { session, activeSheetId, setActiveSheetId } = useWorkbook();
+  const snapshot = useSnapshot();
+
+  return (
+    <nav className="wk-explorer" aria-label="Sheets">
+      <button type="button" className="wk-explorer-group-btn" onClick={() => session.setSelection({ kind: "workbook" })}>
+        {workbookLabel}
+      </button>
+      {snapshot.sheets.map((sheet) => (
+        <div key={sheet.id} className="wk-explorer-group">
+          <button
+            type="button"
+            className={sheet.id === activeSheetId ? "wk-explorer-group-btn is-active" : "wk-explorer-group-btn"}
+            onClick={() => {
+              setActiveSheetId(sheet.id);
+              session.setSelection({ kind: "sheet", sheetId: sheet.id });
+            }}
+          >
+            {sheet.name}
+          </button>
+          <ul className="wk-explorer-tables">
+            {sheet.tableIds.map((tableId) => {
+              const table = snapshot.tables.find((t) => t.id === tableId);
+              if (!table) return null;
+              return (
+                <li key={table.id}>
+                  <button
+                    type="button"
+                    className="wk-explorer-table"
+                    onClick={() => {
+                      setActiveSheetId(sheet.id);
+                      session.setSelection({ kind: "table", tableId: table.id });
+                    }}
+                  >
+                    {table.name}
+                  </button>
+                </li>
+              );
+            })}
+            <li>
+              <button
+                type="button"
+                className="wk-explorer-table wk-explorer-new"
+                aria-label="New table"
+                onClick={() => tryCall(() => session.addTable(sheet.id))}
+              >
+                <span className="wk-explorer-new-glyph" aria-hidden="true">
+                  +
+                </span>
+                New table
+              </button>
+            </li>
+          </ul>
+        </div>
+      ))}
+      <div className="wk-explorer-group">
+        <button
+          type="button"
+          className="wk-explorer-group-btn wk-explorer-new"
+          aria-label="New sheet"
+          onClick={() => tryCall(() => session.addSheet())}
+        >
+          <span className="wk-explorer-new-glyph" aria-hidden="true">
+            +
+          </span>
+          New sheet
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+export function ScenarioBar() {
+  const { session } = useWorkbook();
+  const snapshot = useSnapshot();
+
+  return (
+    <div className="wk-scenario-bar">
+      <span className="wk-label">Scenario</span>
+      <select
+        value={snapshot.activeScenarioId ?? ""}
+        onChange={(e) => session.activateScenario(e.target.value || null)}
+      >
+        <option value="">Base</option>
+        {snapshot.scenarios.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+export function FormulaBar() {
+  return null;
+}
+
+export function TimeGrainSwitch() {
+  const { timeGrain, setTimeGrain } = useWorkbook();
+  return (
+    <div className="wk-grain">
+      {(["month", "quarter", "year"] as const).map((g) => (
+        <button
+          key={g}
+          type="button"
+          className={timeGrain === g ? "is-active" : ""}
+          onClick={() => setTimeGrain(g)}
+        >
+          {g === "month" ? "Måned" : g === "quarter" ? "Kvartal" : "År"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function GroupCanvas() {
+  return <SheetCanvas />;
+}

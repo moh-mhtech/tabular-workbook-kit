@@ -259,17 +259,41 @@ function FormulaDraft({
     area.style.height = `${area.scrollHeight}px`;
   }, [draft]);
 
+  const pendingCaretRef = useRef<{ start: number; end: number }>({
+    start: committed.length,
+    end: committed.length,
+  });
+  const applyingCaretRef = useRef(false);
+
+  useLayoutEffect(() => {
+    const area = areaRef.current;
+    if (!area) return;
+    const edit = session.formulaEdit;
+    if (edit?.mode === "edit") return;
+    const start = edit?.selectionStart ?? pendingCaretRef.current.start;
+    const end = edit?.selectionEnd ?? start;
+    applyingCaretRef.current = true;
+    area.setSelectionRange(start, end);
+    pendingCaretRef.current = { start, end };
+    applyingCaretRef.current = false;
+  });
+
   const applyDraft = (next: string, nextCaret: number) => {
+    pendingCaretRef.current = { start: nextCaret, end: nextCaret };
     setDraft(next);
     onChange(next);
-    requestAnimationFrame(() => {
-      const area = areaRef.current;
-      if (area) area.setSelectionRange(nextCaret, nextCaret);
-    });
+  };
+
+  const placeCaretInFormulaText = (event: { target: EventTarget | null }) => {
+    if (event.target instanceof Element && event.target.closest(".wk-formula-suggest")) return;
+    setSuggestOpen(false);
+    if (session.formulaEdit) session.setFormulaEditMode("edit");
+    const area = areaRef.current;
+    if (area && event.target !== area) area.focus();
   };
 
   return (
-    <div className="wk-formula-bar">
+    <div className="wk-formula-bar click-outside-ignore" onPointerDown={placeCaretInFormulaText}>
       <OutlinedField label="Value" endLabel={evaluated || undefined}>
         <textarea
           ref={areaRef}
@@ -280,29 +304,38 @@ function FormulaDraft({
           value={draft}
           onFocus={() => {
             if (draft === "*") setDraft(firstValue);
-            if (session.formulaEdit) session.setFormulaEditMode(session.formulaEdit.mode === "point" ? "point" : "edit");
           }}
           onChange={(e) => {
+            const start = e.target.selectionStart ?? e.target.value.length;
+            const end = e.target.selectionEnd ?? start;
+            pendingCaretRef.current = { start, end };
             setDraft(e.target.value);
             setSuggestOpen(true);
             setActiveSuggest(0);
             onChange(e.target.value);
+            if (session.formulaEdit) session.syncFormulaEditCursor(e.target.value, start, end);
           }}
           onSelect={(e) => {
             const area = e.currentTarget;
-            if (session.formulaEdit) {
-              session.syncFormulaEditCursor(area.value, area.selectionStart ?? 0, area.selectionEnd ?? 0);
-            }
+            if (applyingCaretRef.current) return;
+            if (session.formulaEdit && area.value !== session.formulaEdit.draft) return;
+            const start = area.selectionStart ?? 0;
+            const end = area.selectionEnd ?? start;
+            pendingCaretRef.current = { start, end };
+            if (session.formulaEdit) session.syncFormulaEditCursor(area.value, start, end);
           }}
           onBlur={() => {
             window.setTimeout(() => {
               if (!session.formulaEdit) return;
               if (session.formulaEdit.mode === "point") return;
+              const active = document.activeElement;
+              if (active instanceof Element && active.closest(".wk-overlay-editor, .wk-formula-bar, #portal")) return;
               onCommit(session.formulaEdit.draft);
             }, 0);
           }}
           onKeyDown={(e) => {
-            const action = formulaKeyAction(mode, e, {
+            const liveMode = session.formulaEdit?.mode ?? mode;
+            const action = formulaKeyAction(liveMode, e, {
               suggestVisible: suggestions.length > 0,
               isFormula: canPointFromDraft(draft),
             });
@@ -334,7 +367,7 @@ function FormulaDraft({
             }
             if (action === "toggle-mode" || action === "toggle-text") {
               e.preventDefault();
-              session.setFormulaEditMode(toggleOverlayNavMode(mode));
+              session.setFormulaEditMode(toggleOverlayNavMode(liveMode));
               return;
             }
             if (action === "formula-operator") {

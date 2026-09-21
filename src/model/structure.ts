@@ -1,6 +1,11 @@
 import type { CellSnapshot, TableSnapshot, WorkbookSnapshot } from "../model/types.js";
 
-export const TABLE_NAME_PATTERN = /^[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*$/;
+/** Identifier start: Unicode letter or underscore. */
+export const IDENT_START = String.raw`\p{L}_`;
+/** Identifier continue: letters, combining marks, digits, underscore. */
+export const IDENT_CONT = String.raw`\p{L}\p{N}\p{M}_`;
+export const IDENTIFIER = `[${IDENT_START}][${IDENT_CONT}]*`;
+export const TABLE_NAME_PATTERN = new RegExp(`^${IDENTIFIER}$`, "u");
 
 export function uid(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;

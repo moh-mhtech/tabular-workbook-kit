@@ -1,6 +1,7 @@
 import { MixedTextInput } from "../MixedTextInput.js";
 import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
+import { invalidRowKey } from "../../model/names.js";
 
 function tryCall(fn: () => void) {
   try {
@@ -21,6 +22,7 @@ export function RowInspector({ tableId, rowId }: { tableId: string; rowId: strin
       <OutlinedField label="Key">
         <MixedTextInput
           values={[row.key]}
+          validate={(value) => invalidRowKey(snapshot, table.id, row.id, value)}
           onCommit={(value) => tryCall(() => session.renameRow(table.id, row.id, value))}
         />
       </OutlinedField>

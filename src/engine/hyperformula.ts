@@ -139,7 +139,7 @@ function compileForHyperFormula(
   for (const item of buildNamedExpressions(layout)) {
     if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(item.name)) continue;
     const escaped = item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const token = new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "gu");
+    const token = new RegExp(`(^|[^\\p{L}\\p{N}\\p{M}_])${escaped}(?![\\p{L}\\p{N}\\p{M}_])`, "gu");
     compiled = transformOutsideStrings(compiled, (part) =>
       part.replace(token, (_match, prefix: string) => `${prefix}${item.expression.slice(1)}`),
     );

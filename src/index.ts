@@ -35,6 +35,7 @@ export {
   canPromoteRowKeys,
   canRegisterDefinedName,
   getCellName,
+  invalidGlobalName,
   promotedNames,
 } from "./model/names.js";
 export { hitTest, layoutSheets, planExpansion } from "./model/sheetView.js";

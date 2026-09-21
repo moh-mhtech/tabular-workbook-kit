@@ -4,10 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import { projectTable, selectionForProjectedCell } from "../grid/sheetProjection.js";
 import { layoutWorkbook } from "../model/layout.js";
-import type { WorkbookSnapshot } from "../model/types.js";
+import { selectedCellRefs, type WorkbookSnapshot } from "../model/types.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 import { WorkbookProvider } from "./WorkbookProvider.js";
+import { pressTableKey, renderPlaygroundCanvas, selectProjectedCell } from "./playgroundCanvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -345,5 +346,172 @@ describe("ctrl arrow navigation UI", () => {
     await selectCell(session, "tbl-b", 1, 0);
     await pressCtrlArrow("tbl-b", "ArrowUp");
     focus.expectAt("tbl-a", 1, 3);
+  });
+});
+
+function mockNarrowSheetViewport() {
+  const canvas = document.querySelector(".wk-canvas") as HTMLElement;
+  const sheet = document.querySelector('[data-table-id="tbl-a"] .wk-table-spreadsheet') as HTMLElement;
+  expect(canvas).toBeTruthy();
+  expect(sheet).toBeTruthy();
+  canvas.style.padding = "16px";
+  Object.defineProperty(canvas, "clientWidth", { configurable: true, value: 200 });
+  Object.defineProperty(canvas, "clientHeight", { configurable: true, value: 400 });
+  Object.defineProperty(canvas, "scrollWidth", { configurable: true, value: 2000 });
+  Object.defineProperty(canvas, "scrollLeft", { configurable: true, writable: true, value: 0 });
+  Object.defineProperty(canvas, "scrollTop", { configurable: true, writable: true, value: 0 });
+  const box = (left: number, top: number, width: number, height: number) =>
+    ({
+      x: left,
+      y: top,
+      top,
+      left,
+      width,
+      height,
+      right: left + width,
+      bottom: top + height,
+      toJSON() {
+        return {};
+      },
+    }) as DOMRect;
+  canvas.getBoundingClientRect = () => box(0, 0, 200, 400);
+  sheet.getBoundingClientRect = () => box(0, 16, 800, 200);
+  for (const card of canvas.querySelectorAll<HTMLElement>("[data-table-id]")) {
+    Object.defineProperty(card, "offsetHeight", { configurable: true, value: 200 });
+    card.getBoundingClientRect = sheet.getBoundingClientRect;
+  }
+  return canvas;
+}
+
+describe("shift ctrl arrow cell range", () => {
+  it("extends the Cell range to the next Phase change", async () => {
+    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    await selectProjectedCell(session, "tbl-a", 1, 1);
+    await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
+    expect(session.selection).toMatchObject({
+      kind: "cell",
+      tableId: "tbl-a",
+      rowId: "ra1",
+      columnId: "ca",
+    });
+    expect(selectedCellRefs(session.selection)).toEqual([
+      { tableId: "tbl-a", rowId: "ra1", columnId: "ca" },
+      { tableId: "tbl-a", rowId: "ra1", columnId: "cb" },
+    ]);
+  });
+
+  it("does not select Growth cells", async () => {
+    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    await selectProjectedCell(session, "tbl-a", 1, 3);
+    await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
+    expect(session.selection).toMatchObject({
+      kind: "cell",
+      tableId: "tbl-a",
+      rowId: "ra3",
+      columnId: "ca",
+    });
+    expect(selectedCellRefs(session.selection)).toEqual([
+      { tableId: "tbl-a", rowId: "ra3", columnId: "ca" },
+      { tableId: "tbl-a", rowId: "ra3", columnId: "cb" },
+      { tableId: "tbl-a", rowId: "ra3", columnId: "cc" },
+      { tableId: "tbl-a", rowId: "ra3", columnId: "cd" },
+      { tableId: "tbl-a", rowId: "ra3", columnId: "ce" },
+    ]);
+  });
+
+  it("does not cross into another Table", async () => {
+    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    await selectProjectedCell(session, "tbl-a", 1, 2);
+    await pressTableKey("tbl-a", "ArrowDown", { ctrlKey: true, shiftKey: true });
+    expect(session.selection).toMatchObject({
+      kind: "cell",
+      tableId: "tbl-a",
+      rowId: "ra2",
+      columnId: "ca",
+    });
+    expect(selectedCellRefs(session.selection)).toEqual([
+      { tableId: "tbl-a", rowId: "ra2", columnId: "ca" },
+    ]);
+  });
+
+  it("keeps the Cell range origin while jumping to the next Phase change", async () => {
+    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    await selectProjectedCell(session, "tbl-a", 1, 1);
+    await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
+    await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
+    expect(session.selection).toMatchObject({
+      kind: "cell",
+      tableId: "tbl-a",
+      rowId: "ra1",
+      columnId: "ca",
+    });
+    expect(selectedCellRefs(session.selection)).toEqual([
+      { tableId: "tbl-a", rowId: "ra1", columnId: "ca" },
+      { tableId: "tbl-a", rowId: "ra1", columnId: "cb" },
+      { tableId: "tbl-a", rowId: "ra1", columnId: "cc" },
+      { tableId: "tbl-a", rowId: "ra1", columnId: "cd" },
+    ]);
+  });
+
+  it("Shift+Arrow extends the Cell range by one cell after Shift+Ctrl+arrow", async () => {
+    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    await selectProjectedCell(session, "tbl-a", 1, 1);
+    await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
+    await pressTableKey("tbl-a", "ArrowRight", { shiftKey: true });
+    expect(session.selection).toMatchObject({
+      kind: "cell",
+      tableId: "tbl-a",
+      rowId: "ra1",
+      columnId: "ca",
+    });
+    expect(selectedCellRefs(session.selection)).toEqual([
+      { tableId: "tbl-a", rowId: "ra1", columnId: "ca" },
+      { tableId: "tbl-a", rowId: "ra1", columnId: "cb" },
+      { tableId: "tbl-a", rowId: "ra1", columnId: "cc" },
+    ]);
+  });
+
+  it("Shift+Arrow extends a Cell range by one cell", async () => {
+    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    await selectProjectedCell(session, "tbl-a", 1, 1);
+    await pressTableKey("tbl-a", "ArrowDown", { shiftKey: true });
+    expect(selectedCellRefs(session.selection)).toEqual([
+      { tableId: "tbl-a", rowId: "ra1", columnId: "ca" },
+      { tableId: "tbl-a", rowId: "ra2", columnId: "ca" },
+    ]);
+  });
+
+  it("does not select Growth cells with Shift+Arrow", async () => {
+    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    await selectProjectedCell(session, "tbl-a", 5, 1);
+    await pressTableKey("tbl-a", "ArrowRight", { shiftKey: true });
+    await pressTableKey("tbl-a", "ArrowLeft", { shiftKey: true });
+    expect(selectedCellRefs(session.selection)).toEqual([
+      { tableId: "tbl-a", rowId: "ra1", columnId: "cd" },
+      { tableId: "tbl-a", rowId: "ra1", columnId: "ce" },
+    ]);
+  });
+
+  it("scrolls the viewport to the moving Cell of a Shift+Ctrl+arrow range", async () => {
+    const snapshot = filledWorkbook();
+    snapshot.sheets[0]!.horizontalScroll = "sheet";
+    const { session } = await renderPlaygroundCanvas({ snapshot });
+    await selectProjectedCell(session, "tbl-a", 1, 3);
+    const canvas = mockNarrowSheetViewport();
+    await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
+    // CE is column 5; columns floor at 48px, so 240–288. Viewport 200 with 16px insets → 104.
+    expect(canvas.scrollLeft).toBe(104);
+  });
+
+  it("scrolls the viewport to the landing Cell of Ctrl+arrow", async () => {
+    const snapshot = filledWorkbook();
+    snapshot.sheets[0]!.horizontalScroll = "sheet";
+    const { session } = await renderPlaygroundCanvas({ snapshot });
+    await selectProjectedCell(session, "tbl-a", 1, 1);
+    const canvas = mockNarrowSheetViewport();
+    await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true });
+    await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true });
+    // CD is column 4; 192–240. Viewport 200 with 16px insets → 56.
+    expect(canvas.scrollLeft).toBe(56);
   });
 });

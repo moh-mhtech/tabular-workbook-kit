@@ -414,4 +414,23 @@ describe("ctrl arrow navigation", () => {
       row: 1,
     });
   });
+
+  it("when confined to data, does not land on Growth or enter another Table", () => {
+    const { layout, tables } = blockTables();
+    expect(
+      ctrlArrowNavTarget(tables, { tableId: "tbl-a", col: 5, row: 1 }, "right", layout, new Map(), {
+        confineToData: true,
+      }),
+    ).toBeUndefined();
+    expect(
+      ctrlArrowNavTarget(tables, { tableId: "tbl-a", col: 1, row: 3 }, "right", layout, new Map(), {
+        confineToData: true,
+      }),
+    ).toEqual({ tableId: "tbl-a", col: 5, row: 3 });
+    expect(
+      ctrlArrowNavTarget(tables, { tableId: "tbl-a", col: 1, row: 2 }, "down", layout, new Map(), {
+        confineToData: true,
+      }),
+    ).toBeUndefined();
+  });
 });

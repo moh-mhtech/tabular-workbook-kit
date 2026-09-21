@@ -2,6 +2,7 @@ import { MixedTextInput } from "../MixedTextInput.js";
 import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
 import { hasTimeColumns } from "../../model/yearColumns.js";
+import { invalidTableName } from "../../model/names.js";
 
 function tryCall(fn: () => void) {
   try {
@@ -21,6 +22,7 @@ export function TableInspector({ tableId }: { tableId: string }) {
       <OutlinedField label="Name">
         <MixedTextInput
           values={[table.name]}
+          validate={(value) => invalidTableName(snapshot, value, table.id)}
           onCommit={(value) => tryCall(() => session.renameTable(table.id, value))}
         />
       </OutlinedField>

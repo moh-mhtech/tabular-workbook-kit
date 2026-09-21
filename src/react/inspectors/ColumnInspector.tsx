@@ -5,6 +5,7 @@ import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
 import { NumberFormatField } from "./NumberFormatField.js";
 import { StyleField } from "./StyleField.js";
+import { invalidColumnName } from "../../model/names.js";
 
 function tryCall(fn: () => void) {
   try {
@@ -29,6 +30,7 @@ export function ColumnInspector({ tableId, columnId }: { tableId: string; column
         <OutlinedField label="Name">
           <MixedTextInput
             values={[col.name]}
+            validate={(value) => invalidColumnName(snapshot, table.id, col.id, value)}
             onCommit={(value) => tryCall(() => session.renameColumn(table.id, col.id, value))}
           />
         </OutlinedField>

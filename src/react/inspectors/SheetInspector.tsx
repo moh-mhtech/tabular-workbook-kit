@@ -1,6 +1,7 @@
 import { MixedTextInput } from "../MixedTextInput.js";
 import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
+import { invalidGlobalName } from "../../model/names.js";
 
 function tryCall(fn: () => void) {
   try {
@@ -20,6 +21,7 @@ export function SheetInspector({ sheetId }: { sheetId: string }) {
       <OutlinedField label="Name">
         <MixedTextInput
           values={[sheet.name]}
+          validate={(value) => invalidGlobalName(snapshot, value, { sheetId: sheet.id })}
           onCommit={(value) => tryCall(() => session.renameSheet(sheet.id, value))}
         />
       </OutlinedField>

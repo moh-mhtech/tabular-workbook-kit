@@ -5,7 +5,8 @@ import {
   type SheetGridProjection,
 } from "../grid/sheetProjection.js";
 import type { WorkbookLayout } from "../model/layout.js";
-import { canRegisterDefinedName, getCellName } from "../model/names.js";
+import { getCellName } from "../model/names.js";
+import { IDENT_CONT, IDENTIFIER } from "../model/structure.js";
 import type { WorkbookSession } from "../session/WorkbookSession.js";
 
 export type FormulaEditMode = "enter" | "edit" | "point";
@@ -45,6 +46,13 @@ export function isFormulaOperatorKey(key: string): boolean {
 
 export function toggleOverlayNavMode(mode: OverlayNavMode): OverlayNavMode {
   return mode === "edit" ? "enter" : "edit";
+}
+
+export type OverlayActivation = "double-click" | "f2" | "type" | "enter-key";
+
+/** Excel: double-click and F2 start Edit (arrows move the Caret); typing or Enter starts Enter. */
+export function overlayModeForActivation(activation: OverlayActivation): OverlayNavMode {
+  return activation === "double-click" || activation === "f2" ? "edit" : "enter";
 }
 
 export function commitKeyMovement(event: {
@@ -93,7 +101,7 @@ export function formulaKeyAction(
     if (!opts.isFormula && mode === "enter" && !event.shiftKey) return "commit-move";
     return "caret";
   }
-  if (isFormulaOperatorKey(event.key) && !modified) return "formula-operator";
+  if (isFormulaOperatorKey(event.key) && !modified && mode === "point") return "formula-operator";
   if (commitKeyMovement(event)) return "commit-move";
   return "caret";
 }
@@ -123,9 +131,8 @@ export function canPointClick(mode: FormulaEditMode | undefined, draft: string, 
   return isValidInsertPoint(draft, caret);
 }
 
-const ATOM_REF =
-  "(?:(?:[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\\.)?[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*(?![A-Za-z0-9ÆØÅæøå_]|\\s*\\())";
-const FORMULA_REF = new RegExp(`(?:${ATOM_REF})(?::(?:${ATOM_REF}))?`, "g");
+const ATOM_REF = `(?:(?:${IDENTIFIER}\\.)?${IDENTIFIER}\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|${IDENTIFIER}(?![${IDENT_CONT}]|\\s*\\())`;
+const FORMULA_REF = new RegExp(`(?:${ATOM_REF})(?::(?:${ATOM_REF}))?`, "gu");
 
 export function formulaRefSpans(draft: string): PointedRefSpan[] {
   FORMULA_REF.lastIndex = 0;
@@ -202,6 +209,18 @@ export function isSpreadsheetPointEvent(event: { target: EventTarget | null }): 
   return typeof node.closest === "function" && Boolean(node.closest(".wk-table-spreadsheet, #portal"));
 }
 
+export function isFormulaEditOutsideClick(
+  event: { target: EventTarget | null },
+  session: WorkbookSession,
+): boolean {
+  const node = event.target as { closest?: (selector: string) => unknown } | null;
+  if (typeof node?.closest === "function" && node.closest(".wk-formula-bar, .wk-overlay-editor-host, .wk-overlay-editor, .wk-formula-suggest")) {
+    return false;
+  }
+  if (!isSpreadsheetPointEvent(event)) return true;
+  return !shouldPointGridClick(session);
+}
+
 export function formulaRefForProjectedCell(
   projection: SheetGridProjection,
   layout: WorkbookLayout,
@@ -211,7 +230,7 @@ export function formulaRefForProjectedCell(
   const cell = projectedCell(projection, layout, col, row);
   if (cell.kind !== "table" || cell.hit.kind !== "cell") return undefined;
   const named = getCellName(layout, cell.hit.tableId, cell.hit.rowId, cell.hit.columnId);
-  return named.defined && canRegisterDefinedName(named.defined) ? named.defined : named.structured;
+  return named.defined ?? named.structured;
 }
 
 export function nextPointableCell(
@@ -326,4 +345,55 @@ export function shouldPointGridClick(session: WorkbookSession): boolean {
   if (!edit) return false;
   const caret = edit.selectionEnd ?? edit.selectionStart ?? edit.draft.length;
   return canPointClick(edit.mode, edit.draft, caret);
+}
+
+export function applyGridPointerToFormulaEdit(
+  session: WorkbookSession,
+  projection: SheetGridProjection,
+  layout: WorkbookLayout,
+  col: number,
+  row: number,
+  options?: { extend?: boolean },
+): "point" | "commit" | "ignore" {
+  const edit = session.formulaEdit;
+  if (!edit || !projection.tableId) return "ignore";
+  if (edit.editCell && edit.editCell.tableId === projection.tableId && edit.editCell.col === col && edit.editCell.row === row) {
+    if (!shouldPointGridClick(session)) return "ignore";
+  }
+  if (shouldPointGridClick(session)) {
+    return pointAtProjectedCell(session, projection, layout, col, row, options) ? "point" : "ignore";
+  }
+  if (options?.extend) return "ignore";
+  if (commitLiteralEditAndSelect(session, projection, layout, col, row)) return "commit";
+  session.commitFormulaEdit();
+  if (!acceptTableGridSelection(projection, [col, row])) return "commit";
+  session.setGridFocus({ tableId: projection.tableId, col, row });
+  session.setSelection(selectionForProjectedCell(projection, layout, col, row));
+  return "commit";
+}
+
+export function gridLocationFromPointer(
+  host: HTMLElement,
+  clientX: number,
+  clientY: number,
+  columnWidths: number[],
+  rowHeights: number[],
+): readonly [number, number] | null {
+  const rect = host.getBoundingClientRect();
+  let x = clientX - rect.left;
+  let y = clientY - rect.top;
+  if (x < 0 || y < 0) return null;
+  let col = 0;
+  for (; col < columnWidths.length; col++) {
+    x -= columnWidths[col]!;
+    if (x < 0) break;
+  }
+  if (col >= columnWidths.length) return null;
+  let row = 0;
+  for (; row < rowHeights.length; row++) {
+    y -= rowHeights[row]!;
+    if (y < 0) break;
+  }
+  if (row >= rowHeights.length) return null;
+  return [col, row];
 }

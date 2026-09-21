@@ -2,6 +2,7 @@ import {
   applyPointedRef,
   activeFormulaRefKey,
   cursorFormulaRef,
+  isValidInsertPoint,
   pointingReplaceSpan,
   type FormulaEditMode,
 } from "../react/customGridOverlay.js";
@@ -552,6 +553,7 @@ export class WorkbookSession {
     const key = activeFormulaRefKey(span, text);
     const keyChanged = key !== this.formulaEdit.activeFormulaRefKey;
     const draftChanged = text !== this.formulaEdit.draft;
+    const inserting = keyChanged && !span && isValidInsertPoint(text, selectionStart);
     if (
       !draftChanged &&
       !keyChanged &&
@@ -570,7 +572,8 @@ export class WorkbookSession {
       selectionStart,
       selectionEnd,
       activeFormulaRefKey: key,
-      targetCell: keyChanged ? this.formulaEdit.editCell : this.formulaEdit.targetCell,
+      targetCell: inserting ? this.formulaEdit.editCell : this.formulaEdit.targetCell,
+      rangeAnchor: inserting ? undefined : this.formulaEdit.rangeAnchor,
     };
     if (draftChanged || keyChanged) {
       for (const listener of this.listeners) listener();
@@ -658,7 +661,6 @@ export class WorkbookSession {
     this.formulaEdit = {
       ...this.formulaEdit,
       mode,
-      rangeAnchor: mode === "enter" ? undefined : this.formulaEdit.rangeAnchor,
     };
     for (const listener of this.listeners) listener();
   }

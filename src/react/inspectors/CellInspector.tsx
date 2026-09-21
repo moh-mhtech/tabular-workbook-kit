@@ -1,4 +1,5 @@
 import { selectedCellRefs, type CellRef, type WorkbookSnapshot } from "../../model/types.js";
+import { invalidRowKey } from "../../model/names.js";
 import { MixedTextInput } from "../MixedTextInput.js";
 import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
@@ -90,6 +91,7 @@ export function CellNameField({
     <OutlinedField label="Name">
       <MixedTextInput
         values={[row.key]}
+        validate={(value) => invalidRowKey(snapshot, table.id, row.id, value)}
         onCommit={(value) => tryCall(() => session.renameRow(table.id, row.id, value))}
       />
     </OutlinedField>

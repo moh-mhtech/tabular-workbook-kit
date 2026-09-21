@@ -41,11 +41,11 @@ The identity of a row in a Table (Karol, Vat). If the user has not named it, the
 _Avoid_: Row number, A1 row
 
 **Key cell**:
-The leftmost cell of a data row, showing the Row key. Clicking it selects the row. Typing here renames the Row key. The Growth-row key is a Growth header, not a Key cell.
+The leftmost cell of a data row, showing the Row key. Clicking it selects the row. Typing here renames the Row key in the cell — not Formula edit. The Growth-row key is a Growth header, not a Key cell.
 _Avoid_: Index cell, row header (when you mean this)
 
 **Header cell**:
-The top cell of a data column, showing the column name. Clicking it selects the column. Typing here renames an Attribute column. Year-column headers are Period labels. The Growth-column header is a Growth header.
+The top cell of a data column, showing the column name. Clicking it selects the column. Typing here renames an Attribute column in the cell — not Formula edit. Year-column headers are Period labels. The Growth-column header is a Growth header.
 _Avoid_: Column letter, A1 header
 
 **Attribute column**:
@@ -57,7 +57,7 @@ A Table column that is one calendar year of Periods. Storage is always months. D
 _Avoid_: Time axis, table kind, date column, sheet months
 
 **Grain**:
-The display grouping of a Year column: month, quarter, or year.
+The display grouping of a Year column: month, quarter, or year. Storage is always months. Quarter and year views show a Grain total and write with Even-split.
 _Avoid_: Workbook grain, table kind, zoom
 
 **Key-value policy**:
@@ -107,34 +107,76 @@ The value at Table + row key + attribute column or Period. Canonical address is 
 _Avoid_: A1, range address (as identity)
 
 **Input**:
-A Cell whose value the user typed. Scenarios may overlay Inputs.
+A Cell whose Stored value the user typed. Scenarios may overlay Inputs. A typed number is stored as a number (comma or dot as decimal); other text stays text; `TRUE`/`FALSE` are booleans. An empty Input is Blank.
 _Avoid_: Hardcoded, constant, data cell
 
 **Formula**:
-A Cell computed from a structured expression. Authoring is column-first: `Sheet.Table[Column][Row]`, `Table[Column][Row]`, `[Column][Row]`. `@` is this column or row; `@±n` is an offset. Omitting `[Row]` means this row. A1 is not the authoring language.
+A Cell computed from a structured expression. Authoring is column-first: `Sheet.Table[Column][Row]`, `Table[Column][Row]`, `[Column][Row]`. `@` is this column or row; `@±n` is an offset. Omitting `[Row]` means this row. A1 is not the authoring language. The grid shows the Display value in blue unless Cell style sets a text color.
 _Avoid_: A1 (`=B12`), `Sheet!A1`, `[column, row]`
 
 **Overlay**:
-One Scenario replacement for a single Input.
+One Scenario replacement for a single Input. Formulas are never overlaid. The grid shows an overlaid Input with a yellow fill unless Cell style sets a fill color.
 _Avoid_: Patch, delta, what-if cell
 
+**Error**:
+A Formula whose evaluation failed. The grid shows the error token in red (`#DIV/0!`). Number format is not applied. An Error in any stored month makes that Grain total an Error.
+_Avoid_: Invalid, NaN, crash (when you mean a Formula Error)
+
+**Blank**:
+A Cell with no Display value — empty Input, missing Cell, or empty Computed value. Ctrl+arrow treats Blank vs Filled as a Phase change. Distinct from Unused corner.
+_Avoid_: Empty string (when you mean this), unused (that is Unused corner)
+
+**Filled**:
+A Cell with a Display value. Opposite of Blank for Arrow navigation and Ctrl+arrow.
+_Avoid_: Occupied, non-empty (when you mean visible text)
+
 **Cell style**:
-Appearance stored on a Cell or column: bold, italic, strikethrough, text color, fill color, and font size.
+Appearance stored on a Cell or column: bold, italic, strikethrough, text color, fill color, and font size. The Cell’s style wins over the column’s. Fill and text color replace the default Input / Formula / Overlay / Error colors. Distinct from Number format.
 _Avoid_: Theme, conditional format, number format (when you mean appearance)
 
+**Clear formatting**:
+Removes Cell style from the Cell. Does not change Number format or Stored value.
+_Avoid_: Clear (that clears Stored value), reset style
+
 **Number format**:
-How a numeric Cell is shown (significant digits, thousand separators, compact K/M/B/T, currency). It does not change the stored Input or the value Formulas use.
+How a numeric Display value is shown. The Cell’s pattern wins, then the column’s (**Column format**), then the default: three significant digits with grouping. Patterns include `G3`, `#,##G3`, `G3A` (auto K/M/B/T from 1,000), `G3K` / `G3M` / `G3B` / `G3T`, `0.00`, `0%`, and a prefix or quoted suffix (`DKK G3A`, `G3A" kr"`). It does not change Stored value or Computed value. Text and `TRUE`/`FALSE` are shown as-is.
 _Avoid_: Cell style, rounding the stored value
+
+**Column format**:
+A Number format on an Attribute column or year-column Period, used when the Cell has none of its own.
+_Avoid_: Table format, workbook format
 
 **Loose cell**:
 A typed value on a Sheet outside every Table. It is not a Formula and not a modeling surface.
 _Avoid_: Free cell, unstructured table, scratch table (as a place to model)
 
+### Evaluation
+
+**Stored value**:
+The Input or Formula text a Commit writes. Formula bar and Formula edit show this, not the Display value.
+_Avoid_: Computed value, Display value, raw (as a user-facing name)
+
+**Computed value**:
+The result after evaluation. For an Input, the Stored value after Overlay. For a Formula, the evaluated result. Other Formulas use this value. Number format does not change it. After a Commit, a structure change, or a Scenario switch, Formulas are recalculated.
+_Avoid_: Display value, cached value, engine result
+
+**Display value**:
+What the grid shows: the Computed value after Number format and Cell style. Blank when the Computed value is empty. Numbers align right; text aligns left.
+_Avoid_: Formatted string (as identity), grid text (when you mean this)
+
+**Even-split**:
+Typing a number into a quarter or year Grain cell writes equal shares onto the stored months; the last month absorbs rounding. The same Formula is written to every month in that Grain cell. Changing Grain does not rewrite stored months.
+_Avoid_: Distribute, allocate, average (when you mean this write)
+
+**Grain total**:
+The Display value of a quarter or year Grain cell: the sum of the stored monthly Computed values.
+_Avoid_: Rollup, pivot, aggregate, bucket
+
 ### Formulas
 
 **Defined name**:
-A Workbook-wide name for one Cell. A key-value Table registers each row key as the name of that row’s Value cell (`Vat`). Names must be unique against other promoted keys, Table names, Sheet names, and reserved functions.
-_Avoid_: Name-as-formula (`=@-1`), P table
+A Workbook-wide name for one Cell. A key-value Table registers each row key as the name of that row’s Value cell (`Vat`, `Årssalg`, `Café`). Letters in any script, digits, and underscore; unique against other promoted keys, Table names, Sheet names, and reserved functions. New rows on a key-value Table get `Param`, `Param2`, … — not `1`, `2`, `3` (those are default Row keys on other Tables, and cannot be Defined names).
+_Avoid_: Name-as-formula (`=@-1`), P table, ASCII-only names
 
 **Formula ref**:
 One complete structured-ref or Defined name token in Formula text (`Vat`, `Salg[Jan][CNC]`, `Vat:AndelCNC`).
@@ -155,15 +197,15 @@ No Formula edit is open. Arrows move Selection. Typing starts Enter and replaces
 _Avoid_: Idle, browse, navigation mode
 
 **Enter**:
-Formula edit started by typing. A Literal: arrow or click Commits and moves Selection. A Formula (`=`): arrow or click starts Point.
+Formula edit started by typing, or by an operator typed while Pointing. A Literal: arrow or click Commits and moves Selection. A Formula (`=`): arrow or click starts Point.
 _Avoid_: Typeover, replace mode (Excel’s name is Enter)
 
 **Edit mode**:
-Formula edit started by F2, double-click, or Formula bar. Arrows move the Caret. Click Points only at an Insert point; otherwise it Commits and selects. F2 toggles Enter ↔ Edit mode.
+Formula edit in which arrows move the Caret, started by F2, double-click, Formula bar, or a click that places the Caret in Formula text. A grid click Points only at an Insert point (otherwise it Commits and selects); F2 toggles Enter ↔ Edit mode.
 _Avoid_: Edit (the verb), F2 mode, in-cell edit (when you mean the mode)
 
 **Point**:
-Formula-edit mode that inserts a Formula ref. Click or arrow updates the Active formula ref; the editor stays open. An operator returns to Enter. F2 returns to Edit mode. Click-drag or Shift+Arrow writes a Formula range in the same Table.
+Formula-edit mode that inserts a Formula ref from a grid click or arrow; click-drag or Shift+Arrow writes a Formula range in the same Table. An operator typed while Pointing returns to Enter; F2, or a click that places the Caret in Formula text (in-cell editor or Formula bar), returns to Edit mode without Cancel.
 _Avoid_: Navigate (when you mean inserting a ref)
 
 **Edit cell**:
@@ -174,6 +216,10 @@ _Avoid_: Active cell (when you mean this vs Selection), source cell
 The draft string in Formula edit.
 _Avoid_: Overlay value, input value (when you mean the draft)
 
+**Invalid draft**:
+A typed value that cannot Commit: an illegal identifier, a collision, a reserved function name, or an empty name. The field uses a light red fill while the draft is invalid and does not write. Distinct from a Formula Error (that is a stored Formula that failed to evaluate).
+_Avoid_: Error (when you mean the draft), validation message box
+
 **Active formula ref**:
 The Formula ref under the caret or selection, or none when inserting a new one.
 _Avoid_: Selection (the Properties panel object), highlighted ref
@@ -183,7 +229,7 @@ The Cell currently chosen for the Active formula ref. The next Point arrow walk 
 _Avoid_: Selection, pointed cell (use this name)
 
 **Caret**:
-The insertion position in Formula text. In Edit mode, arrows move the Caret. In Enter and Point, arrows do not.
+The insertion position in Formula text. A click in Formula text (in-cell editor or Formula bar) places the Caret and is Edit mode, including after a Formula range from a mouse drag. In Edit mode arrows move it; in Enter and Point they do not.
 _Avoid_: Cursor, selection (the Properties panel object)
 
 **Insert point**:
@@ -216,8 +262,16 @@ _Avoid_: Caret movement (that is Edit mode), Point (that inserts a ref)
 In Ready, jump to the next Phase change along that axis, always landing on the filled side. Left/right never wrap to another row. The Growth row is not a stop and not a Table change; the next up/down press after the last data cell enters the adjacent Table.
 _Avoid_: End key, Ctrl+End
 
+**Shift+arrow**:
+In Ready, extend the Cell range by one cell along that axis, limited to this Table’s data cells. Growth is not included.
+_Avoid_: Shift+Enter (that is Commit)
+
+**Shift+Ctrl+arrow**:
+In Ready, a Cell range extended by the same Phase-change jumps as Ctrl+arrow, limited to this Table’s data cells. Growth and other Tables are not included.
+_Avoid_: Ctrl+Shift+End, current region
+
 **Phase change**:
-A switch between filled and blank Cells on an axis, or a Table boundary, used by Ctrl+arrow.
+A switch between filled and blank Cells on an axis, or a Table boundary, used by Ctrl+arrow and Shift+Ctrl+arrow.
 _Avoid_: Block, region, current region (Excel’s name)
 
 ### Shell
@@ -227,15 +281,15 @@ The left column: Sheets and the Tables on each Sheet. Clicking a Table name Reve
 _Avoid_: Folder tree, sheet tabs (when you mean this list)
 
 **Reveal**:
-Selecting a Table from Explorer and scrolling the viewport to that Table’s start. Distinct from keeping the selected Cell in view while Arrow navigation or Commit moves it.
+Selecting a Table from Explorer and scrolling the viewport to that Table’s start. Distinct from keeping the moving Cell in view while Arrow navigation, Ctrl+arrow, Shift+arrow, or Shift+Ctrl+arrow extends a Cell range.
 _Avoid_: Jump, scroll-into-view, follow selection
 
 **Selection**:
-The object the Properties panel edits: Workbook, Sheet, Table, column, row, or Cell (optionally a Cell range). Clicking empty canvas selects the Sheet. Clicking a Key cell selects the row; a Header cell, the column. Selection never sits on an Unused corner. Arrow navigation keeps the selected Cell in view without Reveal.
+The object the Properties panel edits: Workbook, Sheet, Table, column, row, or Cell (optionally a Cell range). Clicking empty canvas selects the Sheet. Clicking a Key cell selects the row; a Header cell, the column. Selection never sits on an Unused corner. Arrow navigation, Ctrl+arrow, Shift+arrow, and Shift+Ctrl+arrow keep the moving Cell in view without Reveal.
 _Avoid_: A1 range (when you mean this), focus (when you mean Selection)
 
 **Cell range**:
-A multi-cell Selection, built in Ready by click-drag or Shift+Arrow. Shared inspector fields show one value or Mixed. Typing or a Formula-bar Commit writes to every Cell in the range.
+A multi-cell Selection, built in Ready by click-drag, Shift+arrow, or Shift+Ctrl+arrow. Shared inspector fields show one value or Mixed. Typing or a Formula-bar Commit writes to every Cell in the range.
 _Avoid_: Formula range (that is in Formula text), A1 range
 
 **Mixed**:
@@ -247,7 +301,7 @@ The always-mounted right column. A Formula bar plus one inspector per Selection 
 _Avoid_: Host KPIs, property grid (as Excel VBA)
 
 **Formula bar**:
-The Value field for the selected Cell’s Input or Formula. It stays mounted while Pointing so a Sheet switch does not cancel Formula edit. It shares Enter / Edit mode / Point with the in-cell editor.
+The Value field for the selected Cell’s Stored value (Input or Formula text). It stays mounted while Pointing so a Sheet switch does not cancel Formula edit. It shares Enter / Edit mode / Point with the in-cell editor. A click in it while Pointing is Edit mode, not Cancel. The grid still shows the Display value.
 _Avoid_: Formula line, name box
 
 **Horizontal scroll**:

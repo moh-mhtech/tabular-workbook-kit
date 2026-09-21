@@ -22,6 +22,10 @@ describe("formula suggestions", () => {
     expect(suggestFormula("=Vat+", 5, layout)).toEqual([]);
     expect(suggestFormula("=V", 2, layout).some((item) => item.label === "Vat")).toBe(true);
     expect(suggestFormula("=Sa", 3, layout).some((item) => item.label === "Salg")).toBe(true);
+    const withCafe = createPlaygroundWorkbook();
+    withCafe.tables[0]!.rows[2]!.key = "Café";
+    expect(formulaPrefix("=Café", 5)).toEqual({ start: 1, text: "Café", bracket: false });
+    expect(suggestFormula("=Ca", 3, layoutWorkbook(withCafe)).some((item) => item.label === "Café")).toBe(true);
     expect(suggestFormula("=Salg[", 6, layout).some((item) => item.kind === "column")).toBe(true);
   });
 

@@ -1,4 +1,5 @@
 import type { WorkbookLayout } from "../model/layout.js";
+import { IDENT_CONT, IDENTIFIER } from "../model/structure.js";
 import { tableYearColumns, visibleTimeSlots } from "../model/yearColumns.js";
 
 export type FormulaSuggestionKind = "function" | "table" | "name" | "column";
@@ -31,11 +32,11 @@ export function formulaPrefix(
 ): { start: number; text: string; bracket: boolean } | null {
   if (!draft.trimStart().startsWith("=")) return null;
   const before = draft.slice(0, cursor);
-  const bracket = before.match(/\[([A-Za-z0-9ÆØÅæøå_-]*)$/);
+  const bracket = before.match(new RegExp(`\\[([${IDENT_CONT}-]*)$`, "u"));
   if (bracket?.index !== undefined) {
     return { start: bracket.index + 1, text: bracket[1]!, bracket: true };
   }
-  const match = before.match(/([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)$/);
+  const match = before.match(new RegExp(`(${IDENTIFIER})$`, "u"));
   if (match?.index === undefined) return null;
   return { start: match.index, text: match[1]!, bracket: false };
 }

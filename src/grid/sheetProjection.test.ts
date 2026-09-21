@@ -122,6 +122,24 @@ describe("sheet grid projection", () => {
     });
   });
 
+  it("moves Enter from a Key cell onto the next Key cell, not Growth", () => {
+    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const params = projectTable(layout, "tbl-params")!;
+    expect(cellAfterCommitMove(params, layout, [0, 3], [0, 1])).toEqual({
+      location: [0, 4],
+      selection: { kind: "row", tableId: "tbl-params", rowId: "row-andel-cnc" },
+    });
+  });
+
+  it("moves Tab from a Header cell onto the next Header cell", () => {
+    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const staff = projectTable(layout, "tbl-staff")!;
+    expect(cellAfterCommitMove(staff, layout, [1, 0], [1, 0])).toEqual({
+      location: [2, 0],
+      selection: { kind: "column", tableId: "tbl-staff", columnId: "BaseSalary" },
+    });
+  });
+
   it("uses table column names as identifiers instead of ABC defaults", () => {
     const layout = layoutWorkbook(createPlaygroundWorkbook());
     const projection = projectTable(layout, "tbl-params")!;

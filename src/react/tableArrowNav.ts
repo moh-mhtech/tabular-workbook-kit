@@ -76,6 +76,18 @@ function stepToNextCell(
   return undefined;
 }
 
+/** Shift+Arrow: one data cell in that direction, same Table, no wrap, no Growth. */
+export function shiftArrowNavTarget(
+  projection: SheetGridProjection,
+  from: TableArrowNavCell,
+  direction: ArrowNavDirection,
+): TableArrowNavCell | undefined {
+  if (projection.tableId !== from.tableId) return undefined;
+  const next = stepToNextCell(projection, from, direction);
+  if (!next || !inDataArea(projection, next.col, next.row)) return undefined;
+  return next;
+}
+
 function firstSelectableRow(projection: SheetGridProjection, col: number): number | undefined {
   for (let row = 0; row < projection.rowCount; row++) {
     if (isSelectable(projection, col, row)) return row;
@@ -134,6 +146,18 @@ function lastDataRow(projection: SheetGridProjection, col: number): number | und
   return undefined;
 }
 
+function lastDataCol(projection: SheetGridProjection, row: number): number | undefined {
+  const last = projection.growthColumn ? projection.colCount - 2 : projection.colCount - 1;
+  for (let col = last; col >= 0; col--) {
+    if (isSelectable(projection, col, row)) return col;
+  }
+  return undefined;
+}
+
+function inDataArea(projection: SheetGridProjection, col: number, row: number): boolean {
+  return isSelectable(projection, col, row) && !isGrowthRow(projection, row) && !isGrowthColumn(projection, col);
+}
+
 function firstHeaderCell(projection: SheetGridProjection): TableArrowNavCell | undefined {
   if (!projection.tableId) return undefined;
   return cellAt(projection.tableId, firstSelectableCol(projection, 0), 0);
@@ -158,9 +182,16 @@ function axisEnd(
   col: number,
   row: number,
   direction: ArrowNavDirection,
+  confineToData = false,
 ): TableArrowNavCell | undefined {
   if (!projection.tableId) return undefined;
-  if (direction === "right") return cellAt(projection.tableId, lastSelectableCol(projection, row), row);
+  if (direction === "right") {
+    return cellAt(
+      projection.tableId,
+      confineToData ? lastDataCol(projection, row) : lastSelectableCol(projection, row),
+      row,
+    );
+  }
   if (direction === "left") return cellAt(projection.tableId, firstSelectableCol(projection, row), row);
   if (direction === "down") return cellAt(projection.tableId, col, lastDataRow(projection, col));
   return cellAt(projection.tableId, col, firstSelectableRow(projection, col));
@@ -187,8 +218,10 @@ function ctrlStepFrom(
   direction: ArrowNavDirection,
   layout: WorkbookLayout,
   evaluated: ReadonlyMap<string, EvaluatedCell>,
+  confineToData = false,
 ): TableArrowNavCell | undefined {
   if (!projection.tableId) return undefined;
+  if (confineToData && !inDataArea(projection, from.col, from.row)) return undefined;
   const [dx, dy] = DIRECTION_DELTA[direction];
   const vertical = direction === "up" || direction === "down";
   if (vertical && direction === "down" && isGrowthRow(projection, from.row)) return undefined;
@@ -197,7 +230,8 @@ function ctrlStepFrom(
     row >= 0 &&
     col < projection.colCount &&
     row < projection.rowCount &&
-    !(vertical && isGrowthRow(projection, row));
+    !(vertical && isGrowthRow(projection, row)) &&
+    !(confineToData && isGrowthColumn(projection, col));
 
   const lastFilledOfRun = (startCol: number, startRow: number): TableArrowNavCell => {
     let col = startCol;
@@ -226,7 +260,7 @@ function ctrlStepFrom(
     }
     return { tableId: projection.tableId, col, row };
   }
-  const end = axisEnd(projection, from.col, from.row, direction);
+  const end = axisEnd(projection, from.col, from.row, direction, confineToData);
   if (!end || sameNavCell(from, end)) return undefined;
   if (
     vertical &&
@@ -243,6 +277,8 @@ function ctrlStepFrom(
  * filled side. Jumping blanks lands on the first following filled cell. If no
  * phase remains, go to the end of the table data (growth row is not a stop or a
  * table change); the next press (up/down only) enters the adjacent table.
+ * `confineToData` keeps the walk inside this table's data cells (no Growth, no
+ * other table) — Shift+Ctrl+arrow uses that to extend a Cell range.
  */
 export function ctrlArrowNavTarget(
   tables: readonly SheetGridProjection[],
@@ -250,16 +286,17 @@ export function ctrlArrowNavTarget(
   direction: ArrowNavDirection,
   layout: WorkbookLayout,
   evaluated: ReadonlyMap<string, EvaluatedCell> = new Map(),
+  options?: { confineToData?: boolean },
 ): TableArrowNavCell | undefined {
   const startIndex = tables.findIndex((table) => table.tableId === from.tableId);
   if (startIndex < 0) return undefined;
   const current = tables[startIndex];
   if (!current) return undefined;
 
-  const hit = ctrlStepFrom(current, from, direction, layout, evaluated);
+  const hit = ctrlStepFrom(current, from, direction, layout, evaluated, options?.confineToData);
   if (hit) return hit;
 
-  if (direction === "left" || direction === "right") return undefined;
+  if (options?.confineToData || direction === "left" || direction === "right") return undefined;
   const next = tables[startIndex + (direction === "down" ? 1 : -1)];
   return next ? axisEntry(next, from.col, direction) : undefined;
 }

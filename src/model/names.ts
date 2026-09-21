@@ -1,4 +1,4 @@
-import { TABLE_NAME_PATTERN } from "./structure.js";
+import { TABLE_NAME_PATTERN, assertTableName } from "./structure.js";
 import { valueColumn, type WorkbookLayout } from "./layout.js";
 import type { WorkbookSnapshot } from "./types.js";
 
@@ -44,7 +44,7 @@ export function promotedNames(snapshot: WorkbookSnapshot): { name: string; table
   return out;
 }
 
-/** Univer defined names reject non-ASCII identifiers; structured refs still work. */
+/** ASCII-only names the calc engine can register as workbook named expressions. */
 export function canRegisterDefinedName(name: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
 }
@@ -82,6 +82,73 @@ export function assertGlobalName(
     }
   }
   return trimmed;
+}
+
+export function invalidGlobalName(
+  snapshot: WorkbookSnapshot,
+  candidate: string,
+  except?: { rowId?: string; tableId?: string; sheetId?: string },
+): string | undefined {
+  try {
+    assertGlobalName(snapshot, candidate, except);
+    return undefined;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+export function invalidTableName(
+  snapshot: WorkbookSnapshot,
+  candidate: string,
+  exceptId?: string,
+): string | undefined {
+  try {
+    const next = assertTableName(candidate, snapshot, exceptId);
+    assertGlobalName(snapshot, next, { tableId: exceptId });
+    return undefined;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+export function invalidRowKey(
+  snapshot: WorkbookSnapshot,
+  tableId: string,
+  rowId: string | null,
+  candidate: string,
+): string | undefined {
+  const table = snapshot.tables.find((item) => item.id === tableId);
+  const row = rowId ? table?.rows.find((item) => item.id === rowId) : undefined;
+  if (!table || (rowId && !row)) return "Unknown row.";
+  try {
+    const next = table.promoteRowKeys
+      ? assertGlobalName(snapshot, candidate, { rowId: row?.id, tableId: table.id })
+      : candidate.trim();
+    if (!next) throw new Error("Row key cannot be empty.");
+    if (table.rows.some((item) => item.id !== row?.id && item.key.toLowerCase() === next.toLowerCase())) {
+      throw new Error(`Row key "${next}" is already used.`);
+    }
+    return undefined;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+export function invalidColumnName(
+  snapshot: WorkbookSnapshot,
+  tableId: string,
+  columnId: string | null,
+  candidate: string,
+): string | undefined {
+  const table = snapshot.tables.find((item) => item.id === tableId);
+  const col = columnId ? table?.attributeColumns.find((item) => item.id === columnId) : undefined;
+  if (!table || (columnId && !col)) return "Unknown column.";
+  const next = candidate.trim();
+  if (!next) return "Column name cannot be empty.";
+  if (table.attributeColumns.some((item) => item.id !== col?.id && item.name.toLowerCase() === next.toLowerCase())) {
+    return `Column name "${next}" is already used.`;
+  }
+  return undefined;
 }
 
 export function nextPromotableKey(snapshot: WorkbookSnapshot): string {

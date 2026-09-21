@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
 import { promotedNames } from "../model/names.js";
 import { WorkbookSession } from "./WorkbookSession.js";
@@ -68,5 +69,15 @@ describe("parameters sheet and table", () => {
     expect(added.key).toBe("Param");
     session.renameRow("Params", added.id, "Moms");
     expect(promotedNames(session.getSnapshot()).map((p) => p.name)).toContain("Moms");
+  });
+
+  it("accepts a Defined name with letters outside æøå", async () => {
+    const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());
+    await session.recalculate();
+    session.renameRow("Params", "Vat", "Café");
+    session.setFormula("Params", "AndelCNC", "Value", "=Café");
+    await session.recalculate();
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2]!.key).toBe("Café");
+    expect(session.getCell("Params", "AndelCNC", "Value").computed).toBe(0.25);
   });
 });

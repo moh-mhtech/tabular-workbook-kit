@@ -195,21 +195,48 @@ describe("playground chrome UI", () => {
       });
     });
     const name = screen.getByDisplayValue("Vat") as HTMLInputElement;
-    const alerts: string[] = [];
-    vi.spyOn(window, "alert").mockImplementation((message) => {
-      alerts.push(String(message));
-    });
     await act(async () => {
+      fireEvent.focus(name);
       fireEvent.change(name, { target: { value: "SUM" } });
+    });
+    expect(name.getAttribute("aria-invalid")).toBe("true");
+    await act(async () => {
       fireEvent.blur(name);
     });
-    expect(alerts.length).toBeGreaterThan(0);
     expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2]!.key).toBe("Vat");
     await act(async () => {
       fireEvent.change(name, { target: { value: "Moms" } });
       fireEvent.blur(name);
     });
     expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2]!.key).toBe("Moms");
+  });
+
+  it("marks an Invalid draft when a Defined name starts with a digit", async () => {
+    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    await act(async () => {
+      session.setSelection({
+        kind: "cell",
+        tableId: "tbl-params",
+        rowId: "row-vat",
+        columnId: "Value",
+      });
+    });
+    const name = screen.getByLabelText("Name") as HTMLInputElement;
+    const alerts: string[] = [];
+    vi.spyOn(window, "alert").mockImplementation((message) => {
+      alerts.push(String(message));
+    });
+    await act(async () => {
+      fireEvent.focus(name);
+      fireEvent.change(name, { target: { value: "1" } });
+    });
+    expect(name.getAttribute("aria-invalid")).toBe("true");
+    await act(async () => {
+      fireEvent.blur(name);
+    });
+    expect(alerts).toEqual([]);
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2]!.key).toBe("Vat");
+    expect(name.value).toBe("Vat");
   });
 
   it("refreshes name and value when the selected cell changes", async () => {

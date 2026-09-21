@@ -1,10 +1,13 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { useMemo } from "react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyCustomGridClear, applyCustomGridEdits, applyCustomGridFill, applyCustomGridPaste } from "./customGridInteractions.js";
 import { layoutWorkbook } from "../model/layout.js";
-import { projectTable } from "../grid/sheetProjection.js";
+import { projectTable, projectedLocationForRef } from "../grid/sheetProjection.js";
+import { evaluatedCells, gridCell } from "./CustomSheetCanvas.js";
 import { formulaBar, installGridDom, renderPlaygroundCanvas, selectProjectedCell } from "./playgroundCanvasTest.js";
+import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -13,6 +16,17 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
+
+function GridCellProbe({ tableId, rowId, columnId }: { tableId: string; rowId: string; columnId: string }) {
+  const { session } = useWorkbook();
+  const snapshot = useSnapshot();
+  const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
+  const projection = useMemo(() => projectTable(layout, tableId)!, [layout, tableId]);
+  const values = useMemo(() => evaluatedCells(session, snapshot), [session, snapshot]);
+  const location = projectedLocationForRef(projection, layout, { tableId, rowId, columnId });
+  const cell = location ? gridCell(projection, layout, values, location) : { displayData: "" };
+  return <pre data-testid="grid-cell">{JSON.stringify({ displayData: cell.displayData })}</pre>;
+}
 
 describe("playground edit UI", () => {
   it("cancels the formula bar on Escape without writing", async () => {
@@ -85,6 +99,22 @@ describe("playground edit UI", () => {
       await session.recalculate();
     });
     expect(session.getCell("Params", "Vat", "Value").computed).toBe(2);
+  });
+
+  it("evaluates a Formula of a Blank Defined name as Blank", async () => {
+    const { session } = await renderPlaygroundCanvas({
+      extra: <GridCellProbe tableId="tbl-params" rowId="row-andel-cnc" columnId="Value" />,
+    });
+    await act(async () => {
+      const added = session.addRow("Params");
+      session.renameRow("Params", added.id, "hello");
+      session.setFormula("Params", "AndelCNC", "Value", "=hello");
+      await session.recalculate();
+    });
+    expect(session.getCell("Params", "hello", "Value").computed).toBe(null);
+    expect(session.getCell("Params", "AndelCNC", "Value").computed).toBe(null);
+    expect(session.getCell("Params", "AndelCNC", "Value").error).toBeUndefined();
+    expect(JSON.parse(screen.getByTestId("grid-cell").textContent ?? "{}").displayData).toBe("");
   });
 
   it("recalculates Salg when Params Vækst changes", async () => {

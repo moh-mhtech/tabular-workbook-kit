@@ -13,7 +13,7 @@ import { layoutWorkbook } from "../model/layout.js";
 import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { CustomSheetCanvas } from "./CustomSheetCanvas.js";
-import { SpreadsheetTextEditor } from "./customGridEditor.js";
+import { ProjectedOverlayEditor, SpreadsheetTextEditor } from "./customGridEditor.js";
 import { applyCustomGridEdits } from "./customGridInteractions.js";
 import { PropertiesPanel } from "./PropertiesPanel.js";
 import { WorkbookProvider, useSnapshot, useWorkbook } from "./WorkbookProvider.js";
@@ -89,6 +89,51 @@ function CellEditorHost() {
       isHighlighted={false}
       initialNavMode="edit"
       editingLocation={[1, 3]}
+      projection={projection}
+      layout={layout}
+    />
+  );
+}
+
+function CommitEditorHost({
+  tableId,
+  location,
+  data,
+}: {
+  tableId: string;
+  location: readonly [number, number];
+  data: string;
+}) {
+  const { session } = useWorkbook();
+  const snapshot = useSnapshot();
+  const layout = layoutWorkbook(snapshot);
+  const projection = projectTable(layout, tableId)!;
+  const [value, setValue] = useState<GridCell>({
+    kind: GridCellKind.Text,
+    data,
+    displayData: data,
+    allowOverlay: true,
+  });
+
+  return (
+    <ProjectedOverlayEditor
+      value={value}
+      onChange={setValue}
+      onFinishedEditing={(next, movement = [0, 0]) => {
+        const committed = next ?? value;
+        applyCustomGridEdits(session, projection, layout, [{ location, value: committed }]);
+        session.cancelFormulaEdit();
+        const delta: readonly [-1 | 0 | 1, -1 | 0 | 1] = [
+          movement[0] < 0 ? -1 : movement[0] > 0 ? 1 : 0,
+          movement[1] < 0 ? -1 : movement[1] > 0 ? 1 : 0,
+        ];
+        const moved = cellAfterCommitMove(projection, layout, location, delta);
+        session.setSelection(moved?.selection ?? selectionForProjectedCell(projection, layout, location[0], location[1]));
+        if (moved) session.gridFocus = { tableId, col: moved.location[0], row: moved.location[1] };
+      }}
+      isHighlighted={false}
+      initialNavMode="edit"
+      editingLocation={[location[0], location[1]]}
       projection={projection}
       layout={layout}
     />
@@ -179,5 +224,39 @@ describe("cell commit UI", () => {
     expect(alerts).toEqual([]);
     expect(errors).toEqual([]);
     expectVatCommitted(session);
+  });
+
+  it("commits a Key cell on Enter and selects the next Key cell", async () => {
+    const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());
+    await session.recalculate();
+    await act(async () => {
+      render(
+        <WorkbookProvider session={session}>
+          <CommitEditorHost tableId="tbl-params" location={[0, 3]} data="Vat" />
+        </WorkbookProvider>,
+      );
+    });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByLabelText("Cell editor"), { key: "Enter" });
+    });
+    expect(session.selection).toEqual({ kind: "row", tableId: "tbl-params", rowId: "row-andel-cnc" });
+    expect(session.gridFocus).toEqual({ tableId: "tbl-params", col: 0, row: 4 });
+  });
+
+  it("commits a Header cell on Tab and selects the next Header cell", async () => {
+    const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());
+    await session.recalculate();
+    await act(async () => {
+      render(
+        <WorkbookProvider session={session}>
+          <CommitEditorHost tableId="tbl-staff" location={[1, 0]} data="Role" />
+        </WorkbookProvider>,
+      );
+    });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByLabelText("Cell editor"), { key: "Tab" });
+    });
+    expect(session.selection).toEqual({ kind: "column", tableId: "tbl-staff", columnId: "BaseSalary" });
+    expect(session.gridFocus).toEqual({ tableId: "tbl-staff", col: 2, row: 0 });
   });
 });

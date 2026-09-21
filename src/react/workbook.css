@@ -684,6 +684,16 @@
   border-color: #2a6f97;
 }
 
+.wk-properties .wk-outlined :is(input, textarea)[aria-invalid="true"],
+.wk-properties .wk-outlined:focus-within :is(input, textarea)[aria-invalid="true"] {
+  background: #fde8e8;
+  border-color: #e08a8a;
+}
+
+.wk-overlay-editor[aria-invalid="true"] {
+  background: #fde8e8;
+}
+
 .wk-outlined-label {
   position: absolute;
   left: 8px;
@@ -970,6 +980,11 @@
   font: 13px/1.4 "Segoe UI", sans-serif;
 }
 
+.wk-overlay-editor-host {
+  width: 100%;
+  height: 100%;
+}
+
 .wk-overlay-editor {
   box-sizing: border-box;
   width: 100%;
@@ -984,6 +999,19 @@
   color: inherit;
   font: inherit;
   line-height: inherit;
+}
+
+.wk-overlay-editor.wk-inline-editor {
+  padding: 0 8px;
+  background: #f4f7fa;
+}
+
+.wk-overlay-editor.wk-inline-editor[aria-invalid="true"] {
+  background: #fde8e8;
+}
+
+#portal .gdg-unstyle {
+  max-width: none;
 }
 
 #portal {

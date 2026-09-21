@@ -21,6 +21,7 @@ describe("glossary", () => {
       "Document",
       "Tables",
       "Cells",
+      "Evaluation",
       "Formulas",
       "Editing",
       "Navigation",
@@ -37,14 +38,25 @@ describe("glossary", () => {
     expect(terms).toContain("Cancel");
     expect(terms).toContain("Mixed");
     expect(terms).toContain("Cell style");
+    expect(terms).toContain("Number format");
+    expect(terms).toContain("Error");
+    expect(terms).toContain("Blank");
+    expect(terms).toContain("Stored value");
+    expect(terms).toContain("Computed value");
+    expect(terms).toContain("Display value");
+    expect(terms).toContain("Even-split");
+    expect(terms).toContain("Grain total");
     expect(terms).toContain("Ready");
     expect(terms).toContain("Enter");
     expect(terms).toContain("Edit mode");
     expect(terms).toContain("Point");
     expect(terms).toContain("Insert point");
+    expect(terms).toContain("Invalid draft");
     expect(terms).toContain("Commit");
     expect(terms).toContain("Arrow navigation");
     expect(terms).toContain("Ctrl+arrow");
+    expect(terms).toContain("Shift+arrow");
+    expect(terms).toContain("Shift+Ctrl+arrow");
     expect(terms).toContain("Cell range");
     expect(terms).toContain("Reveal");
     expect(terms).toContain("Properties panel");

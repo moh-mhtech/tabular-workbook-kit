@@ -5,6 +5,7 @@ import { projectTable } from "../grid/sheetProjection.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import {
   applyFormulaOperator,
+  applyGridPointerToFormulaEdit,
   applyPointedRef,
   canPointFromDraft,
   commitLiteralEditAndSelect,
@@ -12,12 +13,15 @@ import {
   formulaKeyAction,
   formulaRefForProjectedCell,
   formulaRefSpans,
+  gridLocationFromPointer,
   isSpreadsheetPointEvent,
+  isFormulaEditOutsideClick,
   isValidInsertPoint,
   nextPointableCell,
   commitKeyMovement,
   overlayArrowMovement,
   overlayKeyAction,
+  overlayModeForActivation,
   pointAtProjectedCell,
   pointFromArrow,
   targetWalkStart,
@@ -27,6 +31,13 @@ import {
 const inert = { evaluate: () => ({}) };
 
 describe("custom grid overlay navigation", () => {
+  it("starts Edit from a double-click or F2, and Enter from typing", () => {
+    expect(overlayModeForActivation("double-click")).toBe("edit");
+    expect(overlayModeForActivation("f2")).toBe("edit");
+    expect(overlayModeForActivation("type")).toBe("enter");
+    expect(overlayModeForActivation("enter-key")).toBe("enter");
+  });
+
   it("toggles between pointing at cells and in-cell caret", () => {
     expect(toggleOverlayNavMode("enter")).toBe("edit");
     expect(toggleOverlayNavMode("edit")).toBe("enter");
@@ -58,8 +69,11 @@ describe("custom grid overlay navigation", () => {
     expect(overlayKeyAction("enter", { key: "ArrowLeft" })).toBe("point-cell");
     expect(overlayKeyAction("edit", { key: "ArrowDown" })).toBe("caret");
     expect(overlayKeyAction("enter", { key: "a" })).toBe("caret");
-    expect(overlayKeyAction("enter", { key: "+" })).toBe("formula-operator");
-    expect(overlayKeyAction("edit", { key: "*" })).toBe("formula-operator");
+    expect(overlayKeyAction("enter", { key: "+" })).toBe("caret");
+    expect(overlayKeyAction("point", { key: "+" })).toBe("formula-operator");
+    expect(overlayKeyAction("point", { key: ")" })).toBe("formula-operator");
+    expect(overlayKeyAction("edit", { key: "*" })).toBe("caret");
+    expect(overlayKeyAction("edit", { key: ")" })).toBe("caret");
   });
 
   it("leaves modified arrows inside the cell", () => {
@@ -219,6 +233,38 @@ describe("custom grid overlay navigation", () => {
     expect(isSpreadsheetPointEvent({ target: null })).toBe(false);
   });
 
+  it("does not treat Formula text as an outside click while Pointing a Formula range", () => {
+    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=Vat:AndelCNC", {
+      pointing: true,
+      mode: "point",
+      editCell: { tableId: "tbl-params", col: 1, row: 3 },
+    });
+    const formulaBar = {
+      closest: (selector: string) => (selector.includes(".wk-formula-bar") ? {} : null),
+    };
+    const overlay = {
+      closest: (selector: string) => (selector.includes(".wk-overlay-editor") ? {} : null),
+    };
+    const grid = {
+      closest: (selector: string) => (selector.includes(".wk-table-spreadsheet") ? {} : null),
+    };
+    const chrome = { closest: () => null };
+    expect(isFormulaEditOutsideClick({ target: formulaBar as unknown as EventTarget }, session)).toBe(false);
+    expect(isFormulaEditOutsideClick({ target: overlay as unknown as EventTarget }, session)).toBe(false);
+    expect(isFormulaEditOutsideClick({ target: grid as unknown as EventTarget }, session)).toBe(false);
+    expect(isFormulaEditOutsideClick({ target: chrome as unknown as EventTarget }, session)).toBe(true);
+  });
+
+  it("moves the Caret with ArrowLeft in Edit mode, not Point", () => {
+    expect(
+      formulaKeyAction("edit", { key: "ArrowLeft" }, { suggestVisible: false, isFormula: true }),
+    ).toBe("caret");
+    expect(
+      formulaKeyAction("point", { key: "ArrowLeft" }, { suggestVisible: false, isFormula: true }),
+    ).toBe("point-cell");
+  });
+
   it("walks to the next addressable cell and names it", () => {
     const layout = layoutWorkbook(createPlaygroundWorkbook());
     const projection = projectTable(layout, "tbl-params")!;
@@ -301,5 +347,36 @@ describe("custom grid overlay navigation", () => {
       ref: "AndelOutsource",
     });
     expect(session.formulaEdit?.draft).toBe("=Vat:AndelOutsource");
+  });
+
+  it("points a formula click and commits a literal click away from the edit cell", () => {
+    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const layout = layoutWorkbook(session.getSnapshot());
+    const projection = projectTable(layout, "tbl-params")!;
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=", {
+      pointing: true,
+      mode: "edit",
+      editCell: { tableId: "tbl-params", col: 1, row: 3 },
+    });
+    expect(applyGridPointerToFormulaEdit(session, projection, layout, 1, 4)).toBe("point");
+    expect(session.formulaEdit?.draft).toBe("=AndelCNC");
+    session.cancelFormulaEdit();
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "12", {
+      mode: "edit",
+      editCell: { tableId: "tbl-params", col: 1, row: 3 },
+    });
+    expect(applyGridPointerToFormulaEdit(session, projection, layout, 1, 3)).toBe("ignore");
+    expect(applyGridPointerToFormulaEdit(session, projection, layout, 1, 4)).toBe("commit");
+    expect(session.formulaEdit).toBeNull();
+  });
+
+  it("maps a pointer to a projected cell from host-local coordinates", () => {
+    const host = {
+      getBoundingClientRect: () => ({ left: 10, top: 20 }),
+    } as HTMLElement;
+    expect(gridLocationFromPointer(host, 11, 21, [40, 80], [28, 28, 28])).toEqual([0, 0]);
+    expect(gridLocationFromPointer(host, 51, 49, [40, 80], [28, 28, 28])).toEqual([1, 1]);
+    expect(gridLocationFromPointer(host, 9, 21, [40, 80], [28, 28, 28])).toBeNull();
+    expect(gridLocationFromPointer(host, 200, 21, [40, 80], [28, 28, 28])).toBeNull();
   });
 });

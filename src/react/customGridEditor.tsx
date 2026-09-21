@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { GridCellKind, type GridCell, type Item } from "@glideapps/glide-data-grid";
 import { applySuggestion, suggestFormula } from "../formula/formulaSuggest.js";
-import { projectedCell, type SheetGridProjection } from "../grid/sheetProjection.js";
+import { projectedCell, type ProjectedCell, type SheetGridProjection } from "../grid/sheetProjection.js";
+import { invalidColumnName, invalidRowKey } from "../model/names.js";
+import { KEY_COLUMN_ID, type WorkbookSnapshot } from "../model/types.js";
 import type { WorkbookLayout } from "../model/layout.js";
 import { FormulaSuggestList } from "./FormulaSuggestList.js";
 import {
@@ -23,6 +25,105 @@ export type OverlayEditorProps = {
   isHighlighted: boolean;
 };
 
+export type GridOverlayEditorProps = OverlayEditorProps & {
+  initialNavMode: OverlayNavMode;
+  editingLocation: Item;
+  projection: SheetGridProjection;
+  layout: WorkbookLayout;
+};
+
+export function isIdentifierEdit(editing: ProjectedCell, snapshot: WorkbookSnapshot): boolean {
+  if (editing.kind === "table") {
+    if (editing.hit.kind === "key") return true;
+    if (editing.hit.kind !== "header" || editing.hit.columnId === KEY_COLUMN_ID) return false;
+    const table = snapshot.tables.find((item) => item.id === editing.hit.tableId);
+    return Boolean(table?.attributeColumns.some((column) => column.id === editing.hit.columnId));
+  }
+  if (editing.kind !== "extension") return false;
+  if (editing.expansion.direction === "below") return editing.expansion.columnId === KEY_COLUMN_ID;
+  return editing.expansion.rowId === null;
+}
+
+export function overlayProvideOptions(identifier: boolean, columnWidth: number, rowHeight: number) {
+  if (!identifier) return { styleOverride: { minWidth: columnWidth * 2 } };
+  return {
+    disablePadding: true,
+    disableStyling: true,
+    styleOverride: {
+      width: columnWidth,
+      minWidth: columnWidth,
+      maxWidth: columnWidth,
+      height: rowHeight,
+      minHeight: rowHeight,
+      maxHeight: rowHeight,
+      padding: 0,
+      boxShadow: "none",
+      borderRadius: 0,
+    },
+  };
+}
+
+export function ProjectedOverlayEditor(props: GridOverlayEditorProps) {
+  const editing = projectedCell(props.projection, props.layout, props.editingLocation[0], props.editingLocation[1]);
+  const Editor = isIdentifierEdit(editing, props.layout.snapshot) ? IdentifierEditor : SpreadsheetTextEditor;
+  return <Editor {...props} />;
+}
+
+export function IdentifierEditor({
+  value,
+  onChange,
+  onFinishedEditing,
+  isHighlighted,
+  initialNavMode,
+  editingLocation,
+  projection,
+  layout,
+}: GridOverlayEditorProps) {
+  const { session } = useWorkbook();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const initial = value.kind === GridCellKind.Text ? value.data : "";
+  const [draft, setDraft] = useState(initial);
+  const editing = projectedCell(projection, layout, editingLocation[0], editingLocation[1]);
+  const error = identifierDraftError(editing, session.getSnapshot(), draft);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    const end = input.value.length;
+    const start = isHighlighted && initialNavMode === "enter" ? 0 : end;
+    input.setSelectionRange(start, end);
+  }, [initialNavMode, isHighlighted]);
+
+  return (
+    <input
+      ref={inputRef}
+      className="wk-overlay-editor wk-inline-editor"
+      aria-label="Cell editor"
+      aria-invalid={error ? true : undefined}
+      title={error}
+      value={draft}
+      onChange={(event) => {
+        const next = event.currentTarget.value;
+        setDraft(next);
+        if (value.kind === GridCellKind.Text) onChange({ ...value, data: next });
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") return;
+        event.stopPropagation();
+        if (event.key !== "Enter" && event.key !== "Tab") return;
+        event.preventDefault();
+        if (error) return;
+        const next = value.kind === GridCellKind.Text ? { ...value, data: draft } : value;
+        if (value.kind === GridCellKind.Text) onChange(next);
+        const commitMove = commitKeyMovement(event);
+        if (!commitMove) return;
+        onFinishedEditing(next, commitMove);
+      }}
+    />
+  );
+}
+
 export function SpreadsheetTextEditor({
   value,
   onChange,
@@ -40,8 +141,8 @@ export function SpreadsheetTextEditor({
 }) {
   const { session } = useWorkbook();
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const selectionRef = useRef({ start: 0, end: 0 });
+  const applyingSelectionRef = useRef(false);
   const onChangeRef = useRef(onChange);
   const valueRef = useRef(value);
   onChangeRef.current = onChange;
@@ -54,6 +155,34 @@ export function SpreadsheetTextEditor({
   const mode = session.formulaEdit?.mode ?? initialNavMode;
   const suggestCursor = selectionRef.current.start || draft.length;
   const suggestions = suggestOpen ? suggestFormula(draft, suggestCursor, layout) : [];
+
+  const rememberSelection = (start: number, end: number) => {
+    selectionRef.current = { start, end };
+  };
+
+  const placeCaretInFormulaText = (event: { target: EventTarget | null }) => {
+    if (event.target instanceof Element && event.target.closest(".wk-formula-suggest")) return;
+    setSuggestOpen(false);
+    if (session.formulaEdit) session.setFormulaEditMode("edit");
+    const input = inputRef.current;
+    if (input && event.target !== input) input.focus();
+  };
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const node = event.target instanceof Element ? event.target : null;
+      if (!node) return;
+      if (node.closest(".wk-formula-suggest")) return;
+      if (!node.closest("#portal, .wk-overlay-editor-host, .wk-overlay-editor, .wk-formula-bar")) return;
+      setSuggestOpen(false);
+      if (session.formulaEdit) session.setFormulaEditMode("edit");
+      if (node.closest(".wk-formula-bar")) return;
+      const input = inputRef.current;
+      if (input && event.target !== input) input.focus();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [session]);
 
   useLayoutEffect(() => {
     const target = projectedCell(projection, layout, editingLocation[0], editingLocation[1]);
@@ -69,13 +198,27 @@ export function SpreadsheetTextEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    const edit = session.formulaEdit;
+    if (edit?.mode === "edit") return;
+    const start = edit?.selectionStart ?? selectionRef.current.start;
+    const end = edit?.selectionEnd ?? start;
+    applyingSelectionRef.current = true;
+    input.setSelectionRange(start, end);
+    rememberSelection(start, end);
+    applyingSelectionRef.current = false;
+  });
+
   useEffect(() => {
     const input = inputRef.current;
     if (!input) return;
     input.focus();
     const end = input.value.length;
     const start = isHighlighted && initialNavMode === "enter" ? 0 : end;
-    applySelection(input, start, end);
+    rememberSelection(start, end);
+    input.setSelectionRange(start, end);
     session.syncFormulaEditCursor(input.value, start, end);
   }, [initialNavMode, isHighlighted, session]);
 
@@ -83,57 +226,32 @@ export function SpreadsheetTextEditor({
     if (sessionDraft === undefined || sessionDraft === draft) return;
     setDraft(sessionDraft);
     const span = session.formulaEdit?.activeFormulaRef;
-    pendingSelectionRef.current = span
-      ? { start: span.start, end: span.end }
-      : { start: sessionDraft.length, end: sessionDraft.length };
+    rememberSelection(span?.start ?? sessionDraft.length, span?.end ?? sessionDraft.length);
     const current = valueRef.current;
     if (current.kind === GridCellKind.Text) {
       onChangeRef.current({ ...current, data: sessionDraft });
     }
   }, [draft, sessionDraft, session.formulaEdit?.activeFormulaRef]);
 
-  useLayoutEffect(() => {
-    const input = inputRef.current;
-    if (!input || document.activeElement !== input) return;
-    if (pendingSelectionRef.current) {
-      const next = pendingSelectionRef.current;
-      pendingSelectionRef.current = null;
-      applySelection(input, next.start, next.end);
-      return;
-    }
-    const { start, end } = selectionRef.current;
-    if (input.selectionStart !== start || input.selectionEnd !== end) {
-      input.setSelectionRange(start, end);
-    }
-  });
-
-  const applySelection = (input: HTMLTextAreaElement, start: number, end: number) => {
-    input.setSelectionRange(start, end);
-    selectionRef.current = { start, end };
-  };
-
   const writeDraft = (nextText: string, selectionStart: number, selectionEnd: number) => {
-    pendingSelectionRef.current = null;
+    rememberSelection(selectionStart, selectionEnd);
     setDraft(nextText);
-    selectionRef.current = { start: selectionStart, end: selectionEnd };
     if (value.kind === GridCellKind.Text) onChange({ ...value, data: nextText });
     session.syncFormulaEditCursor(nextText, selectionStart, selectionEnd);
   };
 
   const syncInputCursor = (input: HTMLTextAreaElement) => {
-    if (pendingSelectionRef.current) {
-      const next = pendingSelectionRef.current;
-      applySelection(input, next.start, next.end);
-      return;
-    }
+    if (applyingSelectionRef.current) return;
+    if (session.formulaEdit && input.value !== session.formulaEdit.draft) return;
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? start;
-    selectionRef.current = { start, end };
+    rememberSelection(start, end);
     session.syncFormulaEditCursor(input.value, start, end);
   };
 
   return (
     <>
+    <div className="wk-overlay-editor-host" onPointerDown={placeCaretInFormulaText}>
     <textarea
       ref={inputRef}
       className="wk-overlay-editor"
@@ -148,10 +266,11 @@ export function SpreadsheetTextEditor({
       onSelect={(event) => syncInputCursor(event.currentTarget)}
       onKeyDown={(event) => {
         const input = event.currentTarget;
+        const liveMode = session.formulaEdit?.mode ?? mode;
         const liveSuggest = suggestOpen
           ? suggestFormula(draft, input.selectionStart || draft.length, layout)
           : [];
-        const action = formulaKeyAction(mode, event, {
+        const action = formulaKeyAction(liveMode, event, {
           suggestVisible: liveSuggest.length > 0,
           isFormula: canPointFromDraft(draft),
         });
@@ -195,10 +314,10 @@ export function SpreadsheetTextEditor({
         if (action === "toggle-mode" || action === "toggle-text") {
           event.preventDefault();
           event.stopPropagation();
-          const nextMode = toggleOverlayNavMode(mode);
+          const nextMode = toggleOverlayNavMode(liveMode);
           session.setFormulaEditMode(nextMode);
-          if (mode !== "edit") {
-            requestAnimationFrame(() => applySelection(input, input.value.length, input.value.length));
+          if (liveMode !== "edit") {
+            rememberSelection(input.value.length, input.value.length);
           }
           return;
         }
@@ -215,14 +334,14 @@ export function SpreadsheetTextEditor({
           );
           writeDraft(applied.draft, applied.caret, applied.caret);
           session.setFormulaEditMode("enter");
-          pendingSelectionRef.current = { start: applied.caret, end: applied.caret };
-          applySelection(input, applied.caret, applied.caret);
           return;
         }
-        if (action !== "point-cell" && action !== "extend-range") return;
+        if (action !== "point-cell" && action !== "extend-range") {
+          event.stopPropagation();
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
-        syncInputCursor(input);
         const movement = overlayArrowMovement(event.key);
         if (!movement) return;
         const pointed = pointFromArrow(session, editingLocation, movement, projection, layout, {
@@ -231,15 +350,10 @@ export function SpreadsheetTextEditor({
         if (!pointed || !session.formulaEdit) return;
         const nextDraft = session.formulaEdit.draft;
         const span = session.formulaEdit.activeFormulaRef;
-        const start = span?.start ?? nextDraft.length;
-        const end = span?.end ?? nextDraft.length;
-        pendingSelectionRef.current = { start, end };
-        selectionRef.current = { start, end };
-        setDraft(nextDraft);
-        if (value.kind === GridCellKind.Text) onChange({ ...value, data: nextDraft });
-        applySelection(input, start, end);
+        writeDraft(nextDraft, span?.start ?? nextDraft.length, span?.end ?? nextDraft.length);
       }}
     />
+    </div>
       <FormulaSuggestList
         items={suggestions}
         active={activeSuggest}
@@ -250,4 +364,22 @@ export function SpreadsheetTextEditor({
       />
     </>
   );
+}
+
+function identifierDraftError(editing: ProjectedCell, snapshot: WorkbookSnapshot, draft: string): string | undefined {
+  if (editing.kind === "table") {
+    if (editing.hit.kind === "key") return invalidRowKey(snapshot, editing.hit.tableId, editing.hit.rowId, draft);
+    if (editing.hit.kind === "header" && editing.hit.columnId !== KEY_COLUMN_ID) {
+      return invalidColumnName(snapshot, editing.hit.tableId, editing.hit.columnId, draft);
+    }
+    return undefined;
+  }
+  if (editing.kind !== "extension") return undefined;
+  if (editing.expansion.direction === "below" && editing.expansion.columnId === KEY_COLUMN_ID) {
+    return invalidRowKey(snapshot, editing.expansion.tableId, null, draft);
+  }
+  if (editing.expansion.direction === "right" && editing.expansion.rowId === null) {
+    return invalidColumnName(snapshot, editing.expansion.tableId, null, draft);
+  }
+  return undefined;
 }

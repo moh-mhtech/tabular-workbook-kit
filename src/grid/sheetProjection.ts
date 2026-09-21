@@ -221,7 +221,7 @@ export function projectedLocationForRef(
   return [col, row + 1];
 }
 
-/** Walks Enter/Tab from a committed cell onto the next data cell or unused growth cell. */
+/** Walks Enter/Tab from a committed cell onto the next selectable cell, including Key, Header, and Growth. */
 export function cellAfterCommitMove(
   projection: SheetGridProjection,
   layout: WorkbookLayout,
@@ -233,7 +233,7 @@ export function cellAfterCommitMove(
   let row = from[1] + movement[1];
   while (col >= 0 && row >= 0 && col < projection.colCount && row < projection.rowCount) {
     const projected = projectedCell(projection, layout, col, row);
-    if (projected.kind === "extension" || (projected.kind === "table" && projected.hit.kind === "cell")) {
+    if (projected.kind === "extension" || projected.kind === "table") {
       return { location: [col, row], selection: selectionForProjectedCell(projection, layout, col, row) };
     }
     col += movement[0];

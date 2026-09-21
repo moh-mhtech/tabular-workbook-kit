@@ -1,5 +1,6 @@
 import { a1, columnLetters, findColumn, valueColumn, type LaidOutColumn, type TableLayout, type WorkbookLayout } from "../model/layout.js";
 import { canRegisterDefinedName, getCellName, promotedNames } from "../model/names.js";
+import { IDENT_CONT, IDENTIFIER } from "../model/structure.js";
 import { resolveTimeToken } from "../model/yearColumns.js";
 
 export interface CompileContext {
@@ -13,18 +14,21 @@ export interface CompileContext {
   directKnownRows?: boolean;
 }
 
-const QUALIFIED =
-  /(?:([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)\.)?([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)\[([^\]]+)\](?:\[([^\]]+)\])?/g;
-const LOCAL_PAIR = /(?<![A-Za-z0-9_ÆØÅæøå.])\[([^\]]+)\](?:\[([^\]]+)\])?/g;
+const QUALIFIED = new RegExp(
+  `(?:(${IDENTIFIER})\\.)?(${IDENTIFIER})\\[([^\\]]+)\\](?:\\[([^\\]]+)\\])?`,
+  "gu",
+);
+const LOCAL_PAIR = new RegExp(`(?<![${IDENT_CONT}.])\\[([^\\]]+)\\](?:\\[([^\\]]+)\\])?`, "gu");
 const AT = /^@([+-]\d+)?$/;
-const ATOM_REF =
-  "(?:(?:[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\\.)?[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*(?![A-Za-z0-9ÆØÅæøå_]|\\s*\\())";
-const RANGE_REF = new RegExp(`(${ATOM_REF}):(${ATOM_REF})`, "g");
+const ATOM_REF = `(?:(?:${IDENTIFIER}\\.)?${IDENTIFIER}\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|${IDENTIFIER}(?![${IDENT_CONT}]|\\s*\\())`;
+const RANGE_REF = new RegExp(`(${ATOM_REF}):(${ATOM_REF})`, "gu");
 
 export function compileFormula(formula: string, ctx: CompileContext): string {
   const source = formula.trim().startsWith("=") ? formula.trim().slice(1) : formula.trim();
 
   RANGE_REF.lastIndex = 0;
+  QUALIFIED.lastIndex = 0;
+  LOCAL_PAIR.lastIndex = 0;
   let out = source.replace(RANGE_REF, (full, left: string, right: string) => {
     try {
       const compiled = compileRefRange(left, right, ctx);
@@ -94,7 +98,7 @@ function resolveAuthoringCell(
   ctx: CompileContext,
 ): { table: TableLayout; rowId: string; columnId: string } | undefined {
   const qualified = text.match(
-    /^(?:([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)\.)?([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)\[([^\]]+)\](?:\[([^\]]+)\])?$/,
+    new RegExp(`^(?:(${IDENTIFIER})\\.)?(${IDENTIFIER})\\[([^\\]]+)\\](?:\\[([^\\]]+)\\])?$`, "u"),
   );
   if (qualified) {
     const table = ctx.layout.tablesByName.get(qualified[2]!.toLowerCase());

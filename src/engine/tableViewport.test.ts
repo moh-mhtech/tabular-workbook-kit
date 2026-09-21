@@ -42,6 +42,6 @@ describe("createTableViewport", () => {
 
     expect(sheet.rowData?.[view.bands[0].headerRow]?.hd).toBe(BooleanNumber.TRUE);
     expect(sheet.rowData?.[target.headerRow]?.hd).toBe(BooleanNumber.FALSE);
-    expect(sheet.cellData?.[target.headerRow]?.[target.startCol]?.v).toBe("key");
+    expect(sheet.cellData?.[target.headerRow]?.[target.startCol]).toBeUndefined();
   });
 });

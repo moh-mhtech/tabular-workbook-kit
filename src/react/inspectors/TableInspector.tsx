@@ -16,7 +16,6 @@ export function TableInspector({ tableId }: { tableId: string }) {
   if (!table) return null;
   return (
     <section>
-      <h3>Table</h3>
       <label>
         Name
         <input

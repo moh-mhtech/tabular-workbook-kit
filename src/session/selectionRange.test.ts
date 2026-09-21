@@ -11,6 +11,15 @@ const range = [
 ];
 
 describe("selected cell range properties", () => {
+  it("reveals a table even when it is already selected", () => {
+    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    session.revealTable("tbl-params");
+    expect(session.selection).toEqual({ kind: "table", tableId: "tbl-params" });
+    const first = session.revealNonce;
+    session.revealTable("tbl-params");
+    expect(session.revealNonce).toBe(first + 1);
+  });
+
   it("reports * when formats differ and writes one format to every cell", () => {
     const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
     session.setSelection({

@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { formatDisplayValue, resolveCellFormat } from "../model/numberFormat.js";
 import { KEY_COLUMN_ID, isCellSelection, selectedCellRefs, sharedOrStar } from "../model/types.js";
 import { blurOnEnter } from "./blurOnEnter.js";
+import { moveSelectionAfterCommit } from "./customGridInteractions.js";
+import { commitKeyMovement } from "./customGridOverlay.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 import { WorkbookInspector } from "./inspectors/WorkbookInspector.js";
 import { SheetInspector } from "./inspectors/SheetInspector.js";
@@ -43,9 +45,11 @@ export function PropertiesPanel({
     <aside className="wk-properties">
       <h2>{selectionTitle(selection)}</h2>
       {selection?.kind === "cell" ? (
-        <CellNameField tableId={selection.tableId} rowId={selection.rowId} columnId={selection.columnId} />
+        <>
+          <CellNameField tableId={selection.tableId} rowId={selection.rowId} columnId={selection.columnId} />
+          <FormulaField />
+        </>
       ) : null}
-      <FormulaField />
       {!selection || selection.kind === "workbook" ? (
         <>
           <WorkbookInspector label={workbookLabel} />
@@ -156,7 +160,7 @@ function FormulaField() {
         if (!table || !row || !cellSel) return;
         session.beginFormulaEdit(table.id, row.id, cellSel.columnId, next);
       }}
-      onCommit={(next) => {
+      onCommit={(next, movement) => {
         if (!refs.length) return;
         if (next === "*" && committed === "*") return;
         tryCall(() => {
@@ -170,6 +174,7 @@ function FormulaField() {
               else session.writeCell(targetTable.name, targetRow.key, ref.columnId, next);
             }
           });
+          if (movement) moveSelectionAfterCommit(session, snapshot, movement);
         });
       }}
       onCancel={() => session.cancelFormulaEdit()}
@@ -193,7 +198,7 @@ function FormulaDraft({
   disabled: boolean;
   resetKey: string;
   onChange: (value: string) => void;
-  onCommit: (value: string) => void;
+  onCommit: (value: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => void;
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState(committed);
@@ -226,8 +231,17 @@ function FormulaDraft({
         }}
         onBlur={() => onCommit(draft)}
         onKeyDown={(e) => {
-          if (e.key === "Escape") onCancel();
-          else blurOnEnter(e);
+          if (e.key === "Escape") {
+            onCancel();
+            return;
+          }
+          const movement = commitKeyMovement(e);
+          if (movement) {
+            e.preventDefault();
+            onCommit(draft, movement);
+            return;
+          }
+          blurOnEnter(e);
         }}
       />
       {evaluated !== undefined ? <span className="wk-evaluated">{evaluated}</span> : null}

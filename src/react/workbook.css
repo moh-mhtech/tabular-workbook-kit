@@ -200,7 +200,7 @@
 }
 
 .wk-canvas {
-  padding: 16px 20px 40px;
+  padding: 16px 20px;
   overflow: auto;
   height: 100%;
   box-sizing: border-box;
@@ -520,9 +520,23 @@
   align-items: flex-start;
   gap: 20px;
   min-width: 0;
+  overflow-y: auto;
+}
+
+.wk-table-canvases.is-table-scroll-x {
+  overflow-x: hidden;
+}
+
+.wk-table-canvases.is-sheet-scroll-x {
+  overflow-x: auto;
 }
 
 .wk-table-viewport-card {
+  flex: 0 0 auto;
+}
+
+.wk-table-canvases.is-table-scroll-x .wk-table-viewport-card,
+.wk-table-canvases.is-table-scroll-x .wk-table-spreadsheet {
   max-width: 100%;
 }
 
@@ -538,12 +552,57 @@
 }
 
 .wk-table-spreadsheet {
-  max-width: 100%;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid #d7dee8;
-  background: #fff;
+  border: 0;
+  background: #eef2f6;
   box-sizing: border-box;
+}
+
+/* Glide still paints a 1px header overlay when headerHeight is 0. */
+.wk-table-spreadsheet canvas:not([data-testid="data-grid-canvas"]) {
+  display: none;
+}
+
+/*
+ * Crop the y=0.5 grid line on the bitmap. Ancestor clip-path fails on wide
+ * tables because .dvn-scroller uses translate3d and composites the stroke
+ * fully inside the visible box.
+ */
+.wk-table-spreadsheet canvas[data-testid="data-grid-canvas"] {
+  clip-path: inset(1px 0 0 0);
+}
+
+.wk-table-spreadsheet .dvn-scroller {
+  overflow-y: hidden !important;
+  background: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: #c5d0dc transparent;
+}
+
+.wk-table-spreadsheet .dvn-scroller::-webkit-scrollbar {
+  height: 16px;
+}
+
+.wk-table-spreadsheet .dvn-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.wk-table-spreadsheet .dvn-scroller::-webkit-scrollbar-thumb {
+  background: #c5d0dc;
+  border-radius: 8px;
+}
+
+.wk-table-spreadsheet .dvn-scroller::-webkit-scrollbar-button {
+  display: none;
+}
+
+.wk-table-canvases.is-table-scroll-x .wk-table-spreadsheet .dvn-scroller {
+  overflow-x: auto !important;
+}
+
+.wk-table-canvases.is-sheet-scroll-x .wk-table-spreadsheet .dvn-scroller {
+  overflow-x: hidden !important;
 }
 
 .wk-table-spreadsheet-host,

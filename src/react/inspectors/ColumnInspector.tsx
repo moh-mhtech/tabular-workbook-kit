@@ -21,7 +21,6 @@ export function ColumnInspector({ tableId, columnId }: { tableId: string; column
   const format = col?.format ?? table.columnFormats?.[columnId] ?? "";
   return (
     <section>
-      <h3>Column</h3>
       {col ? (
         <label>
           Name

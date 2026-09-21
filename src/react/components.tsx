@@ -45,7 +45,7 @@ export function Explorer({ workbookLabel = "Workbook" }: { workbookLabel?: strin
                     className="wk-explorer-table"
                     onClick={() => {
                       setActiveSheetId(sheet.id);
-                      session.setSelection({ kind: "table", tableId: table.id });
+                      session.revealTable(table.id);
                     }}
                   >
                     {table.name}

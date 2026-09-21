@@ -8,6 +8,11 @@ import {
 } from "../model/sheetView.js";
 import { overlayKey, type CellRef, type Selection } from "../model/types.js";
 
+export const TABLE_KEY_COLUMN_WIDTH = 48;
+export const TABLE_GROWTH_COLUMN_WIDTH = 48;
+export const TABLE_DATA_COLUMN_WIDTH = 110;
+export const GROWTH_HEADER_MARK = "+";
+
 export interface SheetGridColumn {
   id: string;
   title: string;
@@ -84,12 +89,50 @@ export function projectTable(layout: WorkbookLayout, tableId: string): SheetGrid
       const column = tableLayout.columns[index];
       return {
         id: column?.id ?? `empty-${index}`,
-        title: column?.name ?? "",
-        width: index === 0 ? 150 : 110,
+        title: column && column.kind !== "key" ? column.name : "",
+        width: !column
+          ? TABLE_GROWTH_COLUMN_WIDTH
+          : column.kind === "key"
+            ? TABLE_KEY_COLUMN_WIDTH
+            : TABLE_DATA_COLUMN_WIDTH,
       };
     }),
     view,
   };
+}
+
+/** Growth-row key and growth-column header — the add-row / add-column affordances. */
+export function isGrowthHeaderCell(
+  projection: SheetGridProjection,
+  col: number,
+  row: number,
+): boolean {
+  if (isUnusedTableCorner(projection, col, row)) return false;
+  return (col === 0 && row === projection.rowCount - 1) || (row === 0 && col === projection.colCount - 1);
+}
+
+/** Key header and unused growth corner — not fields, not expansion cells. */
+export function isUnusedTableCorner(
+  projection: SheetGridProjection,
+  col: number,
+  row: number,
+): boolean {
+  const sheetRow = row + projection.originRow;
+  const sheetCol = col + projection.originCol;
+  return projection.view.bands.some((band) => {
+    const topLeft = sheetRow === band.headerRow && sheetCol === band.startCol;
+    const bottomRight =
+      sheetRow === band.headerRow + band.rowCount && sheetCol === band.startCol + band.colCount;
+    return topLeft || bottomRight;
+  });
+}
+
+export function acceptTableGridSelection(
+  projection: SheetGridProjection,
+  cell: readonly [number, number] | undefined,
+): boolean {
+  if (!cell) return true;
+  return !isUnusedTableCorner(projection, cell[0], cell[1]);
 }
 
 export function projectedCell(
@@ -103,6 +146,9 @@ export function projectedCell(
   }
   const sheetRow = row + projection.originRow;
   const sheetCol = col + projection.originCol;
+  if (isUnusedTableCorner(projection, col, row)) {
+    return { kind: "readonly", row, col };
+  }
   const hit = hitTest(projection.view, layout.snapshot, sheetRow, sheetCol, layout.periods);
   if (hit.kind !== "outside" && hit.kind !== "gap") {
     return { kind: "table", row, col, hit };
@@ -113,6 +159,11 @@ export function projectedCell(
     : { kind: "readonly", row, col };
 }
 
+function isLockedGrowthMargin(projection: SheetGridProjection, col: number, row: number): boolean {
+  if (!projection.tableId || isUnusedTableCorner(projection, col, row)) return false;
+  return col === projection.colCount - 1 || row === projection.rowCount - 1;
+}
+
 export function selectionForProjectedCell(
   projection: SheetGridProjection,
   layout: WorkbookLayout,
@@ -121,7 +172,12 @@ export function selectionForProjectedCell(
 ): Selection {
   const cell = projectedCell(projection, layout, col, row);
   if (cell.kind === "extension") return { kind: "table", tableId: cell.expansion.tableId };
-  if (cell.kind === "readonly") return { kind: "sheet", sheetId: projection.sheetId };
+  if (cell.kind === "readonly") {
+    if (projection.tableId && isLockedGrowthMargin(projection, col, row)) {
+      return { kind: "table", tableId: projection.tableId };
+    }
+    return { kind: "sheet", sheetId: projection.sheetId };
+  }
   const hit = cell.hit;
   if (hit.kind === "cell") {
     return {
@@ -133,6 +189,40 @@ export function selectionForProjectedCell(
   }
   if (hit.kind === "key") return { kind: "row", tableId: hit.tableId, rowId: hit.rowId };
   return { kind: "column", tableId: hit.tableId, columnId: hit.columnId };
+}
+
+export function projectedLocationForRef(
+  projection: SheetGridProjection,
+  layout: WorkbookLayout,
+  ref: CellRef,
+): readonly [number, number] | undefined {
+  const table = layout.tables.get(ref.tableId);
+  if (!table || (projection.tableId && projection.tableId !== ref.tableId)) return undefined;
+  const col = table.columns.findIndex((column) => column.id === ref.columnId);
+  const row = table.rows.findIndex((candidate) => candidate.id === ref.rowId);
+  if (col < 0 || row < 0) return undefined;
+  return [col + table.band.startCol - projection.originCol, row + 1 + table.band.headerRow - projection.originRow];
+}
+
+/** Walks Enter/Tab from a committed cell onto the next data cell or unused growth cell. */
+export function cellAfterCommitMove(
+  projection: SheetGridProjection,
+  layout: WorkbookLayout,
+  from: readonly [number, number],
+  movement: readonly [-1 | 0 | 1, -1 | 0 | 1],
+): { location: readonly [number, number]; selection: Selection } | undefined {
+  if (movement[0] === 0 && movement[1] === 0) return undefined;
+  let col = from[0] + movement[0];
+  let row = from[1] + movement[1];
+  while (col >= 0 && row >= 0 && col < projection.colCount && row < projection.rowCount) {
+    const projected = projectedCell(projection, layout, col, row);
+    if (projected.kind === "extension" || (projected.kind === "table" && projected.hit.kind === "cell")) {
+      return { location: [col, row], selection: selectionForProjectedCell(projection, layout, col, row) };
+    }
+    col += movement[0];
+    row += movement[1];
+  }
+  return undefined;
 }
 
 export function cellsInProjectedRange(

@@ -12,6 +12,7 @@ import {
   formulaRefSpans,
   isSpreadsheetPointEvent,
   nextPointableCell,
+  commitKeyMovement,
   overlayArrowMovement,
   overlayKeyAction,
   pointAtProjectedCell,
@@ -26,6 +27,13 @@ describe("custom grid overlay navigation", () => {
   it("toggles between pointing at cells and in-cell caret", () => {
     expect(toggleOverlayNavMode("cells")).toBe("text");
     expect(toggleOverlayNavMode("text")).toBe("cells");
+  });
+
+  it("maps Enter and Tab to the next cell after a commit", () => {
+    expect(commitKeyMovement({ key: "Enter" })).toEqual([0, 1]);
+    expect(commitKeyMovement({ key: "Tab" })).toEqual([1, 0]);
+    expect(commitKeyMovement({ key: "Tab", shiftKey: true })).toEqual([-1, 0]);
+    expect(commitKeyMovement({ key: "Enter", shiftKey: true })).toBeUndefined();
   });
 
   it("maps arrow keys to overlay movement", () => {

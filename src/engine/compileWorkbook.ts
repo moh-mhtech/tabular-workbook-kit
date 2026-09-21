@@ -43,6 +43,7 @@ export function snapshotToUniverData(snapshot: WorkbookSnapshot, engineLayout?: 
       const tableLayout = layout.tables.get(band.tableId);
       if (!tableLayout) continue;
       for (const col of tableLayout.columns) {
+        if (col.kind === "key") continue;
         setCell(band.headerRow, col.colIndex, { v: col.name });
       }
       for (const row of tableLayout.rows) {

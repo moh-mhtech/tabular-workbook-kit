@@ -30,6 +30,15 @@ export function toggleOverlayNavMode(mode: OverlayNavMode): OverlayNavMode {
   return mode === "cells" ? "text" : "cells";
 }
 
+export function commitKeyMovement(event: {
+  key: string;
+  shiftKey?: boolean;
+}): readonly [-1 | 0 | 1, -1 | 0 | 1] | undefined {
+  if (event.key === "Enter" && !event.shiftKey) return [0, 1];
+  if (event.key === "Tab") return [event.shiftKey ? -1 : 1, 0];
+  return undefined;
+}
+
 export function overlayArrowMovement(key: string): readonly [-1 | 0 | 1, -1 | 0 | 1] | undefined {
   switch (key) {
     case "ArrowUp":

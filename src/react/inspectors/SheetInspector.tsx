@@ -16,7 +16,6 @@ export function SheetInspector({ sheetId }: { sheetId: string }) {
   if (!sheet) return null;
   return (
     <section>
-      <h3>Sheet</h3>
       <label>
         Name
         <input
@@ -24,6 +23,18 @@ export function SheetInspector({ sheetId }: { sheetId: string }) {
           onBlur={(e) => tryCall(() => session.renameSheet(sheet.id, e.target.value))}
           onKeyDown={blurOnEnter}
         />
+      </label>
+      <label>
+        Horizontal scroll
+        <select
+          value={sheet.horizontalScroll ?? "table"}
+          onChange={(e) =>
+            tryCall(() => session.setSheetHorizontalScroll(sheet.id, e.target.value === "sheet" ? "sheet" : "table"))
+          }
+        >
+          <option value="table">Per table</option>
+          <option value="sheet">Sheet</option>
+        </select>
       </label>
       {sheet.locked ? null : (
         <button type="button" onClick={() => tryCall(() => session.deleteSheet(sheet.id))}>

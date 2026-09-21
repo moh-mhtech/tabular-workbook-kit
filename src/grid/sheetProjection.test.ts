@@ -2,10 +2,18 @@ import { describe, expect, it } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
 import {
+  TABLE_DATA_COLUMN_WIDTH,
+  TABLE_GROWTH_COLUMN_WIDTH,
+  TABLE_KEY_COLUMN_WIDTH,
+  cellAfterCommitMove,
   cellsInProjectedRange,
+  acceptTableGridSelection,
+  isGrowthHeaderCell,
+  isUnusedTableCorner,
   projectSheet,
   projectTable,
   projectedCell,
+  projectedLocationForRef,
   selectionForProjectedCell,
 } from "./sheetProjection.js";
 
@@ -80,17 +88,80 @@ describe("sheet grid projection", () => {
     ]);
   });
 
+  it("maps a committed cell to the next row or column", () => {
+    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const params = projectTable(layout, "tbl-params")!;
+    const salg = projectTable(layout, "tbl-salg")!;
+
+    expect(projectedLocationForRef(params, layout, {
+      tableId: "tbl-params",
+      rowId: "row-vat",
+      columnId: "Value",
+    })).toEqual([1, 3]);
+    expect(cellAfterCommitMove(params, layout, [1, 3], [0, 1])).toEqual({
+      location: [1, 4],
+      selection: { kind: "cell", tableId: "tbl-params", rowId: "row-andel-cnc", columnId: "Value" },
+    });
+    expect(cellAfterCommitMove(params, layout, [1, 3], [1, 0])).toBeUndefined();
+    expect(cellAfterCommitMove(params, layout, [1, 7], [0, 1])).toEqual({
+      location: [1, 8],
+      selection: { kind: "table", tableId: "tbl-params" },
+    });
+
+    expect(cellAfterCommitMove(salg, layout, [1, 1], [1, 0])).toEqual({
+      location: [2, 1],
+      selection: { kind: "cell", tableId: "tbl-salg", rowId: "row-cnc", columnId: "2025-02" },
+    });
+    expect(cellAfterCommitMove(salg, layout, [1, 1], [0, 1])).toEqual({
+      location: [1, 2],
+      selection: { kind: "cell", tableId: "tbl-salg", rowId: "row-out", columnId: "2025-01" },
+    });
+    expect(cellAfterCommitMove(salg, layout, [1, 4], [0, 1])).toEqual({
+      location: [1, 5],
+      selection: { kind: "table", tableId: "tbl-salg" },
+    });
+  });
+
   it("uses table column names as identifiers instead of ABC defaults", () => {
     const layout = layoutWorkbook(createPlaygroundWorkbook());
     const projection = projectTable(layout, "tbl-params")!;
 
-    expect(projection.columns.map((column) => column.title)).toEqual(["key", "Value", ""]);
+    expect(projection.columns.map((column) => column.title)).toEqual(["", "Value", ""]);
     expect(projection.rowCount).toBe(9);
     expect(projection.originRow).toBe(0);
+    expect(projectedCell(projection, layout, 0, 0)).toEqual({ kind: "readonly", row: 0, col: 0 });
+    expect(projectedCell(projection, layout, 2, 8)).toEqual({ kind: "readonly", row: 8, col: 2 });
+    expect(isUnusedTableCorner(projection, 0, 0)).toBe(true);
+    expect(isUnusedTableCorner(projection, 2, 8)).toBe(true);
+    expect(acceptTableGridSelection(projection, [0, 0])).toBe(false);
+    expect(acceptTableGridSelection(projection, [2, 8])).toBe(false);
+    expect(acceptTableGridSelection(projection, [1, 1])).toBe(true);
     expect(projectedCell(projection, layout, 0, 1)).toMatchObject({
       kind: "table",
       hit: { kind: "key", tableId: "tbl-params", rowId: "row-aarsalg" },
     });
+    expect(isGrowthHeaderCell(projection, 0, 8)).toBe(true);
+    expect(isGrowthHeaderCell(projection, 2, 0)).toBe(true);
+    expect(isGrowthHeaderCell(projection, 0, 0)).toBe(false);
+    expect(isGrowthHeaderCell(projection, 2, 8)).toBe(false);
+    expect(isGrowthHeaderCell(projection, 1, 1)).toBe(false);
+  });
+
+  it("uses a narrower default width for the key and growth columns", () => {
+    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const params = projectTable(layout, "tbl-params")!;
+    const salg = projectTable(layout, "tbl-salg")!;
+
+    expect(params.columns.map((column) => column.width)).toEqual([
+      TABLE_KEY_COLUMN_WIDTH,
+      TABLE_DATA_COLUMN_WIDTH,
+      TABLE_GROWTH_COLUMN_WIDTH,
+    ]);
+    expect(salg.columns[0]?.width).toBe(TABLE_KEY_COLUMN_WIDTH);
+    expect(salg.columns.at(-1)?.width).toBe(TABLE_GROWTH_COLUMN_WIDTH);
+    expect(salg.columns.slice(1, -1).every((column) => column.width === TABLE_DATA_COLUMN_WIDTH)).toBe(true);
+    expect(TABLE_KEY_COLUMN_WIDTH).toBeLessThan(TABLE_DATA_COLUMN_WIDTH);
+    expect(TABLE_GROWTH_COLUMN_WIDTH).toBeLessThan(TABLE_DATA_COLUMN_WIDTH);
   });
 
   it("keeps inter-table gaps visible but read-only", () => {
@@ -108,6 +179,20 @@ describe("sheet grid projection", () => {
     expect(projectedCell(projection, layout, 1, 10)).toMatchObject({
       kind: "table",
       hit: { kind: "header", tableId: "tbl-salg" },
+    });
+  });
+
+  it("keeps a time-axis growth column selected as the table, not the sheet", () => {
+    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const salg = projectTable(layout, "tbl-salg")!;
+    const growthCol = salg.colCount - 1;
+    expect(selectionForProjectedCell(salg, layout, growthCol, 0)).toEqual({
+      kind: "table",
+      tableId: "tbl-salg",
+    });
+    expect(selectionForProjectedCell(salg, layout, growthCol, 1)).toEqual({
+      kind: "table",
+      tableId: "tbl-salg",
     });
   });
 });

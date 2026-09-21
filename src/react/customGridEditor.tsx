@@ -4,6 +4,7 @@ import { projectedCell, type SheetGridProjection } from "../grid/sheetProjection
 import type { WorkbookLayout } from "../model/layout.js";
 import {
   applyFormulaOperator,
+  commitKeyMovement,
   overlayArrowMovement,
   overlayKeyAction,
   pointFromArrow,
@@ -22,6 +23,7 @@ export type OverlayEditorProps = {
 export function SpreadsheetTextEditor({
   value,
   onChange,
+  onFinishedEditing,
   isHighlighted,
   initialNavMode,
   editingLocation,
@@ -135,6 +137,15 @@ export function SpreadsheetTextEditor({
       onSelect={(event) => syncInputCursor(event.currentTarget)}
       onKeyDown={(event) => {
         const input = event.currentTarget;
+        const commitMove = commitKeyMovement(event);
+        if (commitMove) {
+          event.preventDefault();
+          event.stopPropagation();
+          const next = value.kind === GridCellKind.Text ? { ...value, data: draft } : value;
+          if (value.kind === GridCellKind.Text) onChange(next);
+          onFinishedEditing(next, commitMove);
+          return;
+        }
         const action = overlayKeyAction(mode, event);
         if (action === "toggle-text") {
           event.preventDefault();

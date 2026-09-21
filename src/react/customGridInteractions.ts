@@ -1,14 +1,80 @@
 import { effectiveCell } from "../engine/compileWorkbook.js";
-import type { WorkbookLayout } from "../model/layout.js";
+import { layoutWorkbook, type WorkbookLayout } from "../model/layout.js";
+import { isCellSelection, type Selection, type WorkbookSnapshot } from "../model/types.js";
 import type { WorkbookSession } from "../session/WorkbookSession.js";
 import {
+  cellAfterCommitMove,
+  cellsInProjectedRange,
+  projectTable,
   projectedCell,
+  projectedLocationForRef,
+  selectionForProjectedCell,
   type SheetGridProjection,
 } from "../grid/sheetProjection.js";
+import type { TableSnapshot } from "../model/types.js";
 
 export interface CustomGridEdit {
   location: readonly [number, number];
   value: { data?: unknown };
+}
+
+export interface GridRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export function focusAfterCommitMove(
+  session: WorkbookSession,
+  tableId: string,
+  from: readonly [number, number],
+  movement: readonly [-1 | 0 | 1, -1 | 0 | 1],
+): { location: readonly [number, number]; selection: Selection } | undefined {
+  const layout = layoutWorkbook(session.getSnapshot());
+  const projection = projectTable(layout, tableId);
+  if (!projection) return undefined;
+  const next = cellAfterCommitMove(projection, layout, from, movement);
+  if (!next) return undefined;
+  session.gridFocus = { tableId, col: next.location[0], row: next.location[1] };
+  session.setSelection(next.selection);
+  return next;
+}
+
+export function moveSelectionAfterCommit(
+  session: WorkbookSession,
+  _snapshot: WorkbookSnapshot,
+  movement: readonly [-1 | 0 | 1, -1 | 0 | 1],
+): boolean {
+  const selection = session.selection;
+  if (!isCellSelection(selection)) return false;
+  const layout = layoutWorkbook(session.getSnapshot());
+  const projection = projectTable(layout, selection.tableId);
+  if (!projection) return false;
+  const from = projectedLocationForRef(projection, layout, selection);
+  if (!from) return false;
+  return Boolean(focusAfterCommitMove(session, selection.tableId, from, movement));
+}
+
+/** Copies a single typed value onto every data or growth cell in the range. */
+export function expandEditAcrossRange(
+  projection: SheetGridProjection,
+  layout: WorkbookLayout,
+  edits: readonly CustomGridEdit[],
+  range?: GridRect,
+): CustomGridEdit[] {
+  if (!range || edits.length !== 1) return [...edits];
+  const value = edits[0]!.value;
+  const filled: CustomGridEdit[] = [];
+  for (let row = range.y; row < range.y + range.height; row++) {
+    for (let col = range.x; col < range.x + range.width; col++) {
+      const projected = projectedCell(projection, layout, col, row);
+      if (projected.kind === "readonly") continue;
+      if (projected.kind === "table" && projected.hit.kind !== "cell") continue;
+      filled.push({ location: [col, row], value });
+    }
+  }
+  return filled.length ? filled : [...edits];
 }
 
 export function rawGridValue(value: { data?: unknown }): string {
@@ -16,6 +82,109 @@ export function rawGridValue(value: { data?: unknown }): string {
   if (data === null || data === undefined) return "";
   if (Array.isArray(data)) return data.join(", ");
   return String(data);
+}
+
+function liveTable(session: WorkbookSession, tableId: string) {
+  return session.getSnapshot().tables.find((table) => table.id === tableId);
+}
+
+function tableIdForPaste(
+  session: WorkbookSession,
+  projection: SheetGridProjection,
+  target: readonly [number, number],
+): string | undefined {
+  if (projection.tableId) return projection.tableId;
+  const layout = layoutWorkbook(session.getSnapshot());
+  const cell = projectedCell(projection, layout, target[0], target[1]);
+  if (cell.kind === "table") return cell.hit.tableId;
+  if (cell.kind === "extension") return cell.expansion.tableId;
+  return undefined;
+}
+
+function lastWritableCol(table: TableSnapshot, periodCount: number): number {
+  return table.attributeColumns.length + (table.timeAxis ? periodCount : 0);
+}
+
+function growTableToFit(
+  session: WorkbookSession,
+  tableId: string,
+  startCol: number,
+  startRow: number,
+  width: number,
+  height: number,
+) {
+  const neededRows = Math.max(0, startRow + height - 1);
+  while ((liveTable(session, tableId)?.rows.length ?? 0) < neededRows) {
+    session.addRow(tableId);
+  }
+  const table = liveTable(session, tableId);
+  if (!table || table.timeAxis || table.promoteRowKeys) return;
+  const neededLastCol = startCol + width - 1;
+  while (1 + (liveTable(session, tableId)?.attributeColumns.length ?? 0) <= neededLastCol) {
+    session.addColumn(tableId);
+  }
+}
+
+function selectPastedRange(
+  session: WorkbookSession,
+  tableId: string,
+  startCol: number,
+  startRow: number,
+  width: number,
+  height: number,
+) {
+  const layout = layoutWorkbook(session.getSnapshot());
+  const next = projectTable(layout, tableId);
+  if (!next) return;
+  session.gridFocus = { tableId, col: startCol, row: startRow };
+  const range = cellsInProjectedRange(next, layout, { x: startCol, y: startRow, width, height });
+  const origin = selectionForProjectedCell(next, layout, startCol, startRow);
+  if (origin.kind === "cell") {
+    session.setSelection(range.length ? { ...origin, range } : origin);
+  } else if (range[0]) {
+    session.setSelection({ kind: "cell", ...range[0], range });
+  }
+}
+
+/** Grows the table so a pasted block fits, then writes it as one undo step. */
+export function applyCustomGridPaste(
+  session: WorkbookSession,
+  projection: SheetGridProjection,
+  target: readonly [number, number],
+  values: readonly (readonly string[])[],
+): number {
+  const tableId = tableIdForPaste(session, projection, target);
+  if (!tableId || !values.length) return 0;
+  const height = values.length;
+  const width = values.reduce((max, row) => Math.max(max, row.length), 0);
+  if (!width) return 0;
+  const [startCol, startRow] = target;
+  let written = 0;
+  session.transact(() => {
+    growTableToFit(session, tableId, startCol, startRow, width, height);
+    const table = liveTable(session, tableId);
+    if (!table) return;
+    const lastCol = lastWritableCol(table, layoutWorkbook(session.getSnapshot()).periods.length);
+    const lastRow = table.rows.length;
+    for (let row = 0; row < values.length; row++) {
+      const line = values[row]!;
+      const gridRow = startRow + row;
+      if (gridRow > lastRow) continue;
+      for (let col = 0; col < line.length; col++) {
+        const gridCol = startCol + col;
+        if (gridCol > lastCol) continue;
+        session.writeGridCell(
+          projection.sheetId,
+          gridRow + projection.originRow,
+          gridCol + projection.originCol,
+          line[col] ?? "",
+        );
+        written += 1;
+      }
+    }
+  });
+  selectPastedRange(session, tableId, startCol, startRow, width, height);
+  return written;
 }
 
 /**
@@ -45,13 +214,6 @@ export function applyCustomGridEdits(
     }
   });
   return accepted.length;
-}
-
-export interface GridRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 
 export function applyCustomGridClear(

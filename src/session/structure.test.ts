@@ -59,6 +59,16 @@ describe("table structure editing", () => {
     expect(session.getTable("Params").rows.some((r) => r.key === "Note")).toBe(false);
   });
 
+  it("stores sheet horizontal scroll only when it is not the per-table default", async () => {
+    const session = await open();
+    const sheet = session.getSnapshot().sheets[1];
+    expect(sheet.horizontalScroll).toBeUndefined();
+    session.setSheetHorizontalScroll(sheet.id, "sheet");
+    expect(session.getSnapshot().sheets[1].horizontalScroll).toBe("sheet");
+    session.setSheetHorizontalScroll(sheet.id, "table");
+    expect(session.getSnapshot().sheets[1].horizontalScroll).toBeUndefined();
+  });
+
   it("adds a table to a sheet", async () => {
     const session = await open();
     const sheetId = session.getSnapshot().sheets[0].id;

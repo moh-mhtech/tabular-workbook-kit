@@ -17,7 +17,6 @@ export function RowInspector({ tableId, rowId }: { tableId: string; rowId: strin
   if (!table || !row) return null;
   return (
     <section>
-      <h3>Row</h3>
       <label>
         Key
         <input

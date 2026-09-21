@@ -33,6 +33,7 @@ import {
   type EvaluatedTable,
   type Primitive,
   type Selection,
+  type SheetHorizontalScroll,
   type TableSnapshot,
   type TimeGrain,
   type WorkbookSnapshot,
@@ -94,6 +95,8 @@ export class WorkbookSession {
   private txDirty = false;
   selection: Selection | null = null;
   formulaEdit: FormulaEdit | null = null;
+  revealNonce = 0;
+  gridFocus: { tableId: string; col: number; row: number } | null = null;
 
   constructor(snapshot: WorkbookSnapshot, engine: FormulaEngine = new UniverEngine()) {
     this.snapshot = cloneSnapshot(snapshot);
@@ -404,6 +407,7 @@ export class WorkbookSession {
       return;
     }
     if (hit.kind === "header") {
+      if (hit.columnId === KEY_COLUMN_ID) return;
       if (raw.trim()) this.renameColumn(hit.tableId, hit.columnId, raw);
       return;
     }
@@ -569,6 +573,17 @@ export class WorkbookSession {
   setSelection(selection: Selection | null) {
     if (JSON.stringify(this.selection) === JSON.stringify(selection)) return;
     this.selection = selection;
+    for (const listener of this.listeners) listener();
+  }
+
+  setGridFocus(focus: { tableId: string; col: number; row: number } | null) {
+    this.gridFocus = focus;
+    for (const listener of this.listeners) listener();
+  }
+
+  revealTable(tableId: string) {
+    this.selection = { kind: "table", tableId };
+    this.revealNonce += 1;
     for (const listener of this.listeners) listener();
   }
 
@@ -787,6 +802,17 @@ export class WorkbookSession {
     if (sheet.tableIds.length) throw new Error("Remove tables from the sheet first.");
     this.checkpoint();
     this.snapshot.sheets = this.snapshot.sheets.filter((s) => s.id !== sheet.id);
+    this.emit();
+  }
+
+  setSheetHorizontalScroll(sheetId: string, mode: SheetHorizontalScroll) {
+    const sheet = this.snapshot.sheets.find((s) => s.id === sheetId);
+    if (!sheet) throw new Error(`Unknown sheet "${sheetId}"`);
+    const next = mode === "sheet" ? "sheet" : undefined;
+    if (sheet.horizontalScroll === next) return;
+    this.checkpoint();
+    if (next) sheet.horizontalScroll = next;
+    else delete sheet.horizontalScroll;
     this.emit();
   }
 

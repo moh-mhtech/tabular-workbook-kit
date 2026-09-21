@@ -43,11 +43,15 @@ export interface TableSnapshot {
   columnFormats?: Record<string, string>;
 }
 
+export type SheetHorizontalScroll = "table" | "sheet";
+
 export interface SheetSnapshot {
   id: string;
   name: string;
   tableIds: string[];
   locked?: boolean;
+  /** Wide tables scroll inside each table, or the whole sheet scrolls. Omitted means per table. */
+  horizontalScroll?: SheetHorizontalScroll;
   /** Values typed on the grid outside every table band, keyed by `looseCellKey`. */
   looseCells?: Record<string, CellSnapshot>;
 }

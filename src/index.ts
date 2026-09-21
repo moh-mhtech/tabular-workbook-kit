@@ -12,6 +12,7 @@ export type {
   RowSnapshot,
   ScenarioSnapshot,
   Selection,
+  SheetHorizontalScroll,
   SheetSnapshot,
   TableSnapshot,
   TimeGrain,

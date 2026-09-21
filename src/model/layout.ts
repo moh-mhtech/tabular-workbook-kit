@@ -1,6 +1,7 @@
 import { buildPeriods, resolvePeriodToken, type Period } from "./calendar.js";
 import { layoutSheets, type TableBand } from "./sheetView.js";
 import { KEY_COLUMN_ID, type TableSnapshot, type WorkbookSnapshot } from "./types.js";
+import { tableYearColumns } from "./yearColumns.js";
 
 export interface LaidOutColumn {
   id: string;
@@ -8,6 +9,8 @@ export interface LaidOutColumn {
   kind: "key" | "attribute" | "period";
   colIndex: number;
   periodId?: string;
+  periodIds?: string[];
+  yearColumnId?: string;
 }
 
 export interface LaidOutRow {
@@ -33,6 +36,18 @@ export interface WorkbookLayout {
   sheets: ReturnType<typeof layoutSheets>;
   tables: Map<string, TableLayout>;
   tablesByName: Map<string, TableLayout>;
+}
+
+export function engineSheetSize(layout: WorkbookLayout, sheetId: string): { rowCount: number; colCount: number } {
+  const view = layout.sheets.find((sheet) => sheet.sheetId === sheetId);
+  let rowCount = view?.rowCount ?? 1;
+  let colCount = view?.colCount ?? 1;
+  for (const table of layout.tables.values()) {
+    if (table.sheetId !== sheetId) continue;
+    for (const column of table.columns) colCount = Math.max(colCount, column.colIndex + 2);
+    for (const row of table.rows) rowCount = Math.max(rowCount, row.rowIndex + 2);
+  }
+  return { rowCount, colCount };
 }
 
 export function layoutWorkbook(snapshot: WorkbookSnapshot): WorkbookLayout {
@@ -72,15 +87,17 @@ function buildTableLayout(
       colIndex: band.startCol + 1 + i,
     });
   });
-  if (table.timeAxis) {
-    const offset = columns.length;
-    periods.forEach((period, i) => {
+  for (const yearCol of tableYearColumns(table)) {
+    const months = periods.filter((period) => period.year === yearCol.year);
+    months.forEach((period) => {
       columns.push({
         id: period.id,
         name: period.label,
         kind: "period",
-        colIndex: band.startCol + offset + i,
+        colIndex: band.startCol + columns.length,
         periodId: period.id,
+        periodIds: [period.id],
+        yearColumnId: yearCol.id,
       });
     });
   }

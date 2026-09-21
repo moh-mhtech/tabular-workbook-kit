@@ -12,6 +12,7 @@ import {
   type SheetGridProjection,
 } from "../grid/sheetProjection.js";
 import type { TableSnapshot } from "../model/types.js";
+import { hasTimeColumns, visibleTimeColCount, writePeriodIds } from "../model/yearColumns.js";
 
 export interface CustomGridEdit {
   location: readonly [number, number];
@@ -101,8 +102,8 @@ function tableIdForPaste(
   return undefined;
 }
 
-function lastWritableCol(table: TableSnapshot, periodCount: number): number {
-  return table.attributeColumns.length + (table.timeAxis ? periodCount : 0);
+function lastWritableCol(table: TableSnapshot, periods: { year: number; month: number; id: string; label: string; index: number }[]): number {
+  return table.attributeColumns.length + visibleTimeColCount(table, periods);
 }
 
 function growTableToFit(
@@ -118,7 +119,7 @@ function growTableToFit(
     session.addRow(tableId);
   }
   const table = liveTable(session, tableId);
-  if (!table || table.timeAxis || table.promoteRowKeys) return;
+  if (!table || hasTimeColumns(table) || table.promoteRowKeys) return;
   const neededLastCol = startCol + width - 1;
   while (1 + (liveTable(session, tableId)?.attributeColumns.length ?? 0) <= neededLastCol) {
     session.addColumn(tableId);
@@ -164,7 +165,7 @@ export function applyCustomGridPaste(
     growTableToFit(session, tableId, startCol, startRow, width, height);
     const table = liveTable(session, tableId);
     if (!table) return;
-    const lastCol = lastWritableCol(table, layoutWorkbook(session.getSnapshot()).periods.length);
+    const lastCol = lastWritableCol(table, layoutWorkbook(session.getSnapshot()).periods);
     const lastRow = table.rows.length;
     for (let row = 0; row < values.length; row++) {
       const line = values[row]!;
@@ -270,14 +271,24 @@ export function readProjectedRaw(
   if (!table) return "";
   const hit = cell.hit;
   if (hit.kind === "header") {
-    return table.columns.find((column) => column.id === hit.columnId)?.name ?? "";
+    return (
+      projection.columns.find((column) => column.id === hit.columnId)?.title ||
+      table.columns.find((column) => column.id === hit.columnId)?.name ||
+      ""
+    );
   }
   if (hit.kind === "key") {
     return table.table.rows.find((candidate) => candidate.id === hit.rowId)?.key ?? "";
   }
-  const source = effectiveCell(session.getSnapshot(), hit.tableId, hit.rowId, hit.columnId);
-  if (source.kind === "formula") return source.formula ?? "";
-  if (source.value === null || source.value === undefined) return "";
+  const ids = writePeriodIds(table.table, hit.columnId, layout.periods);
+  const sources = ids.map((id) => effectiveCell(session.getSnapshot(), hit.tableId, hit.rowId, id));
+  const formulas = sources.filter((item) => item.kind === "formula").map((item) => item.formula ?? "");
+  if (formulas.length && formulas.every((item) => item === formulas[0])) return formulas[0] ?? "";
+  if (formulas.length) return formulas[0] ?? "";
+  const numbers = sources.map((item) => item.value).filter((value): value is number => typeof value === "number");
+  if (ids.length > 1 && numbers.length) return String(numbers.reduce((sum, value) => sum + value, 0));
+  const source = sources[0];
+  if (!source || source.value === null || source.value === undefined) return "";
   return String(source.value);
 }
 

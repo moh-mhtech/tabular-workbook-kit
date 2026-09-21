@@ -1,4 +1,5 @@
 import { a1, columnLetters, findColumn, valueColumn, type LaidOutColumn, type TableLayout, type WorkbookLayout } from "../model/layout.js";
+import { resolveTimeToken } from "../model/yearColumns.js";
 
 export interface CompileContext {
   layout: WorkbookLayout;
@@ -52,19 +53,36 @@ function compileRef(
   const colToken = resolveAt(first, table, ctx, "column");
   const rowToken = second !== undefined ? resolveAt(second, table, ctx, "row") : undefined;
 
+  const timeCols = timeColumns(table, colToken, ctx);
+
   if (rowToken !== undefined) {
-    const col = requireColumn(table, colToken, ctx);
-    if (isThisRow(rowToken, table, ctx)) {
-      if (ctx.engine === "range") return cellAddr(table, col, ctx.currentRowIndex!);
-      return local || table.table.id === ctx.currentTable?.table.id ? `[@${col.name}]` : `${name}[@${col.name}]`;
-    }
-    const row = table.keyByLower.get(rowToken.toLowerCase());
-    if (!row) throw new Error(`Unknown row "${rowToken}"`);
-    if (ctx.engine === "range") {
-      if (ctx.directKnownRows) return cellAddr(table, col, row.rowIndex);
-      return `INDEX(${colRange(table, col)},MATCH("${row.key}",${colRange(table, keyColumn(table))},0))`;
-    }
-    return `INDEX(${name}[${col.name}],MATCH("${row.key}",${name}[key],0))`;
+    const cols = timeCols.length ? timeCols : [requireColumn(table, colToken, ctx)];
+    const parts = cols.map((col) => {
+      if (isThisRow(rowToken, table, ctx)) {
+        if (ctx.engine === "range") return cellAddr(table, col, ctx.currentRowIndex!);
+        return local || table.table.id === ctx.currentTable?.table.id ? `[@${col.name}]` : `${name}[@${col.name}]`;
+      }
+      const row = table.keyByLower.get(rowToken.toLowerCase());
+      if (!row) throw new Error(`Unknown row "${rowToken}"`);
+      if (ctx.engine === "range") {
+        if (ctx.directKnownRows) return cellAddr(table, col, row.rowIndex);
+        return `INDEX(${colRange(table, col)},MATCH("${row.key}",${colRange(table, keyColumn(table))},0))`;
+      }
+      return `INDEX(${name}[${col.name}],MATCH("${row.key}",${name}[key],0))`;
+    });
+    return parts.length === 1 ? parts[0]! : `SUM(${parts.join(",")})`;
+  }
+
+  if (timeCols.length > 1) {
+    const parts = timeCols.map((col) => {
+      if (ctx.engine === "range") {
+        if (local && ctx.currentRowIndex !== undefined) return cellAddr(table, col, ctx.currentRowIndex);
+        return colRange(table, col);
+      }
+      if (local && table.table.id === ctx.currentTable?.table.id) return `[@${col.name}]`;
+      return `${name}[${col.name}]`;
+    });
+    return `SUM(${parts.join(",")})`;
   }
 
   const asColumn = tryColumn(table, colToken, ctx);
@@ -136,6 +154,14 @@ function currentColumn(table: TableLayout, ctx: CompileContext): LaidOutColumn |
 
 function tryColumn(table: TableLayout, token: string, ctx: CompileContext): LaidOutColumn | undefined {
   return findColumn(table, token, ctx.layout.periods);
+}
+
+function timeColumns(table: TableLayout, token: string, ctx: CompileContext): LaidOutColumn[] {
+  const periods = resolveTimeToken(token, ctx.layout.periods);
+  if (periods.length <= 1) return [];
+  return periods
+    .map((period) => table.columns.find((col) => col.periodId === period.id))
+    .filter((col): col is LaidOutColumn => Boolean(col));
 }
 
 function requireColumn(table: TableLayout, token: string, ctx: CompileContext): LaidOutColumn {

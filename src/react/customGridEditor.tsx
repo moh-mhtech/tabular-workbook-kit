@@ -1,9 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { GridCellKind, type GridCell, type Item } from "@glideapps/glide-data-grid";
+import { applySuggestion, suggestFormula } from "../formula/formulaSuggest.js";
 import { projectedCell, type SheetGridProjection } from "../grid/sheetProjection.js";
 import type { WorkbookLayout } from "../model/layout.js";
+import { FormulaSuggestList } from "./FormulaSuggestList.js";
 import {
   applyFormulaOperator,
+  canPointFromDraft,
   commitKeyMovement,
   overlayArrowMovement,
   overlayKeyAction,
@@ -46,13 +49,18 @@ export function SpreadsheetTextEditor({
   valueRef.current = value;
   const initial = value.kind === GridCellKind.Text ? value.data : "";
   const [draft, setDraft] = useState(initial);
+  const [activeSuggest, setActiveSuggest] = useState(0);
+  const [suggestOpen, setSuggestOpen] = useState(true);
   const sessionDraft = session.formulaEdit?.draft;
+  const suggestions = suggestOpen
+    ? suggestFormula(draft, selectionRef.current.start, layout)
+    : [];
 
   useLayoutEffect(() => {
     const target = projectedCell(projection, layout, editingLocation[0], editingLocation[1]);
     if (target.kind !== "table" || target.hit.kind !== "cell") return;
     session.beginFormulaEdit(target.hit.tableId, target.hit.rowId, target.hit.columnId, initial, {
-      pointing: true,
+      pointing: initial.trimStart().startsWith("="),
       editCell: projection.tableId
         ? { tableId: projection.tableId, col: editingLocation[0], row: editingLocation[1] }
         : undefined,
@@ -125,6 +133,7 @@ export function SpreadsheetTextEditor({
   };
 
   return (
+    <>
     <textarea
       ref={inputRef}
       className="wk-overlay-editor"
@@ -132,11 +141,37 @@ export function SpreadsheetTextEditor({
       value={draft}
       onChange={(event) => {
         const input = event.currentTarget;
+        setSuggestOpen(true);
+        setActiveSuggest(0);
         writeDraft(input.value, input.selectionStart ?? input.value.length, input.selectionEnd ?? input.value.length);
       }}
       onSelect={(event) => syncInputCursor(event.currentTarget)}
       onKeyDown={(event) => {
         const input = event.currentTarget;
+        if (event.key === "Escape" && suggestions.length) {
+          event.preventDefault();
+          event.stopPropagation();
+          setSuggestOpen(false);
+          return;
+        }
+        if (suggestions.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+          event.preventDefault();
+          event.stopPropagation();
+          setActiveSuggest((current) =>
+            event.key === "ArrowDown"
+              ? (current + 1) % suggestions.length
+              : (current - 1 + suggestions.length) % suggestions.length,
+          );
+          return;
+        }
+        if (suggestions.length && event.key === "Tab") {
+          event.preventDefault();
+          event.stopPropagation();
+          const picked = suggestions[activeSuggest] ?? suggestions[0]!;
+          const applied = applySuggestion(draft, input.selectionStart ?? draft.length, picked);
+          writeDraft(applied.draft, applied.caret, applied.caret);
+          return;
+        }
         const commitMove = commitKeyMovement(event);
         if (commitMove) {
           event.preventDefault();
@@ -172,7 +207,7 @@ export function SpreadsheetTextEditor({
           applySelection(input, applied.caret, applied.caret);
           return;
         }
-        if (action !== "point-cell") return;
+        if (action !== "point-cell" || !canPointFromDraft(draft)) return;
         event.preventDefault();
         event.stopPropagation();
         syncInputCursor(input);
@@ -191,5 +226,14 @@ export function SpreadsheetTextEditor({
         applySelection(input, start, end);
       }}
     />
+      <FormulaSuggestList
+        items={suggestions}
+        active={activeSuggest}
+        onPick={(item) => {
+          const applied = applySuggestion(draft, selectionRef.current.start, item);
+          writeDraft(applied.draft, applied.caret, applied.caret);
+        }}
+      />
+    </>
   );
 }

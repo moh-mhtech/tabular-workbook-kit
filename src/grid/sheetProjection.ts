@@ -7,6 +7,7 @@ import {
   type SheetView,
 } from "../model/sheetView.js";
 import { overlayKey, type CellRef, type Selection } from "../model/types.js";
+import { hideGrowthColumn, visibleTimeSlots } from "../model/yearColumns.js";
 
 export const TABLE_KEY_COLUMN_WIDTH = 48;
 export const TABLE_GROWTH_COLUMN_WIDTH = 48;
@@ -29,6 +30,7 @@ export interface SheetGridProjection {
   colCount: number;
   columns: SheetGridColumn[];
   view: SheetView;
+  growthColumn: boolean;
 }
 
 export type ProjectedCell =
@@ -66,38 +68,45 @@ export function projectSheet(layout: WorkbookLayout, sheetId: string): SheetGrid
       width: index === 0 ? 150 : 110,
     })),
     view,
+    growthColumn: true,
   };
 }
 
-/** One table plus its empty growth row and column. Identifiers are table names. */
+/** One table plus its empty growth row and optional growth column. Identifiers are table names. */
 export function projectTable(layout: WorkbookLayout, tableId: string): SheetGridProjection | null {
   const tableLayout = layout.tables.get(tableId);
   const view = layout.sheets.find((candidate) => candidate.sheetId === tableLayout?.sheetId);
   if (!tableLayout || !view) return null;
 
-  const colCount = tableLayout.band.colCount + 1;
-  const rowCount = tableLayout.band.rowCount + 1;
+  const slots = visibleTimeSlots(tableLayout.table, layout.periods);
+  const dataColumns: SheetGridColumn[] = [
+    { id: tableLayout.columns[0]?.id ?? "__key__", title: "", width: TABLE_KEY_COLUMN_WIDTH },
+    ...tableLayout.table.attributeColumns.map((column) => ({
+      id: column.id,
+      title: column.name,
+      width: TABLE_DATA_COLUMN_WIDTH,
+    })),
+    ...slots.map((slot) => ({
+      id: slot.id,
+      title: slot.name,
+      width: TABLE_DATA_COLUMN_WIDTH,
+    })),
+  ];
+  const growthColumn = !hideGrowthColumn(tableLayout.table);
+  const columns = growthColumn
+    ? [...dataColumns, { id: `empty-${dataColumns.length}`, title: "", width: TABLE_GROWTH_COLUMN_WIDTH }]
+    : dataColumns;
   return {
     sheetId: view.sheetId,
     sheetName: view.sheetName,
     tableId,
     originRow: tableLayout.band.headerRow,
     originCol: tableLayout.band.startCol,
-    rowCount,
-    colCount,
-    columns: Array.from({ length: colCount }, (_, index) => {
-      const column = tableLayout.columns[index];
-      return {
-        id: column?.id ?? `empty-${index}`,
-        title: column && column.kind !== "key" ? column.name : "",
-        width: !column
-          ? TABLE_GROWTH_COLUMN_WIDTH
-          : column.kind === "key"
-            ? TABLE_KEY_COLUMN_WIDTH
-            : TABLE_DATA_COLUMN_WIDTH,
-      };
-    }),
+    rowCount: tableLayout.band.rowCount + 1,
+    colCount: columns.length,
+    columns,
     view,
+    growthColumn,
   };
 }
 
@@ -108,7 +117,10 @@ export function isGrowthHeaderCell(
   row: number,
 ): boolean {
   if (isUnusedTableCorner(projection, col, row)) return false;
-  return (col === 0 && row === projection.rowCount - 1) || (row === 0 && col === projection.colCount - 1);
+  return (
+    (col === 0 && row === projection.rowCount - 1) ||
+    (projection.growthColumn && row === 0 && col === projection.colCount - 1)
+  );
 }
 
 /** Key header and unused growth corner — not fields, not expansion cells. */
@@ -161,7 +173,7 @@ export function projectedCell(
 
 function isLockedGrowthMargin(projection: SheetGridProjection, col: number, row: number): boolean {
   if (!projection.tableId || isUnusedTableCorner(projection, col, row)) return false;
-  return col === projection.colCount - 1 || row === projection.rowCount - 1;
+  return (projection.growthColumn && col === projection.colCount - 1) || row === projection.rowCount - 1;
 }
 
 export function selectionForProjectedCell(
@@ -198,10 +210,15 @@ export function projectedLocationForRef(
 ): readonly [number, number] | undefined {
   const table = layout.tables.get(ref.tableId);
   if (!table || (projection.tableId && projection.tableId !== ref.tableId)) return undefined;
-  const col = table.columns.findIndex((column) => column.id === ref.columnId);
   const row = table.rows.findIndex((candidate) => candidate.id === ref.rowId);
-  if (col < 0 || row < 0) return undefined;
-  return [col + table.band.startCol - projection.originCol, row + 1 + table.band.headerRow - projection.originRow];
+  if (row < 0) return undefined;
+  const col = projection.columns.findIndex((column) => {
+    if (column.id === ref.columnId) return true;
+    const slot = visibleTimeSlots(table.table, layout.periods).find((candidate) => candidate.id === column.id);
+    return Boolean(slot?.periodIds.includes(ref.columnId));
+  });
+  if (col < 0) return undefined;
+  return [col, row + 1];
 }
 
 /** Walks Enter/Tab from a committed cell onto the next data cell or unused growth cell. */

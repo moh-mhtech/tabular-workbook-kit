@@ -1,4 +1,5 @@
-import { blurOnEnter } from "../blurOnEnter.js";
+import { MixedTextInput } from "../MixedTextInput.js";
+import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
 
 function tryCall(fn: () => void) {
@@ -17,14 +18,12 @@ export function RowInspector({ tableId, rowId }: { tableId: string; rowId: strin
   if (!table || !row) return null;
   return (
     <section>
-      <label>
-        Key
-        <input
-          defaultValue={row.key}
-          onBlur={(e) => tryCall(() => session.renameRow(table.id, row.id, e.target.value))}
-          onKeyDown={blurOnEnter}
+      <OutlinedField label="Key">
+        <MixedTextInput
+          values={[row.key]}
+          onCommit={(value) => tryCall(() => session.renameRow(table.id, row.id, value))}
         />
-      </label>
+      </OutlinedField>
       <button type="button" onClick={() => tryCall(() => session.deleteRow(table.id, row.id))}>
         Delete row
       </button>

@@ -1,3 +1,4 @@
+import { selectedYearColumn } from "../model/yearColumns.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 import { SheetCanvas } from "./SheetCanvas.js";
 import "./workbook.css";
@@ -89,12 +90,13 @@ export function Explorer({ workbookLabel = "Workbook" }: { workbookLabel?: strin
 export function ScenarioBar() {
   const { session } = useWorkbook();
   const snapshot = useSnapshot();
+  const activeId = snapshot.activeScenarioId;
 
   return (
     <div className="wk-scenario-bar">
       <span className="wk-label">Scenario</span>
       <select
-        value={snapshot.activeScenarioId ?? ""}
+        value={activeId ?? ""}
         onChange={(e) => session.activateScenario(e.target.value || null)}
       >
         <option value="">Base</option>
@@ -104,6 +106,29 @@ export function ScenarioBar() {
           </option>
         ))}
       </select>
+      <button type="button" onClick={() => tryCall(() => session.addScenario())}>
+        Add
+      </button>
+      <button
+        type="button"
+        disabled={!activeId}
+        onClick={() =>
+          tryCall(() => {
+            if (!activeId) return;
+            const current = snapshot.scenarios.find((s) => s.id === activeId);
+            const next = window.prompt("Rename scenario", current?.name ?? "");
+            if (next != null) session.renameScenario(activeId, next);
+          })
+        }
+      >
+        Rename
+      </button>
+      <button type="button" disabled={!activeId} onClick={() => tryCall(() => activeId && session.duplicateScenario(activeId))}>
+        Duplicate
+      </button>
+      <button type="button" disabled={!activeId} onClick={() => tryCall(() => activeId && session.deleteScenario(activeId))}>
+        Delete
+      </button>
     </div>
   );
 }
@@ -113,15 +138,18 @@ export function FormulaBar() {
 }
 
 export function TimeGrainSwitch() {
-  const { timeGrain, setTimeGrain } = useWorkbook();
+  const { session } = useWorkbook();
+  const snapshot = useSnapshot();
+  const selected = selectedYearColumn(snapshot, session.selection);
+  if (!selected) return null;
   return (
     <div className="wk-grain">
       {(["month", "quarter", "year"] as const).map((g) => (
         <button
           key={g}
           type="button"
-          className={timeGrain === g ? "is-active" : ""}
-          onClick={() => setTimeGrain(g)}
+          className={selected.yearColumn.grain === g ? "is-active" : ""}
+          onClick={() => tryCall(() => session.setYearColumnGrain(selected.tableId, selected.yearColumn.id, g))}
         >
           {g === "month" ? "Måned" : g === "quarter" ? "Kvartal" : "År"}
         </button>

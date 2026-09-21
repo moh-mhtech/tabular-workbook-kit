@@ -1,5 +1,7 @@
-import { blurOnEnter } from "../blurOnEnter.js";
+import { MixedTextInput } from "../MixedTextInput.js";
+import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
+import { hasTimeColumns } from "../../model/yearColumns.js";
 
 function tryCall(fn: () => void) {
   try {
@@ -16,25 +18,32 @@ export function TableInspector({ tableId }: { tableId: string }) {
   if (!table) return null;
   return (
     <section>
-      <label>
-        Name
-        <input
-          defaultValue={table.name}
-          onBlur={(e) => tryCall(() => session.renameTable(table.id, e.target.value))}
-          onKeyDown={blurOnEnter}
+      <OutlinedField label="Name">
+        <MixedTextInput
+          values={[table.name]}
+          onCommit={(value) => tryCall(() => session.renameTable(table.id, value))}
         />
-      </label>
+      </OutlinedField>
       {table.promoteRowKeys ? (
         <p className="wk-muted">Row keys are workbook names. Single data column.</p>
       ) : (
-        <label>
-          <input
-            type="checkbox"
-            checked={table.timeAxis}
-            onChange={(e) => tryCall(() => session.setTimeAxis(table.id, e.target.checked))}
-          />
-          Months
-        </label>
+        <>
+          <label>
+            <input
+              type="checkbox"
+              checked={hasTimeColumns(table)}
+              onChange={(e) =>
+                tryCall(() => (e.target.checked ? session.addYearColumn(table.id) : session.clearYearColumns(table.id)))
+              }
+            />
+            Year columns
+          </label>
+          {hasTimeColumns(table) ? (
+            <button type="button" onClick={() => tryCall(() => session.addYearColumn(table.id))}>
+              Add year
+            </button>
+          ) : null}
+        </>
       )}
       {table.locked ? null : (
         <button type="button" onClick={() => tryCall(() => session.deleteTable(table.id))}>

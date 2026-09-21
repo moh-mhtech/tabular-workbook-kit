@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { formatValue } from "../model/calendar.js";
 import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
-import { UniverEngine } from "../engine/univer.js";
+import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 
 async function open() {
-  const session = new WorkbookSession(createPlaygroundWorkbook(), new UniverEngine());
+  const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());
   await session.recalculate();
   return session;
 }
@@ -48,7 +48,7 @@ describe("scenarios", () => {
     const baseFormula = snapshot.tables
       .find((t) => t.name === "Salg")!
       .rows.find((r) => r.key === "CNC")!.cells["2025-01"].formula;
-    const session = new WorkbookSession(snapshot);
+    const session = new WorkbookSession(snapshot, new HyperFormulaEngine());
     await session.recalculate();
 
     const baseJan = num(session.getTable("Salg").rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);

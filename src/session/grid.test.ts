@@ -260,3 +260,36 @@ describe("sheet extent", () => {
     expect(sheet.cellData![2][2]).toEqual({ v: "x" });
   });
 });
+
+describe("cell value edits keep formatting", () => {
+  it("preserves number format and cell style across writeCell, setInput, and setFormula", () => {
+    const session = playground();
+    const style = { bold: true, italic: true, fontSize: 24, fillColor: "#fff6d6" };
+    session.setCellStyle("tbl-params", "row-vat", "Value", style);
+    session.setCellFormat("tbl-params", "row-vat", "Value", "0.00");
+
+    session.writeCell("Params", "Vat", "Value", "0.5");
+    expect(table(session, "Params").rows[2]!.cells.Value).toEqual({
+      kind: "input",
+      value: 0.5,
+      format: "0.00",
+      style,
+    });
+
+    session.setInput("Params", "Vat", "Value", 0.4);
+    expect(table(session, "Params").rows[2]!.cells.Value).toEqual({
+      kind: "input",
+      value: 0.4,
+      format: "0.00",
+      style,
+    });
+
+    session.setFormula("Params", "Vat", "Value", "=1+1");
+    expect(table(session, "Params").rows[2]!.cells.Value).toEqual({
+      kind: "formula",
+      formula: "=1+1",
+      format: "0.00",
+      style,
+    });
+  });
+});

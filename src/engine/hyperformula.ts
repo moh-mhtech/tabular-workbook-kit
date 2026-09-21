@@ -2,6 +2,7 @@ import { CellError, ErrorType, HyperFormula, type RawCellContent } from "hyperfo
 import { compileFormula } from "../formula/compile.js";
 import {
   columnLetters,
+  engineSheetSize,
   layoutWorkbook,
   type TableLayout,
   type WorkbookLayout,
@@ -49,13 +50,14 @@ export class HyperFormulaEngine implements FormulaEngine {
     try {
       const values: Record<string, SheetGrid> = {};
       for (const view of layout.sheets) {
+        const size = engineSheetSize(layout, view.sheetId);
         const sheetId = engine.getSheetId(view.sheetName);
-        const grid: SheetGrid = Array.from({ length: view.rowCount }, () =>
-          Array<string | number | boolean | null>(view.colCount).fill(null),
+        const grid: SheetGrid = Array.from({ length: size.rowCount }, () =>
+          Array<string | number | boolean | null>(size.colCount).fill(null),
         );
         if (sheetId !== undefined) {
-          for (let row = 0; row < view.rowCount; row++) {
-            for (let col = 0; col < view.colCount; col++) {
+          for (let row = 0; row < size.rowCount; row++) {
+            for (let col = 0; col < size.colCount; col++) {
               grid[row][col] = normalize(engine.getCellValue({ sheet: sheetId, row, col }));
             }
           }
@@ -73,8 +75,9 @@ function buildSheets(snapshot: WorkbookSnapshot, layout: WorkbookLayout): Record
   const sheets: Record<string, RawCellContent[][]> = {};
 
   for (const view of layout.sheets) {
-    const grid: RawCellContent[][] = Array.from({ length: view.rowCount }, () =>
-      Array<RawCellContent>(view.colCount).fill(null),
+    const size = engineSheetSize(layout, view.sheetId);
+    const grid: RawCellContent[][] = Array.from({ length: size.rowCount }, () =>
+      Array<RawCellContent>(size.colCount).fill(null),
     );
 
     for (const band of view.bands) {

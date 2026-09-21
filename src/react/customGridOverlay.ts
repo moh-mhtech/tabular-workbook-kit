@@ -1,4 +1,9 @@
-import { projectedCell, type SheetGridProjection } from "../grid/sheetProjection.js";
+import {
+  acceptTableGridSelection,
+  projectedCell,
+  selectionForProjectedCell,
+  type SheetGridProjection,
+} from "../grid/sheetProjection.js";
 import type { WorkbookLayout } from "../model/layout.js";
 import { canRegisterDefinedName, getCellName } from "../model/names.js";
 import type { WorkbookSession } from "../session/WorkbookSession.js";
@@ -75,8 +80,7 @@ export function overlayKeyAction(
 }
 
 export function canPointFromDraft(draft: string): boolean {
-  void draft;
-  return true;
+  return draft.trimStart().startsWith("=");
 }
 
 const FORMULA_REF =
@@ -184,6 +188,22 @@ export function nextPointableCell(
     row += movement[1];
   }
   return undefined;
+}
+
+export function commitLiteralEditAndSelect(
+  session: WorkbookSession,
+  projection: SheetGridProjection,
+  layout: WorkbookLayout,
+  col: number,
+  row: number,
+): boolean {
+  const edit = session.formulaEdit;
+  if (!edit || canPointFromDraft(edit.draft)) return false;
+  session.commitFormulaEdit();
+  if (!projection.tableId || !acceptTableGridSelection(projection, [col, row])) return true;
+  session.setGridFocus({ tableId: projection.tableId, col, row });
+  session.setSelection(selectionForProjectedCell(projection, layout, col, row));
+  return true;
 }
 
 export function pointAtProjectedCell(

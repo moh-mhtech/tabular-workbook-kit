@@ -107,6 +107,7 @@ describe("custom grid editor UI", () => {
   it("points like Excel: arrows and clicks insert a reference without leaving the cell", () => {
     const { session } = renderEditor("stable");
     fireEvent.change(cellEditor(), { target: { value: "=" } });
+    fireEvent.keyDown(cellEditor(), { key: "Escape" });
     fireEvent.keyDown(cellEditor(), { key: "ArrowDown" });
     expect(cellEditor().value).toBe("=AndelCNC");
     expect(session.formulaEdit?.draft).toBe("=AndelCNC");
@@ -132,6 +133,7 @@ describe("custom grid editor UI", () => {
     const { session } = renderEditor("stable");
     const editor = cellEditor();
     fireEvent.change(editor, { target: { value: "=", selectionStart: 1, selectionEnd: 1 } });
+    fireEvent.keyDown(editor, { key: "Escape" });
     fireEvent.keyDown(editor, { key: "ArrowDown" });
     expect(editor.value).toBe("=AndelCNC");
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 4 });
@@ -146,5 +148,12 @@ describe("custom grid editor UI", () => {
 
     fireEvent.keyDown(editor, { key: "ArrowDown" });
     expect(editor.value).toBe("=AndelCNC+AndelOutsource");
+  });
+
+  it("does not point a cell when the draft is a literal", () => {
+    renderEditor("stable");
+    fireEvent.change(cellEditor(), { target: { value: "100" } });
+    fireEvent.keyDown(cellEditor(), { key: "ArrowDown" });
+    expect(cellEditor().value).toBe("100");
   });
 });

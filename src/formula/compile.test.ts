@@ -52,6 +52,16 @@ describe("column-first compile", () => {
       }),
     ).toBe("=[@Jan]");
   });
+
+  it("compiles quarter and year tokens as the sum of stored months", () => {
+    const snapshot = createPlaygroundWorkbook();
+    const layout = layoutWorkbook(snapshot);
+    expect(compileFormula("=Salg[2025-Q1][Total]", { layout })).toBe(
+      '=SUM(INDEX(Salg[Jan],MATCH("Total",Salg[key],0)),INDEX(Salg[Feb],MATCH("Total",Salg[key],0)),INDEX(Salg[Mar],MATCH("Total",Salg[key],0)))',
+    );
+    expect(compileFormula("=Salg[2025][Total]", { layout })).toContain("INDEX(Salg[Dec]");
+    expect(compileFormula("=Salg[2025][Total]", { layout })).toContain("SUM(");
+  });
 });
 
 describe("sheet hitTest", () => {

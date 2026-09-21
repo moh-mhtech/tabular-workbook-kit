@@ -1,7 +1,7 @@
 import type { ICellData, IWorkbookData } from "@univerjs/core";
 import { LocaleType } from "@univerjs/core";
 import { compileFormula } from "../formula/compile.js";
-import { columnLetters, layoutWorkbook, type WorkbookLayout } from "../model/layout.js";
+import { columnLetters, engineSheetSize, layoutWorkbook, type WorkbookLayout } from "../model/layout.js";
 import { promotedNames } from "../model/names.js";
 import { resolveCellFormat } from "../model/numberFormat.js";
 import { overlayKey, parseLooseCellKey, type Primitive, type WorkbookSnapshot } from "../model/types.js";
@@ -87,12 +87,13 @@ export function snapshotToUniverData(snapshot: WorkbookSnapshot, engineLayout?: 
       const { row, col } = parseLooseCellKey(key);
       setCell(row, col, { v: value });
     }
+    const size = engineSheetSize(layout, view.sheetId);
     sheets[view.sheetId] = {
       id: view.sheetId,
       name: view.sheetName,
       cellData,
-      rowCount: view.rowCount,
-      columnCount: view.colCount,
+      rowCount: size.rowCount,
+      columnCount: size.colCount,
     };
   }
   return {

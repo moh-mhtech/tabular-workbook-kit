@@ -1,4 +1,5 @@
 import { buildPeriods, type Period } from "./calendar.js";
+import { hasTimeColumns, visibleTimeColCount, visibleTimeSlots } from "./yearColumns.js";
 import {
   hasContent,
   looseCellKey,
@@ -47,16 +48,15 @@ export type GridExpansion =
   | { direction: "right"; tableId: string; rowId: string | null };
 
 function columnCount(table: TableSnapshot, periods: Period[]): number {
-  return 1 + table.attributeColumns.length + (table.timeAxis ? periods.length : 0);
+  return 1 + table.attributeColumns.length + visibleTimeColCount(table, periods);
 }
 
 function columnIdAt(table: TableSnapshot, periods: Period[], offset: number): string | null {
   if (offset === 0) return "__key__";
   const attr = table.attributeColumns[offset - 1];
   if (attr) return attr.id;
-  if (!table.timeAxis) return null;
-  const period = periods[offset - 1 - table.attributeColumns.length];
-  return period?.id ?? null;
+  const slot = visibleTimeSlots(table, periods)[offset - 1 - table.attributeColumns.length];
+  return slot?.id ?? null;
 }
 
 function stackBands(tables: TableSnapshot[], periods: Period[]): TableBand[] {
@@ -215,7 +215,7 @@ export function planExpansion(
     if (col === endCol && row >= band.headerRow && row < endRow) {
       // Period columns come from the calendar and a promoted table owns exactly
       // one data column, so neither can take an appended column.
-      if (table.timeAxis || table.promoteRowKeys) return null;
+      if (hasTimeColumns(table) || table.promoteRowKeys) return null;
       for (let r = band.headerRow; r < endRow; r++) {
         if (r !== row && isOccupied(view, snapshot, r, col, calendarPeriods)) return null;
       }
@@ -242,8 +242,24 @@ export function addressOf(
   if (!band || !table) return null;
   const rowIndex = table.rows.findIndex((r) => r.id === rowId);
   if (rowIndex < 0) return null;
-  const cols = ["__key__", ...table.attributeColumns.map((c) => c.id)];
-  if (table.timeAxis) cols.push(...calendarPeriods.map((p) => p.id));
+  const cols = [
+    "__key__",
+    ...table.attributeColumns.map((c) => c.id),
+    ...visibleTimeSlots(table, calendarPeriods).map((slot) => slot.id),
+  ];
+  const slot = visibleTimeSlots(table, calendarPeriods).find((candidate) =>
+    candidate.periodIds.includes(columnId),
+  );
+  if (slot && !cols.includes(columnId)) {
+    const colOffset = cols.indexOf(slot.id);
+    if (colOffset >= 0) {
+      return {
+        sheetName: view.sheetName,
+        row: band.headerRow + 1 + rowIndex,
+        col: band.startCol + colOffset,
+      };
+    }
+  }
   const colOffset = cols.indexOf(columnId);
   if (colOffset < 0) return null;
   return {

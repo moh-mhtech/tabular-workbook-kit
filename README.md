@@ -31,4 +31,4 @@ Authoring language is column-first structured refs (`Table[Col][Row]`, `[Col]`, 
 
 `new WorkbookSession(snapshot, new UniverEngine())` powers the existing renderer. `new WorkbookSession(snapshot, new HyperFormulaEngine({ licenseKey }))` powers the custom renderer; standalone HyperFormula requires GPLv3-compatible use or a commercial key.
 
-Session APIs: `renameTable`, `renameRow`, `renameColumn`, `addRow` / `deleteRow`, `addColumn` / `deleteColumn`, `addTable` / `deleteTable`, `addSheet` / `deleteSheet`, `setTimeAxis`, `setPromoteRowKeys`, `setColumnFormat` / `setCellFormat`. Formulas that use old names are rewritten.
+Session APIs: `renameTable`, `renameRow`, `renameColumn`, `addRow` / `deleteRow`, `addColumn` / `deleteColumn`, `addTable` / `deleteTable`, `addSheet` / `deleteSheet`, `addYearColumn` / `removeYearColumn` / `setYearColumnGrain`, `addScenario` / `renameScenario` / `deleteScenario` / `duplicateScenario`, `setPromoteRowKeys`, `setColumnFormat` / `setCellFormat`. Formulas that use old names are rewritten.

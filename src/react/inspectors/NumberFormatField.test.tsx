@@ -41,6 +41,8 @@ describe("NumberFormatField", () => {
     );
     fireEvent.mouseEnter(screen.getByLabelText("Number format examples"));
     const tip = screen.getByRole("tooltip");
+    expect(tip.parentElement).toBe(document.body);
+    expect(tip.closest(".wk-outlined")).toBeNull();
     expect(tip.textContent).toContain("G3A");
     expect(tip.textContent).toContain("25%");
     expect(tip.textContent).not.toContain("8M");

@@ -25,10 +25,10 @@ const RESERVED_NAMES = new Set(
 );
 
 export function canPromoteRowKeys(table: {
-  timeAxis: boolean;
+  yearColumns?: unknown[];
   attributeColumns: unknown[];
 }): boolean {
-  return !table.timeAxis && table.attributeColumns.length === 1;
+  return !(table.yearColumns?.length) && table.attributeColumns.length === 1;
 }
 
 export function promotedNames(snapshot: WorkbookSnapshot): { name: string; tableId: string; rowId: string; columnId: string }[] {

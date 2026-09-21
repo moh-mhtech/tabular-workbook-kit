@@ -1,4 +1,5 @@
-import { blurOnEnter } from "../blurOnEnter.js";
+import { MixedTextInput } from "../MixedTextInput.js";
+import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
 
 function tryCall(fn: () => void) {
@@ -16,16 +17,13 @@ export function SheetInspector({ sheetId }: { sheetId: string }) {
   if (!sheet) return null;
   return (
     <section>
-      <label>
-        Name
-        <input
-          defaultValue={sheet.name}
-          onBlur={(e) => tryCall(() => session.renameSheet(sheet.id, e.target.value))}
-          onKeyDown={blurOnEnter}
+      <OutlinedField label="Name">
+        <MixedTextInput
+          values={[sheet.name]}
+          onCommit={(value) => tryCall(() => session.renameSheet(sheet.id, value))}
         />
-      </label>
-      <label>
-        Horizontal scroll
+      </OutlinedField>
+      <OutlinedField label="Horizontal scroll">
         <select
           value={sheet.horizontalScroll ?? "table"}
           onChange={(e) =>
@@ -35,7 +33,7 @@ export function SheetInspector({ sheetId }: { sheetId: string }) {
           <option value="table">Per table</option>
           <option value="sheet">Sheet</option>
         </select>
-      </label>
+      </OutlinedField>
       {sheet.locked ? null : (
         <button type="button" onClick={() => tryCall(() => session.deleteSheet(sheet.id))}>
           Delete sheet

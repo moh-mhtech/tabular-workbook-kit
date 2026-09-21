@@ -61,7 +61,7 @@ function navigationWorkbook(): WorkbookSnapshot {
       {
         id: "tbl-wide",
         name: "Wide",
-        timeAxis: false,
+        yearColumns: [],
         attributeColumns: [
           { id: "col-alpha", name: "Alpha" },
           { id: "col-gamma", name: "Gamma" },
@@ -75,7 +75,7 @@ function navigationWorkbook(): WorkbookSnapshot {
       {
         id: "tbl-narrow",
         name: "Narrow",
-        timeAxis: false,
+        yearColumns: [],
         attributeColumns: [{ id: "col-beta", name: "Beta" }],
         rows: [{ id: "rn-1", key: "1", cells: {} }],
       },
@@ -229,7 +229,7 @@ function filledWorkbook(): WorkbookSnapshot {
       {
         id: "tbl-a",
         name: "A",
-        timeAxis: false,
+        yearColumns: [],
         attributeColumns: [
           { id: "ca", name: "CA" },
           { id: "cb", name: "CB" },
@@ -263,7 +263,7 @@ function filledWorkbook(): WorkbookSnapshot {
       {
         id: "tbl-b",
         name: "B",
-        timeAxis: false,
+        yearColumns: [],
         attributeColumns: [
           { id: "ca", name: "CA" },
           { id: "cb", name: "CB" },
@@ -328,5 +328,22 @@ describe("ctrl arrow navigation UI", () => {
     await selectCell(session, "tbl-b", 3, 0);
     await pressCtrlArrow("tbl-b", "ArrowDown");
     focus.expectAt("tbl-b", 3, 1);
+  });
+
+  it("moves left and up by phase without wrapping a row or landing on the growth row", async () => {
+    const { session } = await renderFilledSheet();
+    const focus = trackFocus(session);
+    await selectCell(session, "tbl-a", 5, 1);
+    await pressCtrlArrow("tbl-a", "ArrowLeft");
+    focus.expectAt("tbl-a", 4, 1);
+    await pressCtrlArrow("tbl-a", "ArrowLeft");
+    focus.expectAt("tbl-a", 2, 1);
+    await pressCtrlArrow("tbl-a", "ArrowLeft");
+    focus.expectAt("tbl-a", 0, 1);
+    await pressCtrlArrow("tbl-a", "ArrowLeft");
+    focus.expectAt("tbl-a", 0, 1);
+    await selectCell(session, "tbl-b", 1, 0);
+    await pressCtrlArrow("tbl-b", "ArrowUp");
+    focus.expectAt("tbl-a", 1, 3);
   });
 });

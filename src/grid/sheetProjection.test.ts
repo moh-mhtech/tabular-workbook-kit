@@ -126,24 +126,21 @@ describe("sheet grid projection", () => {
     const layout = layoutWorkbook(createPlaygroundWorkbook());
     const projection = projectTable(layout, "tbl-params")!;
 
-    expect(projection.columns.map((column) => column.title)).toEqual(["", "Value", ""]);
+    expect(projection.columns.map((column) => column.title)).toEqual(["", "Value"]);
+    expect(projection.growthColumn).toBe(false);
     expect(projection.rowCount).toBe(9);
     expect(projection.originRow).toBe(0);
     expect(projectedCell(projection, layout, 0, 0)).toEqual({ kind: "readonly", row: 0, col: 0 });
-    expect(projectedCell(projection, layout, 2, 8)).toEqual({ kind: "readonly", row: 8, col: 2 });
     expect(isUnusedTableCorner(projection, 0, 0)).toBe(true);
-    expect(isUnusedTableCorner(projection, 2, 8)).toBe(true);
     expect(acceptTableGridSelection(projection, [0, 0])).toBe(false);
-    expect(acceptTableGridSelection(projection, [2, 8])).toBe(false);
     expect(acceptTableGridSelection(projection, [1, 1])).toBe(true);
     expect(projectedCell(projection, layout, 0, 1)).toMatchObject({
       kind: "table",
       hit: { kind: "key", tableId: "tbl-params", rowId: "row-aarsalg" },
     });
     expect(isGrowthHeaderCell(projection, 0, 8)).toBe(true);
-    expect(isGrowthHeaderCell(projection, 2, 0)).toBe(true);
+    expect(isGrowthHeaderCell(projection, 1, 0)).toBe(false);
     expect(isGrowthHeaderCell(projection, 0, 0)).toBe(false);
-    expect(isGrowthHeaderCell(projection, 2, 8)).toBe(false);
     expect(isGrowthHeaderCell(projection, 1, 1)).toBe(false);
   });
 
@@ -155,7 +152,6 @@ describe("sheet grid projection", () => {
     expect(params.columns.map((column) => column.width)).toEqual([
       TABLE_KEY_COLUMN_WIDTH,
       TABLE_DATA_COLUMN_WIDTH,
-      TABLE_GROWTH_COLUMN_WIDTH,
     ]);
     expect(salg.columns[0]?.width).toBe(TABLE_KEY_COLUMN_WIDTH);
     expect(salg.columns.at(-1)?.width).toBe(TABLE_GROWTH_COLUMN_WIDTH);

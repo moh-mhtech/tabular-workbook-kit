@@ -7,6 +7,7 @@ import {
   applyFormulaOperator,
   applyPointedRef,
   canPointFromDraft,
+  commitLiteralEditAndSelect,
   cursorFormulaRef,
   formulaRefForProjectedCell,
   formulaRefSpans,
@@ -64,11 +65,11 @@ describe("custom grid overlay navigation", () => {
     expect(overlayKeyAction("cells", { key: "ArrowDown", metaKey: true })).toBe("caret");
   });
 
-  it("can start a formula from any draft, including a literal", () => {
-    expect(canPointFromDraft("")).toBe(true);
+  it("only points from a formula draft", () => {
+    expect(canPointFromDraft("")).toBe(false);
     expect(canPointFromDraft("=")).toBe(true);
     expect(canPointFromDraft("=Vat")).toBe(true);
-    expect(canPointFromDraft("100")).toBe(true);
+    expect(canPointFromDraft("100")).toBe(false);
   });
 
   it("inserts a pointed ref at the caret and replaces the last pointed token", () => {
@@ -224,5 +225,33 @@ describe("custom grid overlay navigation", () => {
     });
     expect(nextPointableCell([1, 1], [0, -1], projection, layout)).toBeUndefined();
     expect(nextPointableCell([1, 1], [-1, 0], projection, layout)).toBeUndefined();
+  });
+
+  it("commits a literal edit and selects the clicked cell", () => {
+    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const layout = layoutWorkbook(session.getSnapshot());
+    const projection = projectTable(layout, "tbl-params")!;
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "0.4");
+    expect(commitLiteralEditAndSelect(session, projection, layout, 1, 4)).toBe(true);
+    expect(session.formulaEdit).toBeNull();
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2]!.cells.Value).toEqual({
+      kind: "input",
+      value: 0.4,
+    });
+    expect(session.selection).toEqual({
+      kind: "cell",
+      tableId: "tbl-params",
+      rowId: "row-andel-cnc",
+      columnId: "Value",
+    });
+  });
+
+  it("does not commit when the draft is a formula", () => {
+    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const layout = layoutWorkbook(session.getSnapshot());
+    const projection = projectTable(layout, "tbl-params")!;
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=Vat");
+    expect(commitLiteralEditAndSelect(session, projection, layout, 1, 4)).toBe(false);
+    expect(session.formulaEdit?.draft).toBe("=Vat");
   });
 });

@@ -12,7 +12,7 @@ import DataEditor, {
 } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { effectiveCell } from "../engine/compileWorkbook.js";
-import { fitProjectedColumnWidths } from "../grid/columnFit.js";
+import { fitProjectedColumnWidths, fitProjectedRowHeights, TABLE_ROW_HEIGHT } from "../grid/columnFit.js";
 import {
   TABLE_DATA_COLUMN_WIDTH,
   GROWTH_HEADER_MARK,
@@ -27,7 +27,10 @@ import {
   type SheetGridProjection,
 } from "../grid/sheetProjection.js";
 import { layoutWorkbook, type WorkbookLayout } from "../model/layout.js";
+import { applyStrikethrough, resolveCellStyle, styleFont } from "../model/cellStyle.js";
 import { formatDisplayValue, rawEditValue, resolveCellFormat } from "../model/numberFormat.js";
+import { selectedCellRefs, type Primitive } from "../model/types.js";
+import { writePeriodIds } from "../model/yearColumns.js";
 import type { EvaluatedCell, WorkbookSnapshot } from "../model/types.js";
 import {
   applyCustomGridClear,
@@ -39,6 +42,8 @@ import {
 } from "./customGridInteractions.js";
 import { SpreadsheetTextEditor, type OverlayEditorProps } from "./customGridEditor.js";
 import {
+  canPointFromDraft,
+  commitLiteralEditAndSelect,
   isSpreadsheetPointEvent,
   pointAtProjectedCell,
   type OverlayNavMode,
@@ -82,7 +87,29 @@ function showError(error: unknown) {
   window.alert(error instanceof Error ? error.message : String(error));
 }
 
-function evaluatedCells(
+function bucketComputed(
+  values: Array<EvaluatedCell | undefined>,
+  sources: Array<{ kind: string; value?: Primitive; formula?: string }>,
+): Primitive {
+  if (values.length <= 1) {
+    const value = values[0];
+    const source = sources[0];
+    return value?.computed ?? (source?.kind === "input" ? source.value ?? null : source?.formula ?? "");
+  }
+  let sum = 0;
+  let saw = false;
+  for (const value of values) {
+    if (typeof value?.computed === "number") {
+      sum += value.computed;
+      saw = true;
+    }
+  }
+  if (saw) return sum;
+  const source = sources[0];
+  return source?.kind === "input" ? source.value ?? null : source?.formula ?? "";
+}
+
+export function evaluatedCells(
   session: ReturnType<typeof useWorkbook>["session"],
   snapshot: WorkbookSnapshot,
 ): Map<string, EvaluatedCell> {
@@ -101,7 +128,7 @@ function evaluatedCells(
   return result;
 }
 
-function textCell(
+export function textCell(
   data: string,
   options: Partial<Omit<Extract<GridCell, { kind: GridCellKind.Text }>, "kind" | "data">> = {},
 ): GridCell {
@@ -125,7 +152,7 @@ function growthHeaderCell(editable: boolean): GridCell {
   });
 }
 
-function gridCell(
+export function gridCell(
   projection: SheetGridProjection,
   layout: WorkbookLayout,
   evaluated: Map<string, EvaluatedCell>,
@@ -167,7 +194,8 @@ function gridCell(
   if (!tableLayout) return textCell("", { allowOverlay: false, readonly: true });
   if (hit.kind === "header") {
     const column = tableLayout.columns.find((candidate) => candidate.id === hit.columnId);
-    return textCell(column?.name ?? "", {
+    const slotTitle = projection.columns.find((candidate) => candidate.id === hit.columnId)?.title;
+    return textCell(slotTitle || column?.name || "", {
       contentAlign: "left",
       themeOverride: CELL_THEME.header,
     });
@@ -180,23 +208,36 @@ function gridCell(
     });
   }
 
-  const value = evaluated.get(`${hit.tableId}\u001f${hit.rowId}\u001f${hit.columnId}`);
-  const source = effectiveCell(layout.snapshot, hit.tableId, hit.rowId, hit.columnId);
+  const periodIds = writePeriodIds(tableLayout.table, hit.columnId, layout.periods);
+  const sources = periodIds.map((id) => effectiveCell(layout.snapshot, hit.tableId, hit.rowId, id));
+  const values = periodIds.map((id) => evaluated.get(`${hit.tableId}\u001f${hit.rowId}\u001f${id}`));
+  const value = values[0];
+  const source = sources[0] ?? effectiveCell(layout.snapshot, hit.tableId, hit.rowId, hit.columnId);
   const sourceRow = tableLayout.table.rows.find((candidate) => candidate.id === hit.rowId);
-  const pattern = resolveCellFormat(tableLayout.table, hit.columnId, sourceRow?.cells[hit.columnId]);
-  const raw = value?.kind === "formula" || source.kind === "formula"
-    ? value?.formula ?? source.formula ?? ""
-    : rawEditValue(value?.input ?? source.value ?? null);
-  const computed = value?.computed ?? (source.kind === "input" ? source.value ?? null : source.formula ?? "");
-  const themeOverride = value?.error
-    ? CELL_THEME.error
-    : value?.overlay
-      ? CELL_THEME.overlay
-      : value?.kind === "formula" || source.kind === "formula"
-        ? CELL_THEME.formula
-        : CELL_THEME.cell;
+  const pattern = resolveCellFormat(tableLayout.table, periodIds[0] ?? hit.columnId, sourceRow?.cells[periodIds[0] ?? hit.columnId]);
+  const formulas = sources.map((item) => (item.kind === "formula" ? item.formula ?? "" : ""));
+  const sameFormula = formulas.length > 0 && formulas.every((item) => item && item === formulas[0]);
+  const computed = bucketComputed(values, sources);
+  const raw = sameFormula
+    ? formulas[0]!
+    : value?.kind === "formula" || source.kind === "formula"
+      ? value?.formula ?? source.formula ?? ""
+      : rawEditValue(periodIds.length > 1 ? computed : value?.input ?? source.value ?? null);
+  const style = resolveCellStyle(tableLayout.table, periodIds[0] ?? hit.columnId, sourceRow?.cells[periodIds[0] ?? hit.columnId]);
+  const themeOverride = {
+    ...(values.some((item) => item?.error)
+      ? CELL_THEME.error
+      : values.some((item) => item?.overlay)
+        ? CELL_THEME.overlay
+        : sameFormula || value?.kind === "formula" || source.kind === "formula"
+          ? CELL_THEME.formula
+          : CELL_THEME.cell),
+    ...(style?.fillColor ? { bgCell: style.fillColor } : {}),
+    ...(style?.textColor ? { textDark: style.textColor, textLight: style.textColor } : {}),
+    ...(styleFont(style) ? { baseFontStyle: styleFont(style) } : {}),
+  };
   return textCell(raw, {
-    displayData: formatDisplayValue(computed, pattern),
+    displayData: applyStrikethrough(formatDisplayValue(computed, pattern), style),
     contentAlign: typeof computed === "number" ? "right" : "left",
     themeOverride,
   });
@@ -209,7 +250,6 @@ function ensureOverlayPortal() {
   document.body.appendChild(portal);
 }
 
-const TABLE_ROW_HEIGHT = 28;
 const SCROLLBAR_GUTTER = 16;
 
 export function CustomSheetCanvas() {
@@ -230,12 +270,30 @@ export function CustomSheetCanvas() {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
+      if (event.target instanceof Element && event.target.closest(".wk-overlay-editor, .wk-formula-bar, textarea, input")) {
+        return;
+      }
       if (key === "z" && !event.shiftKey) {
         event.preventDefault();
         session.undo();
       } else if (key === "y" || (key === "z" && event.shiftKey)) {
         event.preventDefault();
         session.redo();
+      } else if (key === "b" || key === "i" || event.key === "5") {
+        const refs = selectedCellRefs(session.selection);
+        if (!refs.length) return;
+        event.preventDefault();
+        const flag = key === "b" ? "bold" : key === "i" ? "italic" : "strikethrough";
+        session.transact(() => {
+          for (const ref of refs) {
+            const table = session.getSnapshot().tables.find((candidate) => candidate.id === ref.tableId);
+            const row = table?.rows.find((candidate) => candidate.id === ref.rowId);
+            const current = table
+              ? resolveCellStyle(table, ref.columnId, row?.cells[ref.columnId])
+              : undefined;
+            session.setCellStyle(ref.tableId, ref.rowId, ref.columnId, { [flag]: !current?.[flag] });
+          }
+        });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -276,6 +334,9 @@ export function CustomSheetCanvas() {
       onScroll={(event) => clampCanvasScroll(event.currentTarget)}
       onClick={(event) => {
         if ((event.target as HTMLElement | null)?.closest("[data-table-id]")) return;
+        if (session.formulaEdit && !canPointFromDraft(session.formulaEdit.draft)) {
+          session.commitFormulaEdit();
+        }
         session.setSelection({ kind: "sheet", sheetId: sheet.sheetId });
       }}
     >
@@ -309,6 +370,10 @@ function TableGrid({ tableId }: { tableId: string }) {
   const fittedColumns = useMemo(
     () => (projection ? fitProjectedColumnWidths(projection, layout, values) : []),
     [layout, projection, values],
+  );
+  const fittedRows = useMemo(
+    () => (projection ? fitProjectedRowHeights(projection, layout) : []),
+    [layout, projection],
   );
   const [gridSelection, setGridSelection] = useState<GridSelection>(EMPTY_SELECTION);
   const overlayStartModeRef = useRef<OverlayNavMode>("cells");
@@ -359,10 +424,10 @@ function TableGrid({ tableId }: { tableId: string }) {
       cell[0],
       cell[1],
       fittedColumns.map((column) => column.width),
-      TABLE_ROW_HEIGHT,
+      fittedRows,
       horizontalScroll,
     );
-  }, [fittedColumns, followCellSelection, gridSelection, horizontalScroll, projection, tableId]);
+  }, [fittedColumns, fittedRows, followCellSelection, gridSelection, horizontalScroll, projection, tableId]);
 
   const revealSeenRef = useRef(session.revealNonce);
 
@@ -434,7 +499,12 @@ function TableGrid({ tableId }: { tableId: string }) {
   const onCellClicked = useCallback(
     (location: Item) => {
       if (!projection || !session.formulaEdit) return;
-      pointAtProjectedCell(session, projection, layout, location[0], location[1]);
+      if (canPointFromDraft(session.formulaEdit.draft)) {
+        pointAtProjectedCell(session, projection, layout, location[0], location[1]);
+        return;
+      }
+      overlayOpenRef.current = false;
+      commitLiteralEditAndSelect(session, projection, layout, location[0], location[1]);
     },
     [layout, projection, session],
   );
@@ -596,7 +666,7 @@ function TableGrid({ tableId }: { tableId: string }) {
       onKeyDown={(event) => onEditorKeyDown(event)}
       style={{
         width: fittedColumns.reduce((sum, column) => sum + column.width, 0) + 2,
-        height: projection.rowCount * TABLE_ROW_HEIGHT + SCROLLBAR_GUTTER,
+        height: fittedRows.reduce((sum, height) => sum + height, 0) + SCROLLBAR_GUTTER,
       }}
     >
       <DataEditor
@@ -618,6 +688,27 @@ function TableGrid({ tableId }: { tableId: string }) {
             return;
           }
           drawContent();
+          const projected = projectedCell(projection, layout, args.col, args.row);
+          if (projected.kind !== "table" || projected.hit.kind !== "cell") return;
+          const tableLayout = layout.tables.get(projected.hit.tableId);
+          if (!tableLayout) return;
+          const sourceRow = tableLayout.table.rows.find((candidate) => candidate.id === projected.hit.rowId);
+          const periodIds = writePeriodIds(tableLayout.table, projected.hit.columnId, layout.periods);
+          const style = resolveCellStyle(
+            tableLayout.table,
+            periodIds[0] ?? projected.hit.columnId,
+            sourceRow?.cells[periodIds[0] ?? projected.hit.columnId],
+          );
+          if (!style?.strikethrough) return;
+          const y = args.rect.y + args.rect.height / 2;
+          args.ctx.save();
+          args.ctx.strokeStyle = style.textColor ?? "#1e3a5f";
+          args.ctx.lineWidth = 1;
+          args.ctx.beginPath();
+          args.ctx.moveTo(args.rect.x + 6, y);
+          args.ctx.lineTo(args.rect.x + args.rect.width - 6, y);
+          args.ctx.stroke();
+          args.ctx.restore();
         }}
         provideEditor={provideEditor}
         onKeyDown={onEditorKeyDown}
@@ -650,7 +741,7 @@ function TableGrid({ tableId }: { tableId: string }) {
         experimental={{ scrollbarWidthOverride: SCROLLBAR_GUTTER }}
         rowMarkers="none"
         headerHeight={0}
-        rowHeight={TABLE_ROW_HEIGHT}
+        rowHeight={(row) => fittedRows[row] ?? TABLE_ROW_HEIGHT}
         rangeSelect="rect"
         columnSelect="none"
         rowSelect="none"

@@ -79,17 +79,29 @@ export function cellGridMetrics(
   columnWidths: readonly number[],
   col: number,
   row: number,
-  rowHeight: number,
+  rowHeight: number | readonly number[],
 ): { x: number; y: number; width: number; height: number } {
   let x = 0;
   for (let index = 0; index < col && index < columnWidths.length; index++) {
     x += columnWidths[index] ?? 0;
   }
+  if (typeof rowHeight === "number") {
+    return {
+      x,
+      y: row * rowHeight,
+      width: columnWidths[col] ?? 0,
+      height: rowHeight,
+    };
+  }
+  let y = 0;
+  for (let index = 0; index < row && index < rowHeight.length; index++) {
+    y += rowHeight[index] ?? 0;
+  }
   return {
     x,
-    y: row * rowHeight,
+    y,
     width: columnWidths[col] ?? 0,
-    height: rowHeight,
+    height: rowHeight[row] ?? 0,
   };
 }
 
@@ -141,7 +153,7 @@ export function scrollCanvasToKeepCellVisible(
   col: number,
   row: number,
   columnWidths: readonly number[],
-  rowHeight: number,
+  rowHeight: number | readonly number[],
   horizontalScroll: "table" | "sheet" = "table",
 ) {
   const card = tableCard(canvas, tableId);

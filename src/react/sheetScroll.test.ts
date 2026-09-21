@@ -47,6 +47,18 @@ describe("keep selection in the canvas viewport", () => {
       width: 80,
       height: 28,
     });
+    expect(cellGridMetrics([48, 110, 80], 2, 3, [28, 28, 28, 61])).toEqual({
+      x: 158,
+      y: 84,
+      width: 80,
+      height: 61,
+    });
+    expect(cellGridMetrics([48, 110], 1, 2, [28, 61, 28])).toEqual({
+      x: 48,
+      y: 89,
+      width: 110,
+      height: 28,
+    });
   });
 
   it("does not jump when the clicked table title is already in view", () => {

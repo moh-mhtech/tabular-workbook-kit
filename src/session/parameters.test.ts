@@ -42,9 +42,9 @@ describe("parameters sheet and table", () => {
     expect(() => session.getTable("Notes")).toThrow();
   });
 
-  it("locks time axis and extra columns when promoteRowKeys is on", async () => {
+  it("locks year columns and extra columns when promoteRowKeys is on", async () => {
     const session = await open();
-    expect(() => session.setTimeAxis("Params", true)).toThrow(/time axis/);
+    expect(() => session.addYearColumn("Params")).toThrow(/year column/);
     expect(() => session.deleteColumn("Params", "Value")).toThrow(/cannot be deleted/);
     expect(() => session.renameColumn("Params", "Value", "Amount")).toThrow(/cannot be renamed/);
     expect(() => session.addColumn("Params")).toThrow(/extra columns/);

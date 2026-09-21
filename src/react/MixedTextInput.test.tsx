@@ -24,4 +24,20 @@ describe("MixedTextInput", () => {
     render(<MixedTextInput values={["G3A", "G3A"]} onCommit={() => undefined} />);
     expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("G3A");
   });
+
+  it("replaces the displayed value when the source changes", () => {
+    const { rerender } = render(<MixedTextInput values={["AndelOutsource"]} onCommit={() => undefined} />);
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("AndelOutsource");
+    rerender(<MixedTextInput values={["AndelPladebuk"]} onCommit={() => undefined} />);
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("AndelPladebuk");
+  });
+
+  it("does not commit when the value is unchanged", () => {
+    const commits: string[] = [];
+    render(<MixedTextInput values={["Vat"]} onCommit={(value) => commits.push(value)} />);
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+    fireEvent.focus(input);
+    fireEvent.blur(input);
+    expect(commits).toEqual([]);
+  });
 });

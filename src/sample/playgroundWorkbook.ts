@@ -39,7 +39,7 @@ export function createPlaygroundWorkbook(): WorkbookSnapshot {
         name: "Params",
         locked: true,
         promoteRowKeys: true,
-        timeAxis: false,
+        yearColumns: [],
         attributeColumns: [{ id: "Value", name: "Value" }],
         rows: [
           { id: aarsalgRow, key: "Årssalg", cells: { Value: input(8_000_000) } },
@@ -62,7 +62,7 @@ export function createPlaygroundWorkbook(): WorkbookSnapshot {
       {
         id: "tbl-salg",
         name: "Salg",
-        timeAxis: true,
+        yearColumns: [{ id: "yc-2025", year: 2025, grain: "month" }],
         attributeColumns: [],
         rows: [
           {
@@ -102,7 +102,7 @@ export function createPlaygroundWorkbook(): WorkbookSnapshot {
       {
         id: "tbl-staff",
         name: "Staff",
-        timeAxis: true,
+        yearColumns: [{ id: "yc-2025", year: 2025, grain: "month" }],
         attributeColumns: [
           { id: "Role", name: "Role" },
           { id: "BaseSalary", name: "BaseSalary" },
@@ -133,7 +133,7 @@ export function createPlaygroundWorkbook(): WorkbookSnapshot {
       {
         id: "tbl-resultat",
         name: "Resultat",
-        timeAxis: true,
+        yearColumns: [{ id: "yc-2025", year: 2025, grain: "month" }],
         attributeColumns: [],
         rows: [
           {

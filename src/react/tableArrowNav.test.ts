@@ -28,7 +28,7 @@ function stackedTables(): WorkbookSnapshot {
       {
         id: "tbl-wide",
         name: "Wide",
-        timeAxis: false,
+        yearColumns: [],
         attributeColumns: [
           { id: "col-alpha", name: "Alpha" },
           { id: "col-gamma", name: "Gamma" },
@@ -42,7 +42,7 @@ function stackedTables(): WorkbookSnapshot {
       {
         id: "tbl-narrow",
         name: "Narrow",
-        timeAxis: false,
+        yearColumns: [],
         attributeColumns: [{ id: "col-beta", name: "Beta" }],
         rows: [{ id: "rn-1", key: "1", cells: {} }],
       },
@@ -288,7 +288,7 @@ function filledBlocks(): WorkbookSnapshot {
       {
         id: "tbl-a",
         name: "A",
-        timeAxis: false,
+        yearColumns: [],
         attributeColumns: [
           { id: "ca", name: "CA" },
           { id: "cb", name: "CB" },
@@ -322,7 +322,7 @@ function filledBlocks(): WorkbookSnapshot {
       {
         id: "tbl-b",
         name: "B",
-        timeAxis: false,
+        yearColumns: [],
         attributeColumns: [
           { id: "ca", name: "CA" },
           { id: "cb", name: "CB" },

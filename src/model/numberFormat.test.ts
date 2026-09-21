@@ -19,7 +19,7 @@ function table(partial: Partial<TableSnapshot> = {}): TableSnapshot {
   return {
     id: "tbl",
     name: "T",
-    timeAxis: false,
+    yearColumns: [],
     attributeColumns: [{ id: "Value", name: "Value" }],
     rows: [],
     ...partial,

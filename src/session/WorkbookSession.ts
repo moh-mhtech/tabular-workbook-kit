@@ -28,6 +28,7 @@ import {
   overlayKey,
   parseLooseCellKey,
   type CellSnapshot,
+  type CellStyle,
   type EvaluatedCell,
   type EvaluatedColumn,
   type EvaluatedTable,
@@ -39,6 +40,14 @@ import {
   type WorkbookSnapshot,
 } from "../model/types.js";
 import { looksLikeFormula } from "../formula/compile.js";
+import {
+  calendarCoveringYear,
+  defaultYearColumn,
+  evenSplit,
+  hasTimeColumns,
+  tableYearColumns,
+  writePeriodIds,
+} from "../model/yearColumns.js";
 import {
   assertTableName,
   emptyCells,
@@ -261,6 +270,58 @@ export class WorkbookSession {
     this.emit();
   }
 
+  addScenario(name?: string) {
+    const scenarioName = uniqueName(
+      this.snapshot.scenarios.map((s) => s.name),
+      name ?? "Scenario",
+    );
+    this.checkpoint();
+    const scenario = { id: uid("scn"), name: scenarioName, overlays: {} as Record<string, Primitive> };
+    this.snapshot.scenarios.push(scenario);
+    this.emit();
+    return scenario;
+  }
+
+  renameScenario(id: string, name: string) {
+    const scenario = this.snapshot.scenarios.find((s) => s.id === id);
+    if (!scenario) throw new Error(`Unknown scenario "${id}"`);
+    const next = name.trim();
+    if (!next) throw new Error("Scenario name cannot be empty.");
+    if (this.snapshot.scenarios.some((s) => s.id !== id && s.name.toLowerCase() === next.toLowerCase())) {
+      throw new Error(`Scenario name "${next}" is already used.`);
+    }
+    if (next === scenario.name) return;
+    this.checkpoint();
+    scenario.name = next;
+    this.emit();
+  }
+
+  deleteScenario(id: string) {
+    const scenario = this.snapshot.scenarios.find((s) => s.id === id);
+    if (!scenario) throw new Error(`Unknown scenario "${id}"`);
+    this.checkpoint();
+    this.snapshot.scenarios = this.snapshot.scenarios.filter((s) => s.id !== id);
+    if (this.snapshot.activeScenarioId === id) this.snapshot.activeScenarioId = null;
+    this.emit();
+  }
+
+  duplicateScenario(id: string) {
+    const scenario = this.snapshot.scenarios.find((s) => s.id === id);
+    if (!scenario) throw new Error(`Unknown scenario "${id}"`);
+    this.checkpoint();
+    const copy = {
+      id: uid("scn"),
+      name: uniqueName(
+        this.snapshot.scenarios.map((s) => s.name),
+        scenario.name,
+      ),
+      overlays: { ...scenario.overlays },
+    };
+    this.snapshot.scenarios.push(copy);
+    this.emit();
+    return copy;
+  }
+
   private evaluated() {
     if (!this.cache) {
       throw new Error("Workbook is not calculated yet. Await session.recalculate() first.");
@@ -312,11 +373,11 @@ export class WorkbookSession {
       return { id: row.id, key: row.key, cells };
     });
 
-    if (grain === "month" || !tableLayout.table.timeAxis) {
+    if (grain === "month" || !hasTimeColumns(tableLayout.table)) {
       return {
         id: tableLayout.table.id,
         name: tableLayout.table.name,
-        timeAxis: tableLayout.table.timeAxis,
+        yearColumns: tableYearColumns(tableLayout.table),
         timeGrain: "month",
         columns: monthlyCols,
         rows,
@@ -354,38 +415,56 @@ export class WorkbookSession {
       if (!scenario) throw new Error("Active scenario missing");
       scenario.overlays[overlayKey(table.id, row.id, colId)] = value;
     } else {
-      row.cells[colId] = { kind: "input", value };
+      row.cells[colId] = retainCellMeta(existing, { kind: "input", value });
     }
     this.emit();
   }
 
   setFormula(tableName: string, rowKey: string, columnId: string, formula: string) {
     const { row, colId } = this.findCell(tableName, rowKey, columnId);
+    const existing = row.cells[colId];
     this.checkpoint();
-    row.cells[colId] = {
+    row.cells[colId] = retainCellMeta(existing, {
       kind: "formula",
       formula: formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`,
-    };
+    });
     this.emit();
   }
 
   writeCell(tableName: string, rowKey: string, columnId: string, raw: string) {
-    if (looksLikeFormula(raw)) {
-      this.setFormula(tableName, rowKey, columnId, raw);
-      return;
-    }
-    const { table, row, colId } = this.findCell(tableName, rowKey, columnId);
-    const existing = row.cells[colId];
-    if (existing?.kind === "formula") {
-      if (this.snapshot.activeScenarioId) {
-        throw new Error("Cannot overlay a formula cell. Switch to Base to change the formula.");
-      }
+    const { table, row } = this.findCell(tableName, rowKey, columnId);
+    const periods = buildPeriods(this.snapshot.calendar);
+    const periodIds = writePeriodIds(table, columnId, periods);
+    const formula = looksLikeFormula(raw);
+    const parsed = formula ? raw : parsePrimitive(raw);
+    if (formula) {
       this.checkpoint();
-      row.cells[colId] = { kind: "input", value: parsePrimitive(raw) };
+      const text = raw.trim().startsWith("=") ? raw.trim() : `=${raw.trim()}`;
+      for (const id of periodIds) {
+        row.cells[id] = retainCellMeta(row.cells[id], { kind: "formula", formula: text });
+      }
       this.emit();
       return;
     }
-    this.setInput(table.name, row.key, colId, parsePrimitive(raw));
+    const existing = periodIds.map((id) => row.cells[id]).find((cell) => cell?.kind === "formula");
+    if (existing?.kind === "formula" && this.snapshot.activeScenarioId) {
+      throw new Error("Cannot overlay a formula cell. Switch to Base to change the formula.");
+    }
+    this.checkpoint();
+    const values =
+      periodIds.length > 1 && typeof parsed === "number" ? evenSplit(parsed, periodIds.length) : periodIds.map(() => parsed as Primitive);
+    for (let i = 0; i < periodIds.length; i++) {
+      const id = periodIds[i]!;
+      const value = values[i]!;
+      if (this.snapshot.activeScenarioId && row.cells[id]?.kind !== "formula") {
+        const scenario = this.snapshot.scenarios.find((s) => s.id === this.snapshot.activeScenarioId);
+        if (!scenario) throw new Error("Active scenario missing");
+        scenario.overlays[overlayKey(table.id, row.id, id)] = value;
+      } else {
+        row.cells[id] = retainCellMeta(row.cells[id], { kind: "input", value });
+      }
+    }
+    this.emit();
   }
 
   /**
@@ -713,13 +792,50 @@ export class WorkbookSession {
     this.emit();
   }
 
-  setTimeAxis(tableIdOrName: string, enabled: boolean) {
+  addYearColumn(tableIdOrName: string, year?: number, grain: TimeGrain = "month") {
     const table = requireTable(this.snapshot, tableIdOrName);
-    if (table.promoteRowKeys && enabled) {
-      throw new Error("A promoteRowKeys table cannot have a time axis.");
+    if (table.promoteRowKeys) {
+      throw new Error("A promoteRowKeys table cannot have a year column.");
+    }
+    const existing = tableYearColumns(table);
+    const startYear = Number(this.snapshot.calendar.startMonth.slice(0, 4));
+    const nextYear = year ?? (existing.length ? Math.max(...existing.map((col) => col.year)) + 1 : startYear);
+    if (existing.some((col) => col.year === nextYear)) {
+      throw new Error(`Year ${nextYear} is already on this table.`);
     }
     this.checkpoint();
-    table.timeAxis = enabled;
+    this.snapshot.calendar = calendarCoveringYear(this.snapshot.calendar, nextYear);
+    table.yearColumns = [...existing, defaultYearColumn(nextYear, grain)];
+    this.emit();
+    return table.yearColumns[table.yearColumns.length - 1]!;
+  }
+
+  removeYearColumn(tableIdOrName: string, yearColumnId: string) {
+    const table = requireTable(this.snapshot, tableIdOrName);
+    const existing = tableYearColumns(table);
+    if (!existing.some((col) => col.id === yearColumnId)) {
+      throw new Error(`Unknown year column "${yearColumnId}"`);
+    }
+    this.checkpoint();
+    table.yearColumns = existing.filter((col) => col.id !== yearColumnId);
+    this.emit();
+  }
+
+  clearYearColumns(tableIdOrName: string) {
+    const table = requireTable(this.snapshot, tableIdOrName);
+    if (!tableYearColumns(table).length) return;
+    this.checkpoint();
+    table.yearColumns = [];
+    this.emit();
+  }
+
+  setYearColumnGrain(tableIdOrName: string, yearColumnId: string, grain: TimeGrain) {
+    const table = requireTable(this.snapshot, tableIdOrName);
+    const yearCol = tableYearColumns(table).find((col) => col.id === yearColumnId);
+    if (!yearCol) throw new Error(`Unknown year column "${yearColumnId}"`);
+    if (yearCol.grain === grain) return;
+    this.checkpoint();
+    yearCol.grain = grain;
     this.emit();
   }
 
@@ -727,7 +843,7 @@ export class WorkbookSession {
     const table = requireTable(this.snapshot, tableIdOrName);
     if (enabled) {
       if (!canPromoteRowKeys(table)) {
-        throw new Error("promoteRowKeys requires row keys and exactly one data column with no time axis.");
+        throw new Error("promoteRowKeys requires row keys and exactly one data column with no year columns.");
       }
       for (const row of table.rows) {
         assertGlobalName(this.snapshot, row.key, { rowId: row.id, tableId: table.id });
@@ -751,7 +867,7 @@ export class WorkbookSession {
     return sheet;
   }
 
-  addTable(sheetId: string, opts: { name?: string; timeAxis?: boolean } = {}) {
+  addTable(sheetId: string, opts: { name?: string; yearColumns?: boolean } = {}) {
     return this.restack(() => {
       const sheet = this.snapshot.sheets.find((s) => s.id === sheetId);
       if (!sheet) throw new Error(`Unknown sheet "${sheetId}"`);
@@ -768,7 +884,7 @@ export class WorkbookSession {
       const table: TableSnapshot = {
         id: uid("tbl"),
         name,
-        timeAxis: opts.timeAxis ?? false,
+        yearColumns: opts.yearColumns ? [defaultYearColumn(Number(this.snapshot.calendar.startMonth.slice(0, 4)))] : [],
         attributeColumns: [valueCol],
         rows: [{ id: uid("row"), key: "1", cells: { [valueCol.id]: { kind: "input", value: null } } }],
       };
@@ -836,20 +952,57 @@ export class WorkbookSession {
       else delete attr.format;
     } else {
       table.columnFormats ??= {};
-      if (next) table.columnFormats[columnId] = next;
-      else delete table.columnFormats[columnId];
+      const ids = writePeriodIds(table, columnId, buildPeriods(this.snapshot.calendar));
+      for (const id of ids) {
+        if (next) table.columnFormats[id] = next;
+        else delete table.columnFormats[id];
+      }
     }
     this.emit();
   }
 
   setCellFormat(tableIdOrName: string, rowIdOrKey: string, columnId: string, pattern: string) {
-    const { row, colId } = this.findCell(tableIdOrName, rowIdOrKey, columnId);
+    const { table, row } = this.findCell(tableIdOrName, rowIdOrKey, columnId);
     const next = pattern.trim();
+    const ids = writePeriodIds(table, columnId, buildPeriods(this.snapshot.calendar));
     this.checkpoint();
-    const cell = row.cells[colId] ?? { kind: "input" as const, value: null };
-    if (next) cell.format = next;
-    else delete cell.format;
-    row.cells[colId] = cell;
+    for (const id of ids) {
+      const cell = row.cells[id] ?? { kind: "input" as const, value: null };
+      if (next) cell.format = next;
+      else delete cell.format;
+      row.cells[id] = cell;
+    }
+    this.emit();
+  }
+
+  setColumnStyle(tableIdOrName: string, columnId: string, patch: CellStyle) {
+    const table = requireTable(this.snapshot, tableIdOrName);
+    this.checkpoint();
+    const attr = table.attributeColumns.find((c) => c.id === columnId || c.name === columnId);
+    if (attr) attr.style = mergeStyle(attr.style, patch);
+    else {
+      table.columnStyles ??= {};
+      const ids = writePeriodIds(table, columnId, buildPeriods(this.snapshot.calendar));
+      for (const id of ids) {
+        const next = mergeStyle(table.columnStyles[id], patch);
+        if (next) table.columnStyles[id] = next;
+        else delete table.columnStyles[id];
+      }
+    }
+    this.emit();
+  }
+
+  setCellStyle(tableIdOrName: string, rowIdOrKey: string, columnId: string, patch: CellStyle) {
+    const { table, row } = this.findCell(tableIdOrName, rowIdOrKey, columnId);
+    const ids = writePeriodIds(table, columnId, buildPeriods(this.snapshot.calendar));
+    this.checkpoint();
+    for (const id of ids) {
+      const cell = row.cells[id] ?? { kind: "input" as const, value: null };
+      const next = mergeStyle(cell.style, patch);
+      if (next) cell.style = next;
+      else delete cell.style;
+      row.cells[id] = cell;
+    }
     this.emit();
   }
 
@@ -953,9 +1106,26 @@ function aggregateTime(
   return {
     id,
     name,
-    timeAxis: true,
+    yearColumns: [],
     timeGrain: grain,
     columns: [...attributes, ...timeCols],
     rows: nextRows,
   };
+}
+
+function retainCellMeta(existing: CellSnapshot | undefined, next: CellSnapshot): CellSnapshot {
+  if (existing?.format) next.format = existing.format;
+  if (existing?.style && Object.keys(existing.style).length) next.style = existing.style;
+  return next;
+}
+
+function mergeStyle(base: CellStyle | undefined, patch: CellStyle): CellStyle | undefined {
+  const next: CellStyle = { ...base };
+  for (const key of ["bold", "italic", "strikethrough", "textColor", "fillColor", "fontSize"] as const) {
+    if (!(key in patch)) continue;
+    const value = patch[key];
+    if (value === undefined || value === false || value === "") delete next[key];
+    else Object.assign(next, { [key]: value });
+  }
+  return Object.keys(next).length ? next : undefined;
 }

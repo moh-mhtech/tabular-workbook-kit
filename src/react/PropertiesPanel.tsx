@@ -1,7 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { applySuggestion, suggestFormula } from "../formula/formulaSuggest.js";
+import { layoutWorkbook } from "../model/layout.js";
 import { formatDisplayValue, resolveCellFormat } from "../model/numberFormat.js";
 import { KEY_COLUMN_ID, isCellSelection, selectedCellRefs, sharedOrStar } from "../model/types.js";
 import { blurOnEnter } from "./blurOnEnter.js";
+import { FormulaSuggestList } from "./FormulaSuggestList.js";
+import { OutlinedField } from "./OutlinedField.js";
 import { moveSelectionAfterCommit } from "./customGridInteractions.js";
 import { commitKeyMovement } from "./customGridOverlay.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
@@ -201,8 +205,14 @@ function FormulaDraft({
   onCommit: (value: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => void;
   onCancel: () => void;
 }) {
+  const snapshot = useSnapshot();
+  const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
   const [draft, setDraft] = useState(committed);
+  const [activeSuggest, setActiveSuggest] = useState(0);
+  const [suggestOpen, setSuggestOpen] = useState(true);
   const areaRef = useRef<HTMLTextAreaElement>(null);
+  const caret = areaRef.current?.selectionStart ?? draft.length;
+  const suggestions = suggestOpen ? suggestFormula(draft, caret, layout) : [];
   useEffect(() => {
     setDraft(committed);
   }, [committed, resetKey]);
@@ -214,38 +224,76 @@ function FormulaDraft({
   }, [draft]);
 
   return (
-    <label className="wk-formula-bar">
-      Value
-      <textarea
-        ref={areaRef}
-        rows={1}
-        disabled={disabled}
-        placeholder={disabled ? "Select a cell" : undefined}
-        value={draft}
-        onFocus={() => {
-          if (draft === "*") setDraft(firstValue);
-        }}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          onChange(e.target.value);
-        }}
-        onBlur={() => onCommit(draft)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            onCancel();
-            return;
-          }
-          const movement = commitKeyMovement(e);
-          if (movement) {
-            e.preventDefault();
-            onCommit(draft, movement);
-            return;
-          }
-          blurOnEnter(e);
+    <div className="wk-formula-bar">
+      <OutlinedField label="Value" endLabel={evaluated || undefined}>
+        <textarea
+          ref={areaRef}
+          rows={1}
+          disabled={disabled}
+          aria-label="Value"
+          placeholder={disabled ? "Select a cell" : " "}
+          value={draft}
+          onFocus={() => {
+            if (draft === "*") setDraft(firstValue);
+          }}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setSuggestOpen(true);
+            setActiveSuggest(0);
+            onChange(e.target.value);
+          }}
+          onBlur={() => onCommit(draft)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              if (suggestions.length) {
+                e.preventDefault();
+                setSuggestOpen(false);
+                return;
+              }
+              onCancel();
+              return;
+            }
+            if (suggestions.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+              e.preventDefault();
+              setActiveSuggest((current) =>
+                e.key === "ArrowDown"
+                  ? (current + 1) % suggestions.length
+                  : (current - 1 + suggestions.length) % suggestions.length,
+              );
+              return;
+            }
+            if (suggestions.length && (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey))) {
+              e.preventDefault();
+              const picked = suggestions[activeSuggest] ?? suggestions[0]!;
+              const applied = applySuggestion(draft, e.currentTarget.selectionStart ?? draft.length, picked);
+              setDraft(applied.draft);
+              onChange(applied.draft);
+              requestAnimationFrame(() => {
+                const area = areaRef.current;
+                if (area) area.setSelectionRange(applied.caret, applied.caret);
+              });
+              return;
+            }
+            const movement = commitKeyMovement(e);
+            if (movement) {
+              e.preventDefault();
+              onCommit(draft, movement);
+              return;
+            }
+            blurOnEnter(e);
+          }}
+        />
+      </OutlinedField>
+      <FormulaSuggestList
+        items={suggestions}
+        active={activeSuggest}
+        onPick={(item) => {
+          const applied = applySuggestion(draft, areaRef.current?.selectionStart ?? draft.length, item);
+          setDraft(applied.draft);
+          onChange(applied.draft);
         }}
       />
-      {evaluated !== undefined ? <span className="wk-evaluated">{evaluated}</span> : null}
-    </label>
+    </div>
   );
 }
 

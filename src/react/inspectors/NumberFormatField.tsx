@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatDisplayValue } from "../../model/numberFormat.js";
 import { KEY_COLUMN_ID, type Selection, type WorkbookSnapshot } from "../../model/types.js";
 import type { WorkbookSession } from "../../session/WorkbookSession.js";
 import { MixedTextInput } from "../MixedTextInput.js";
+import { OutlinedField } from "../OutlinedField.js";
 import { useWorkbook } from "../WorkbookProvider.js";
 
 const FORMAT_EXAMPLES: Array<{ pattern: string; note: string }> = [
@@ -68,13 +70,9 @@ export function NumberFormatField({
   onCommit: (value: string) => void;
 }) {
   return (
-    <label>
-      <span className="wk-field-head">
-        Number format
-        <NumberFormatHelp />
-      </span>
+    <OutlinedField label="Format" trailing={<NumberFormatHelp />}>
       <MixedTextInput values={values} placeholder="G3, #,##G3, G3A, G3K" onCommit={onCommit} />
-    </label>
+    </OutlinedField>
   );
 }
 
@@ -109,20 +107,23 @@ function NumberFormatHelp() {
       >
         ?
       </button>
-      {open ? (
-        <div className="wk-help-pop" role="tooltip" style={{ top: pos.top, left: pos.left }}>
-          <p className="wk-help-pop-title">Examples using {formatDisplayValue(sample)}</p>
-          <ul>
-            {FORMAT_EXAMPLES.map((example) => (
-              <li key={example.pattern}>
-                <code>{example.pattern}</code>
-                <span>{formatDisplayValue(sample, example.pattern)}</span>
-                <em>{example.note}</em>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      {open
+        ? createPortal(
+            <div className="wk-help-pop" role="tooltip" style={{ top: pos.top, left: pos.left }}>
+              <p className="wk-help-pop-title">Examples using {formatDisplayValue(sample)}</p>
+              <ul>
+                {FORMAT_EXAMPLES.map((example) => (
+                  <li key={example.pattern}>
+                    <code>{example.pattern}</code>
+                    <span>{formatDisplayValue(sample, example.pattern)}</span>
+                    <em>{example.note}</em>
+                  </li>
+                ))}
+              </ul>
+            </div>,
+            document.body,
+          )
+        : null}
     </span>
   );
 }

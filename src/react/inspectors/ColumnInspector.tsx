@@ -1,7 +1,10 @@
-import { KEY_COLUMN_ID } from "../../model/types.js";
-import { blurOnEnter } from "../blurOnEnter.js";
+import { KEY_COLUMN_ID, type TimeGrain } from "../../model/types.js";
+import { selectedYearColumn } from "../../model/yearColumns.js";
+import { MixedTextInput } from "../MixedTextInput.js";
+import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
 import { NumberFormatField } from "./NumberFormatField.js";
+import { StyleField } from "./StyleField.js";
 
 function tryCall(fn: () => void) {
   try {
@@ -19,22 +22,41 @@ export function ColumnInspector({ tableId, columnId }: { tableId: string; column
   const period = columnId !== KEY_COLUMN_ID && !col;
   if (!table) return null;
   const format = col?.format ?? table.columnFormats?.[columnId] ?? "";
+  const yearCol = selectedYearColumn(snapshot, { kind: "column", tableId, columnId });
   return (
     <section>
       {col ? (
-        <label>
-          Name
-          <input
-            defaultValue={col.name}
-            onBlur={(e) => tryCall(() => session.renameColumn(table.id, col.id, e.target.value))}
-            onKeyDown={blurOnEnter}
+        <OutlinedField label="Name">
+          <MixedTextInput
+            values={[col.name]}
+            onCommit={(value) => tryCall(() => session.renameColumn(table.id, col.id, value))}
           />
-        </label>
+        </OutlinedField>
       ) : (
         <p>{period ? `Period ${columnId}` : "Key"}</p>
       )}
       {columnId !== KEY_COLUMN_ID ? (
-        <NumberFormatField values={[format]} onCommit={(value) => session.setColumnFormat(table.id, columnId, value)} />
+        <>
+          <NumberFormatField values={[format]} onCommit={(value) => session.setColumnFormat(table.id, columnId, value)} />
+          <StyleField
+            values={[col?.style ?? table.columnStyles?.[columnId]]}
+            onCommit={(style) => session.setColumnStyle(table.id, columnId, style)}
+          />
+        </>
+      ) : null}
+      {yearCol && period ? (
+        <OutlinedField label="Grain">
+          <select
+            value={yearCol.yearColumn.grain}
+            onChange={(e) =>
+              tryCall(() => session.setYearColumnGrain(table.id, yearCol.yearColumn.id, e.target.value as TimeGrain))
+            }
+          >
+            <option value="month">Month</option>
+            <option value="quarter">Quarter</option>
+            <option value="year">Year</option>
+          </select>
+        </OutlinedField>
       ) : null}
     </section>
   );

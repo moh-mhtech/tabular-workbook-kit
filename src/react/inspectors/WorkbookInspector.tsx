@@ -1,4 +1,5 @@
-import { blurOnEnter } from "../blurOnEnter.js";
+import { MixedTextInput } from "../MixedTextInput.js";
+import { OutlinedField } from "../OutlinedField.js";
 import { useWorkbook, useSnapshot } from "../WorkbookProvider.js";
 
 function tryCall(fn: () => void) {
@@ -15,40 +16,29 @@ export function WorkbookInspector({ label }: { label: string }) {
   return (
     <section>
       <h3>{label}</h3>
-      <label>
-        Name
-        <input
-          defaultValue={snapshot.name}
-          onBlur={(e) => tryCall(() => session.renameWorkbook(e.target.value))}
-          onKeyDown={blurOnEnter}
+      <OutlinedField label="Name">
+        <MixedTextInput values={[snapshot.name]} onCommit={(value) => tryCall(() => session.renameWorkbook(value))} />
+      </OutlinedField>
+      <OutlinedField label="Start month">
+        <MixedTextInput
+          values={[snapshot.calendar.startMonth]}
+          onCommit={(value) => tryCall(() => session.setCalendar({ ...snapshot.calendar, startMonth: value }))}
         />
-      </label>
-      <label>
-        Start month
-        <input
-          defaultValue={snapshot.calendar.startMonth}
-          onBlur={(e) =>
-            tryCall(() => session.setCalendar({ ...snapshot.calendar, startMonth: e.target.value }))
-          }
-          onKeyDown={blurOnEnter}
-        />
-      </label>
-      <label>
-        Months
-        <input
+      </OutlinedField>
+      <OutlinedField label="Months">
+        <MixedTextInput
           type="number"
-          defaultValue={snapshot.calendar.monthCount}
-          onBlur={(e) =>
+          values={[String(snapshot.calendar.monthCount)]}
+          onCommit={(value) =>
             tryCall(() =>
               session.setCalendar({
                 ...snapshot.calendar,
-                monthCount: Number(e.target.value) || snapshot.calendar.monthCount,
+                monthCount: Number(value) || snapshot.calendar.monthCount,
               }),
             )
           }
-          onKeyDown={blurOnEnter}
         />
-      </label>
+      </OutlinedField>
     </section>
   );
 }

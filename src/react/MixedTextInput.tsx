@@ -14,10 +14,12 @@ export function MixedTextInput({
   values,
   onCommit,
   placeholder,
+  type,
 }: {
   values: string[];
   onCommit: (value: string) => void;
   placeholder?: string;
+  type?: "text" | "number";
 }) {
   const first = values[0] ?? "";
   const idle = sharedOrStar(values);
@@ -29,14 +31,15 @@ export function MixedTextInput({
 
   return (
     <input
+      type={type}
       value={draft ?? idle}
-      placeholder={placeholder}
+      placeholder={placeholder ?? " "}
       onFocus={() => setDraft(first)}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => {
         const next = draft ?? idle;
         setDraft(null);
-        if (next === "*" && idle === "*") return;
+        if (next === idle) return;
         tryCall(() => onCommit(next));
       }}
       onKeyDown={blurOnEnter}

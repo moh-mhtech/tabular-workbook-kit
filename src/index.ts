@@ -1,6 +1,7 @@
 export type {
   CalendarSnapshot,
   CellKind,
+  CellStyle,
   CellSnapshot,
   ColumnSnapshot,
   EvaluatedCell,
@@ -17,6 +18,7 @@ export type {
   TableSnapshot,
   TimeGrain,
   WorkbookSnapshot,
+  YearColumnSnapshot,
 } from "./model/types.js";
 export {
   KEY_COLUMN_ID,

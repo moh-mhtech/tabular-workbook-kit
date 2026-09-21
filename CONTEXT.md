@@ -13,7 +13,7 @@ A Univer worksheet and an explorer node. Tables are stacked as locked bands on a
 _Avoid_: Group, tab, folder, unstructured grid (when you mean this)
 
 **Table**:
-A named grid with row keys, columns, and optional time axis. Every value lives in a Table. There is one Table type. Optional flags: `locked` (cannot delete), `promoteRowKeys` (row keys of the single data column become workbook defined names).
+A named grid with row keys, attribute columns, and optional year-columns. Every value lives in a Table. There is one Table type. Optional flags: `locked` (cannot delete), `promoteRowKeys` (row keys of the single data column become workbook defined names; a key-value policy, not a third grid kind).
 _Avoid_: Sheet, range, post list, dataset, parameter class (as a second grid kind)
 
 **Row key**:
@@ -24,16 +24,16 @@ _Avoid_: Row number, A1 row
 A non-time column (Position, Base salary, Comment, Value).
 _Avoid_: Metadata column, property (when you mean this)
 
-**Time axis**:
-Optional period columns on a Table, stored at month grain. Quarterly and yearly displays are views of the same months.
-_Avoid_: Date column, sheet months, forecast columns
+**Year column**:
+A Table column that expands one calendar year into visible period slots. Grain is per year-column (`month` / `quarter` / `year`). Storage stays months (`2025-01`). A quarter/year number edit even-splits onto those months (last month absorbs rounding). Formulas written in Q/Y land on every month in the bucket. `Salg[Jan]`, `Salg[2025-Q1]`, `Salg[2025]`, and `Salg[2025-01]` all compile. Unqualified `Jan` is the first year-column that has that month.
+_Avoid_: Time axis, table kind, date column, sheet months
 
 **Calendar**:
 The Workbook’s ordered monthly Periods (the shared time line tables join on).
 _Avoid_: Timeline, date range, fiscal year (fiscal year is a BudgetTool concept)
 
 **Period**:
-One month on the Calendar. The join key between time-axis tables.
+One month on the Calendar. The join key between year-column tables.
 _Avoid_: Column letter, month index, timestamp
 
 **Cell**:
@@ -89,7 +89,7 @@ Moving the mounted Univer unit onto the current Snapshot by diffing what the gri
 _Avoid_: Re-render, refresh, remount (when you mean this)
 
 **Auto-expansion**:
-Excel's rule that typing directly beneath a Table's last row appends a Row, and typing directly right of its last column appends an attribute Column — only while every other cell adjacent in that direction is empty. Time-axis and `promoteRowKeys` Tables never expand right. The value and the shape change are one undo step.
+Excel's rule that typing directly beneath a Table's last row appends a Row, and typing directly right of its last column appends an attribute Column — only while every other cell adjacent in that direction is empty. Year-column and `promoteRowKeys` Tables never expand right (`promoteRowKeys` also hides the growth column). The value and the shape change are one undo step.
 _Avoid_: Autofill, spill, dynamic array
 
 **WorkbookSession**:

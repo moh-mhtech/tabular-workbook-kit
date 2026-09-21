@@ -11,10 +11,20 @@ export interface CalendarSnapshot {
   monthCount: number;
 }
 
+export type CellStyle = {
+  bold?: boolean;
+  italic?: boolean;
+  strikethrough?: boolean;
+  textColor?: string;
+  fillColor?: string;
+  fontSize?: number;
+};
+
 export interface ColumnSnapshot {
   id: string;
   name: string;
   format?: string;
+  style?: CellStyle;
 }
 
 export interface CellSnapshot {
@@ -22,6 +32,7 @@ export interface CellSnapshot {
   value?: Primitive;
   formula?: string;
   format?: string;
+  style?: CellStyle;
 }
 
 export interface RowSnapshot {
@@ -30,17 +41,25 @@ export interface RowSnapshot {
   cells: Record<string, CellSnapshot>;
 }
 
+export interface YearColumnSnapshot {
+  id: string;
+  year: number;
+  grain: TimeGrain;
+}
+
 export interface TableSnapshot {
   id: string;
   name: string;
   attributeColumns: ColumnSnapshot[];
-  timeAxis: boolean;
+  yearColumns?: YearColumnSnapshot[];
   rows: RowSnapshot[];
   locked?: boolean;
   /** Row keys of the single data column become workbook defined names. */
   promoteRowKeys?: boolean;
   /** Number formats for period (or other non-attribute) columns. */
   columnFormats?: Record<string, string>;
+  /** Styles for period (or other non-attribute) columns. */
+  columnStyles?: Record<string, CellStyle>;
 }
 
 export type SheetHorizontalScroll = "table" | "sheet";
@@ -97,7 +116,7 @@ export interface EvaluatedRow {
 export interface EvaluatedTable {
   id: string;
   name: string;
-  timeAxis: boolean;
+  yearColumns: YearColumnSnapshot[];
   timeGrain: TimeGrain;
   columns: EvaluatedColumn[];
   rows: EvaluatedRow[];

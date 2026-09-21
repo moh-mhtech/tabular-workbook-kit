@@ -124,7 +124,7 @@ function isGrowthRow(projection: SheetGridProjection, row: number): boolean {
 }
 
 function isGrowthColumn(projection: SheetGridProjection, col: number): boolean {
-  return col === projection.colCount - 1;
+  return projection.growthColumn && col === projection.colCount - 1;
 }
 
 function lastDataRow(projection: SheetGridProjection, col: number): number | undefined {

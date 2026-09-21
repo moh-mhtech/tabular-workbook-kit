@@ -1,6 +1,6 @@
 # Workbook kit
 
-Tables-only calculation kernel with interchangeable spreadsheet adapters. The Playground can switch between the existing Univer canvas/engine and the custom Glide canvas/HyperFormula engine against the same JSON snapshot. Glossary: [CONTEXT.md](./CONTEXT.md). Host policy (Parametre/Params): [apps/playground/CONTEXT.md](../../apps/playground/CONTEXT.md).
+Tables-only calculation kernel with interchangeable spreadsheet adapters. Playground mounts the custom canvas and HyperFormula. Glossary: [CONTEXT.md](./CONTEXT.md). Host policy (Parametre/Params): [apps/playground/CONTEXT.md](../../apps/playground/CONTEXT.md).
 
 ## Mount (copy from Playground)
 

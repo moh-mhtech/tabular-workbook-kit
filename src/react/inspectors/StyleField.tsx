@@ -194,26 +194,82 @@ function ColorWell({
   );
 }
 
+function isLightHex(color: string): boolean {
+  const hex = parseHex(color);
+  if (!hex) return true;
+  const n = Number.parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return r * 0.299 + g * 0.587 + b * 0.114 > 186;
+}
+
+function ColorBar({ color, x, y, width, height }: { color: string; x: number; y: number; width: number; height: number }) {
+  const light = isLightHex(color);
+  return (
+    <rect
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      rx={0.7}
+      fill={color}
+      stroke={light ? "#94a3b4" : "none"}
+      strokeWidth={light ? 0.9 : 0}
+    />
+  );
+}
+
+function LetterGlyph({
+  letter,
+  italic,
+  x = 10,
+  y = 14.6,
+  size = 14.5,
+  weight = 650,
+}: {
+  letter: string;
+  italic?: boolean;
+  x?: number;
+  y?: number;
+  size?: number;
+  weight?: number;
+}) {
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor="middle"
+      fill="currentColor"
+      fontFamily={italic ? 'Georgia, "Times New Roman", serif' : '"Segoe UI", system-ui, sans-serif'}
+      fontSize={size}
+      fontWeight={weight}
+      fontStyle={italic ? "italic" : undefined}
+    >
+      {letter}
+    </text>
+  );
+}
+
 function TextColorIcon({ color }: { color: string }) {
   return (
-    <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M8.05 2.35 11.7 12h-1.85l-.8-2.25H6.95L6.15 12H4.3L8.05 2.35Zm-1.7 6.15h3.3L8.05 4.65 6.35 8.5Z"
-      />
-      <rect x="2.4" y="13.2" width="11.2" height="2.1" rx="0.6" fill={color} stroke="#c5d0dc" strokeWidth="0.4" />
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+      <LetterGlyph letter="A" y="12.35" size={13.6} weight={700} />
+      <ColorBar color={color} x="3.4" y="15.55" width="13.2" height="2.85" />
     </svg>
   );
 }
 
 function FillColorIcon({ color }: { color: string }) {
   return (
-    <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M10.15 1.85c.5-.5 1.32-.5 1.82 0l1.9 1.9c.5.5.5 1.32 0 1.82L7.15 12.3 3.2 11.25 10.15 1.85Z"
-      />
-      <rect x="2.4" y="13.2" width="11.2" height="2.1" rx="0.6" fill={color} stroke="#c5d0dc" strokeWidth="0.4" />
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+      <g transform="translate(1.55 -1.55) scale(0.76)">
+        <path
+          fill="currentColor"
+          d="M2.695 14.763 1.433 17.917a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z"
+        />
+      </g>
+      <ColorBar color={color} x="3.2" y="15.7" width="13.6" height="2.85" />
     </svg>
   );
 }
@@ -244,19 +300,16 @@ function StyleToggle({
 
 function BoldIcon() {
   return (
-    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M3.5 2.25h5.1c2.15 0 3.55 1.12 3.55 2.82 0 1.12-.62 2.02-1.68 2.42 1.32.38 2.13 1.4 2.13 2.78 0 1.92-1.58 3.23-4.02 3.23H3.5V2.25Zm2.35 4.7h2.5c.95 0 1.5-.5 1.5-1.2 0-.72-.55-1.18-1.5-1.18H5.85v2.38Zm0 5.55h2.82c1.1 0 1.78-.55 1.78-1.38 0-.85-.68-1.37-1.8-1.37H5.85v2.75Z"
-      />
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+      <LetterGlyph letter="B" size={15.5} weight={800} />
     </svg>
   );
 }
 
 function ItalicIcon() {
   return (
-    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
-      <path fill="currentColor" d="M6.4 2.25h6.35v1.85H10.6L7.85 12h2.55v1.85H3.9V12h2.2L8.9 4.1H6.4V2.25Z" />
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+      <LetterGlyph letter="I" italic size={16.5} weight={700} />
     </svg>
   );
 }
@@ -264,29 +317,36 @@ function ItalicIcon() {
 function StrikeIcon() {
   return (
     <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M2.1 15.2 5.4 5.1h2.2l3.3 10.1H8.6l-.6-1.85H4.85L4.25 15.2H2.1Zm2.95-3.4h2.55L6.45 8.05 5.05 11.8Zm6.25 3.4V8.05h1.85c2 0 3.2.95 3.2 2.45 0 1.55-1.2 2.5-3.25 2.5h-.55v2.2H11.3Zm1.85-3.55h.45c.9 0 1.4-.45 1.4-1.05s-.5-1-1.4-1h-.45v2.05Z"
-      />
-      <rect x="1" y="9.05" width="18" height="2.15" rx="0.4" fill="currentColor" />
+      <LetterGlyph letter="A" size={14.5} weight={700} />
+      <rect x="2.2" y="9.15" width="15.6" height="2.05" rx="0.35" fill="currentColor" />
     </svg>
   );
 }
 
 function ClearFormatIcon() {
   return (
-    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M5.4 2.5 8.6 12H6.85l-.7-2.15H3.5L2.8 12H1.05L4.25 2.5h1.15Zm-1.55 6.15h2.55L5.15 4.7 3.85 8.65Z"
-      />
-      <path
-        fill="none"
-        stroke="#d32f2f"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        d="M9.5 9.6 13.7 13.8M13.7 9.6 9.5 13.8"
-      />
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+      <LetterGlyph letter="A" x="8" y="14.4" size={14.2} weight={700} />
+      <g transform="translate(14.15 14.35)" fill="#e11d2a">
+        <rect x="-4.15" y="-1.05" width="8.3" height="2.1" rx="0.55" transform="rotate(45)" />
+        <rect x="-4.15" y="-1.05" width="8.3" height="2.1" rx="0.55" transform="rotate(-45)" />
+      </g>
+    </svg>
+  );
+}
+
+function ChevronUpIcon() {
+  return (
+    <svg viewBox="0 0 10 6" width="9" height="5" aria-hidden="true">
+      <path fill="currentColor" d="M5 .35 9.6 5.4H.4Z" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg viewBox="0 0 10 6" width="9" height="5" aria-hidden="true">
+      <path fill="currentColor" d="M5 5.65.4.6h9.2Z" />
     </svg>
   );
 }
@@ -310,6 +370,12 @@ function FontSizeStepper({
   const commitRaw = (raw: string) => {
     const next = Number(raw);
     onCommit(Number.isFinite(next) && next > 0 ? clampFontSize(next) : undefined);
+  };
+
+  const bump = (delta: number) => {
+    const from = Number(draft ?? current);
+    const base = Number.isFinite(from) && from > 0 ? from : DEFAULT_CELL_FONT_SIZE;
+    onCommit(clampFontSize(base + delta));
   };
 
   return (
@@ -339,6 +405,15 @@ function FontSizeStepper({
         }}
         onKeyDown={blurOnEnter}
       />
+      <span className="wk-style-size-split" aria-hidden="true" />
+      <span className="wk-style-size-steppers">
+        <button type="button" aria-label="Increase font size" disabled={mixed} onClick={() => bump(1)}>
+          <ChevronUpIcon />
+        </button>
+        <button type="button" aria-label="Decrease font size" disabled={mixed} onClick={() => bump(-1)}>
+          <ChevronDownIcon />
+        </button>
+      </span>
     </span>
   );
 }

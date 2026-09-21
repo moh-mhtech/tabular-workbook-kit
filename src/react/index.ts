@@ -10,6 +10,9 @@ export { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 export { SheetCanvas } from "./SheetCanvas.js";
 export { PropertiesPanel } from "./PropertiesPanel.js";
 export type { HostInspectors } from "./PropertiesPanel.js";
+export { GlossaryButton } from "./GlossaryDialog.js";
+export { parseGlossary } from "./glossary.js";
+export type { GlossaryDoc, GlossarySection, GlossaryTerm } from "./glossary.js";
 export {
   ColumnResizeHandle,
   DEFAULT_EXPLORER_WIDTH,

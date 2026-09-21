@@ -159,6 +159,14 @@ describe("properties inspector UI", () => {
       fireEvent.blur(fontSize);
     });
     expect(session.getSnapshot().tables[0]!.rows[2]!.cells.Value!.style?.fontSize).toBeUndefined();
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Increase font size"));
+    });
+    expect(session.getSnapshot().tables[0]!.rows[2]!.cells.Value!.style?.fontSize).toBe(14);
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Decrease font size"));
+    });
+    expect(session.getSnapshot().tables[0]!.rows[2]!.cells.Value!.style?.fontSize).toBe(13);
   });
 
   it("opens a hue-by-shade palette whose two lightest steps are distinct", async () => {

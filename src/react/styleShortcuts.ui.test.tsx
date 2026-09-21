@@ -67,13 +67,15 @@ describe("cell style UI", () => {
       fireEvent.click(screen.getByLabelText("Bold"));
     });
     expect(screen.getByLabelText("Bold").tagName).toBe("BUTTON");
-    expect(screen.getByLabelText("Bold").textContent).toBe("");
-    expect(screen.getByLabelText("Italic").textContent).toBe("");
-    expect(screen.getByLabelText("Strikethrough").textContent).toBe("");
+    expect(screen.getByLabelText("Bold").querySelector("svg")).not.toBeNull();
+    expect(screen.getByLabelText("Italic").querySelector("svg")).not.toBeNull();
+    expect(screen.getByLabelText("Strikethrough").querySelector("svg")).not.toBeNull();
     expect(screen.getByLabelText("Text color").tagName).toBe("BUTTON");
     expect(screen.getByLabelText("Fill color").tagName).toBe("BUTTON");
     expect(screen.getByLabelText("Clear formatting").tagName).toBe("BUTTON");
     expect(screen.getByLabelText("Font size")).toHaveProperty("type", "number");
+    expect(screen.getByLabelText("Increase font size").tagName).toBe("BUTTON");
+    expect(screen.getByLabelText("Decrease font size").tagName).toBe("BUTTON");
     expect(session.getSnapshot().tables[0]!.rows[0]!.cells.Value!.style).toEqual({ bold: true });
     expect(session.getCell("Params", "Årssalg", "Value").overlay).toBe(true);
   });

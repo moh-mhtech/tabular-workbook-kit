@@ -17,12 +17,36 @@ describe("glossary", () => {
     const markdown = readFileSync(join(here, "../../CONTEXT.md"), "utf8");
     const doc = parseGlossary(markdown);
     expect(doc.title).toBe("Workbook kit");
-    expect(doc.sections.map((section) => section.heading)).toEqual(["Document", "Tables", "Cells", "Formulas", "Shell"]);
+    expect(doc.sections.map((section) => section.heading)).toEqual([
+      "Document",
+      "Tables",
+      "Cells",
+      "Formulas",
+      "Editing",
+      "Navigation",
+      "Shell",
+    ]);
     const terms = doc.sections.flatMap((section) => section.terms.map((term) => term.term));
     expect(terms).toContain("Workbook");
     expect(terms).toContain("Year column");
+    expect(terms).toContain("Growth row");
+    expect(terms).toContain("Unused corner");
+    expect(terms).toContain("Key cell");
+    expect(terms).toContain("Header cell");
+    expect(terms).toContain("Fill");
+    expect(terms).toContain("Cancel");
+    expect(terms).toContain("Mixed");
     expect(terms).toContain("Cell style");
+    expect(terms).toContain("Ready");
+    expect(terms).toContain("Enter");
+    expect(terms).toContain("Edit mode");
     expect(terms).toContain("Point");
+    expect(terms).toContain("Insert point");
+    expect(terms).toContain("Commit");
+    expect(terms).toContain("Arrow navigation");
+    expect(terms).toContain("Ctrl+arrow");
+    expect(terms).toContain("Cell range");
+    expect(terms).toContain("Reveal");
     expect(terms).toContain("Properties panel");
     const table = doc.sections.flatMap((section) => section.terms).find((term) => term.term === "Table");
     expect(table?.avoid).toMatch(/table kind/i);

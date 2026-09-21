@@ -40,6 +40,14 @@ _Avoid_: Default scenario, original, master
 The identity of a row in a Table (Karol, Vat). If the user has not named it, the row still has a stable id — not an Excel row number.
 _Avoid_: Row number, A1 row
 
+**Key cell**:
+The leftmost cell of a data row, showing the Row key. Clicking it selects the row. Typing here renames the Row key. The Growth-row key is a Growth header, not a Key cell.
+_Avoid_: Index cell, row header (when you mean this)
+
+**Header cell**:
+The top cell of a data column, showing the column name. Clicking it selects the column. Typing here renames an Attribute column. Year-column headers are Period labels. The Growth-column header is a Growth header.
+_Avoid_: Column letter, A1 header
+
 **Attribute column**:
 A Table column that is not time (Value, Position, Comment).
 _Avoid_: Metadata column, property (when you mean this)
@@ -73,7 +81,7 @@ The empty column right of a Table’s last data column. Typing here appends an a
 _Avoid_: New column, spare column
 
 **Growth header**:
-The `+` affordance on the Growth-row key or Growth-column header. It is selectable; the Unused corners are not.
+The `+` affordance on the Growth-row key or Growth-column header. It is selectable; the Unused corners are not. Selecting a Growth cell selects the Table until Auto-expansion creates a Cell.
 _Avoid_: Autofill handle, insert button
 
 **Unused corner**:
@@ -87,6 +95,10 @@ _Avoid_: Autofill, spill, dynamic array
 **Paste-grow**:
 Pasting a Cell range that extends past the Table appends rows and/or columns so the paste fits.
 _Avoid_: Spill, insert copied cells
+
+**Fill**:
+Repeating a Cell’s Input or Formula into adjacent Cells via the fill handle. Distinct from Auto-expansion, which adds rows or columns.
+_Avoid_: Autofill (when you mean Growth), flash fill
 
 ### Cells
 
@@ -147,7 +159,7 @@ Formula edit started by typing. A Literal: arrow or click Commits and moves Sele
 _Avoid_: Typeover, replace mode (Excel’s name is Enter)
 
 **Edit mode**:
-Formula edit started by F2, double-click, or Formula bar. Arrows move the caret. Click Points only at an Insert point; otherwise it Commits and selects. F2 toggles Enter ↔ Edit mode.
+Formula edit started by F2, double-click, or Formula bar. Arrows move the Caret. Click Points only at an Insert point; otherwise it Commits and selects. F2 toggles Enter ↔ Edit mode.
 _Avoid_: Edit (the verb), F2 mode, in-cell edit (when you mean the mode)
 
 **Point**:
@@ -170,9 +182,13 @@ _Avoid_: Selection (the Properties panel object), highlighted ref
 The Cell currently chosen for the Active formula ref. The next Point arrow walk starts here; if there is none, it starts at the Edit cell.
 _Avoid_: Selection, pointed cell (use this name)
 
+**Caret**:
+The insertion position in Formula text. In Edit mode, arrows move the Caret. In Enter and Point, arrows do not.
+_Avoid_: Cursor, selection (the Properties panel object)
+
 **Insert point**:
-A caret position in Formula text where a Formula ref may be inserted: after `=`, an operator, or a comma, or on an existing Formula ref.
-_Avoid_: Caret (the caret is not always an insert point)
+A Caret position in Formula text where a Formula ref may be inserted: after `=`, an operator, or a comma, or on an existing Formula ref.
+_Avoid_: Caret (the Caret is not always an insert point)
 
 **Literal**:
 Formula text that is not a Formula — it does not start with `=`. In Enter, arrow or click Commits a Literal.
@@ -181,6 +197,10 @@ _Avoid_: Value edit, number mode
 **Commit**:
 Ending Formula edit and writing Formula text to the Cell. Enter moves Selection down (onto Growth if that is the next unused cell); Tab moves right. A Literal click onto another Cell also Commits and selects that Cell.
 _Avoid_: Save, apply, blur (blur is one way to Commit)
+
+**Cancel**:
+Escape ends Formula edit without writing Formula text. If Formula AutoComplete is open, the first Escape hides the list; a second Escape Cancels.
+_Avoid_: Undo (Cancel does not revert a prior Commit), close editor
 
 **Formula AutoComplete**:
 Suggestions of functions, Defined names, and Table names after a non-empty prefix in Formula text. Bare `=` and operators show none. `[` still completes columns. Tab or Enter inserts from the list and does not Commit.
@@ -203,15 +223,19 @@ _Avoid_: Block, region, current region (Excel’s name)
 ### Shell
 
 **Explorer**:
-The left column: Sheets and the Tables on each Sheet. Clicking a Table name moves the viewport to that Table.
+The left column: Sheets and the Tables on each Sheet. Clicking a Table name Reveals that Table.
 _Avoid_: Folder tree, sheet tabs (when you mean this list)
 
+**Reveal**:
+Selecting a Table from Explorer and scrolling the viewport to that Table’s start. Distinct from keeping the selected Cell in view while Arrow navigation or Commit moves it.
+_Avoid_: Jump, scroll-into-view, follow selection
+
 **Selection**:
-The object the Properties panel edits: Workbook, Sheet, Table, column, row, or Cell (optionally a Cell range). Clicking empty canvas selects the Sheet. Selection never sits on an Unused corner. The selected Cell stays in view.
+The object the Properties panel edits: Workbook, Sheet, Table, column, row, or Cell (optionally a Cell range). Clicking empty canvas selects the Sheet. Clicking a Key cell selects the row; a Header cell, the column. Selection never sits on an Unused corner. Arrow navigation keeps the selected Cell in view without Reveal.
 _Avoid_: A1 range (when you mean this), focus (when you mean Selection)
 
 **Cell range**:
-A multi-cell Selection. Shared inspector fields show one value or Mixed. Typing or a Formula-bar Commit writes to every Cell in the range.
+A multi-cell Selection, built in Ready by click-drag or Shift+Arrow. Shared inspector fields show one value or Mixed. Typing or a Formula-bar Commit writes to every Cell in the range.
 _Avoid_: Formula range (that is in Formula text), A1 range
 
 **Mixed**:

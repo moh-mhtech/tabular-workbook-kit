@@ -1,6 +1,10 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fitProjectedColumnWidths, fitProjectedRowHeights } from "../grid/columnFit.js";
+import { projectTable } from "../grid/sheetProjection.js";
+import { layoutWorkbook } from "../model/layout.js";
+import { evaluatedCells } from "./CustomSheetCanvas.js";
 import {
   blurFormulaBar,
   clickFormulaText,
@@ -10,6 +14,7 @@ import {
   installGridDom,
   pressCaretKey,
   renderPlaygroundCanvas,
+  selectProjectedCell,
   typeEqualsOnProjectedCell,
 } from "./playgroundCanvasTest.js";
 
@@ -141,6 +146,91 @@ describe("Excel-like cell edit UI", () => {
     expect(formulaBar()!.value).toBe("=Vat:AndelCNC");
   });
 
+  it("anchors the Formula-edit popup on the edited cell at one line, not 120px", async () => {
+    const { session } = await renderPlaygroundCanvas();
+    await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
+    const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor");
+    expect(Number.parseFloat(editor!.style.height)).toBe(28);
+    const box = document.querySelector("#portal .gdg-style, #portal .gdg-unstyle");
+    expect(box, "popup box").toBeTruthy();
+    const left = Number.parseFloat(box!.getAttribute("targetx") ?? box!.style.left);
+    const top = Number.parseFloat(box!.getAttribute("targety") ?? box!.style.top);
+    const snapshot = session.getSnapshot();
+    const layout = layoutWorkbook(snapshot);
+    const projection = projectTable(layout, "tbl-params")!;
+    const widths = fitProjectedColumnWidths(projection, layout, evaluatedCells(session, snapshot));
+    const heights = fitProjectedRowHeights(projection, layout);
+    const canvas = document.querySelector<HTMLCanvasElement>(
+      '[data-table-id="tbl-params"] [data-testid="data-grid-canvas"]',
+    )!;
+    const rect = canvas.getBoundingClientRect();
+    const logicalW = Number.parseFloat(canvas.style.width);
+    const scale = rect.width / logicalW;
+    expect(left).toBeCloseTo(widths[0]!.width * scale, -1);
+    expect(top).toBeCloseTo((heights[0]! + heights[1]! + heights[2]!) * scale, -1);
+    const host = document.querySelector<HTMLElement>(".wk-overlay-editor-host");
+    expect(Number.parseFloat(host!.style.height)).toBe(28);
+    expect(host!.classList.contains("is-popup")).toBe(true);
+    expect(Number.parseFloat(host!.style.width)).toBe(110);
+  });
+
+  it("matches the Inline draft to the Edit cell size and padding", async () => {
+    const { session } = await renderPlaygroundCanvas({ formulaEditPlacement: "inline" });
+    await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
+    const host = document.querySelector<HTMLElement>(".wk-overlay-editor-host")!;
+    const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
+    const box = document.querySelector<HTMLElement>("#portal .gdg-style, #portal .gdg-unstyle");
+    expect(Number.parseFloat(host.style.width)).toBe(110);
+    expect(Number.parseFloat(host.style.height)).toBe(28);
+    expect(Number.parseFloat(box!.style.width)).toBe(110);
+    expect(Number.parseFloat(box!.style.height)).toBe(28);
+    expect(box!.style.padding).toBe("0px");
+    expect(editor.style.padding).toBe("3px 8px");
+  });
+
+  it("edits Inline in the Edit cell without a Popup", async () => {
+    const { session } = await renderPlaygroundCanvas({ formulaEditPlacement: "inline" });
+    await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
+    const host = document.querySelector<HTMLElement>(".wk-overlay-editor-host");
+    expect(host!.classList.contains("is-inline")).toBe(true);
+    expect(host!.classList.contains("is-popup")).toBe(false);
+    expect(Number.parseFloat(host!.style.height)).toBe(28);
+    const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
+    await act(async () => {
+      fireEvent.change(editor, { target: { value: `=${"X".repeat(80)}` } });
+    });
+    expect(Number.parseFloat(host!.style.height)).toBe(28);
+    expect(editor.style.whiteSpace).toBe("nowrap");
+    expect(editor.style.overflowX).toBe("auto");
+    expect(editor.style.overflowY).toBe("hidden");
+  });
+
+  it("scrolls Inline Formula text with the Caret", async () => {
+    const { session } = await renderPlaygroundCanvas({ formulaEditPlacement: "inline" });
+    await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
+    const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
+    const long = `=${"X".repeat(80)}`;
+    await act(async () => {
+      fireEvent.change(editor, { target: { value: long } });
+      editor.setSelectionRange(long.length, long.length);
+      fireEvent.select(editor);
+    });
+    expect(editor.clientWidth).toBe(110);
+    expect(editor.scrollLeft).toBe(554);
+  });
+
+  it("does not select the pointed Formula ref in the Formula-edit popup", async () => {
+    const { session } = await renderPlaygroundCanvas();
+    await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
+    const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
+    await act(async () => {
+      fireEvent.keyDown(editor, { key: "ArrowDown" });
+    });
+    expect(session.formulaEdit?.draft).toBe("=AndelCNC");
+    expect(editor.selectionStart).toBe(editor.selectionEnd);
+    expect(editor.selectionStart).toBe("=AndelCNC".length);
+  });
+
   it("moves the Caret after typing =, dragging a Formula range, then clicking Formula text", async () => {
     const { session } = await renderPlaygroundCanvas();
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
@@ -232,5 +322,110 @@ describe("Excel-like cell edit UI", () => {
     expect(session.formulaEdit?.draft).toBe("=Vat:AndelCNC)");
     expect(session.formulaEdit?.rangeAnchor).toEqual({ tableId: "tbl-params", col: 1, row: 3 });
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 4 });
+  });
+
+  it("colors Formula refs in the Formula bar and marks Vat on the grid", async () => {
+    const { session } = await renderPlaygroundCanvas();
+    await selectVat(session);
+    const bar = formulaBar()!;
+    await act(async () => {
+      fireEvent.change(bar, { target: { value: "=Vat+AndelCNC" } });
+    });
+    const vat = document.querySelectorAll('[data-formula-ref="Vat"]');
+    const andel = document.querySelectorAll('[data-formula-ref="AndelCNC"]');
+    expect(vat.length).toBeGreaterThan(0);
+    expect(andel.length).toBeGreaterThan(0);
+    expect((vat[0] as HTMLElement).style.color).toBe("rgb(0, 0, 255)");
+    expect((andel[0] as HTMLElement).style.color).toBe("rgb(255, 0, 0)");
+    const marks = document.querySelector("[data-formula-ref-marks]")?.getAttribute("data-formula-ref-marks");
+    expect(marks).toContain("#0000FF");
+    expect(marks).toContain("Vat");
+  });
+
+  it("points a Formula ref on another Sheet from Explorer", async () => {
+    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    await selectVat(session);
+    const bar = formulaBar()!;
+    await act(async () => {
+      fireEvent.change(bar, { target: { value: "=" } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+    });
+    expect(session.formulaEdit).not.toBeNull();
+    expect(formulaBar()).toBeTruthy();
+    await clickProjectedCell(session, "tbl-salg", 1, 1);
+    expect(formulaBar()?.value).toMatch(/Salg\[/);
+    expect(session.formulaEdit).not.toBeNull();
+    await act(async () => {
+      fireEvent.keyDown(formulaBar()!, { key: "Enter" });
+    });
+    expect(document.querySelector('[data-table-id="tbl-params"]')).toBeTruthy();
+    expect(session.formulaEdit).toBeNull();
+  });
+
+  it("does not point a Formula ref at the Edit cell", async () => {
+    const { session } = await renderPlaygroundCanvas();
+    await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
+    const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
+    await act(async () => {
+      fireEvent.keyDown(editor, { key: "ArrowDown" });
+    });
+    expect(session.formulaEdit?.draft).toBe("=AndelCNC");
+    await act(async () => {
+      fireEvent.keyDown(editor, { key: "ArrowUp" });
+    });
+    expect(session.formulaEdit?.draft).toBe("=");
+    await act(async () => {
+      fireEvent.keyDown(editor, { key: "ArrowDown" });
+    });
+    expect(session.formulaEdit?.draft).toBe("=AndelCNC");
+  });
+
+  it("points a Local Formula ref on the same Table", async () => {
+    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+    });
+    await typeEqualsOnProjectedCell(session, "tbl-salg", 1, 1);
+    await clickProjectedCell(session, "tbl-salg", 1, 2);
+    expect(session.formulaEdit?.draft).toBe("=[@][Outsource]");
+    const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
+    await act(async () => {
+      fireEvent.keyDown(editor, { key: "F4" });
+    });
+    expect(session.formulaEdit?.draft).toBe("=[$Jan][$Outsource]");
+    await act(async () => {
+      fireEvent.keyDown(editor, { key: "F4" });
+    });
+    expect(session.formulaEdit?.draft).toBe("=[@][$Outsource]");
+    await act(async () => {
+      fireEvent.keyDown(editor, { key: "F4" });
+    });
+    expect(session.formulaEdit?.draft).toBe("=[$Jan][Outsource]");
+    await act(async () => {
+      fireEvent.keyDown(editor, { key: "F4" });
+    });
+    expect(session.formulaEdit?.draft).toBe("=[@][Outsource]");
+  });
+
+  it("shows a Growth-cell inspector with only Value", async () => {
+    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    await selectProjectedCell(session, "tbl-params", 0, 8);
+    expect(session.selection).toMatchObject({ kind: "growth", tableId: "tbl-params" });
+    expect(screen.getByRole("heading", { name: "Growth cell" })).toBeTruthy();
+    expect(screen.getByLabelText("Value")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Delete table" })).toBeNull();
+    expect(screen.queryByLabelText("Name")).toBeNull();
+  });
+
+  it("shows a Growth-cell inspector for a data Growth cell", async () => {
+    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    await selectProjectedCell(session, "tbl-params", 1, 8);
+    expect(session.selection).toEqual({ kind: "growth", tableId: "tbl-params", col: 1, row: 8 });
+    expect(screen.getByRole("heading", { name: "Growth cell" })).toBeTruthy();
+    expect(screen.getByLabelText("Value")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Table" })).toBeNull();
+    expect(screen.queryByLabelText("Name")).toBeNull();
   });
 });

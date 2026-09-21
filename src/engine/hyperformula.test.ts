@@ -35,6 +35,26 @@ describe("HyperFormulaEngine", () => {
     expect(snapshot.scenarios[0].overlays[overlayKey("tbl-params", "row-aarsalg", "Value")]).toBe(10_000_000);
   });
 
+  it("evaluates Start after a Param2 Defined name is added", () => {
+    const snapshot = createPlaygroundWorkbook();
+    snapshot.tables.find((table) => table.name === "Params")!.rows.push({
+      id: "row-param2",
+      key: "Param2",
+      cells: { Value: { kind: "input", value: 1 } },
+    });
+    snapshot.tables.find((table) => table.name === "Params")!.rows.push({
+      id: "row-uses-param2",
+      key: "UsesParam2",
+      cells: { Value: { kind: "formula", formula: "=Param2" } },
+    });
+
+    const values = new HyperFormulaEngine().evaluate(snapshot);
+
+    expect(cell(values, snapshot, "Params", "Start", "Value")).toBeCloseTo(563_696.68, 1);
+    expect(cell(values, snapshot, "Params", "Param2", "Value")).toBe(1);
+    expect(cell(values, snapshot, "Params", "UsesParam2", "Value")).toBe(1);
+  });
+
   it("returns a full primitive grid for every domain sheet", () => {
     const snapshot = createContractSnapshot();
     const layout = layoutWorkbook(snapshot);

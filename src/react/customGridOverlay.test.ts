@@ -143,7 +143,7 @@ describe("custom grid overlay navigation", () => {
     });
 
     expect(pointAtProjectedCell(session, projection, layout, 1, 3)).toBe(true);
-    expect(session.formulaEdit?.draft).toBe("=Vat");
+    expect(session.formulaEdit?.draft).toBe("=");
     expect(session.formulaEdit).not.toBeNull();
 
     expect(pointFromArrow(session, [1, 3], [0, 1], projection, layout)).toEqual({
@@ -172,6 +172,7 @@ describe("custom grid overlay navigation", () => {
 
     const afterOp = applyFormulaOperator("=AndelCNC", session.formulaEdit?.activeFormulaRef ?? null, 1, 9, "+");
     expect(afterOp).toEqual({ draft: "=AndelCNC+", caret: 10 });
+    session.setFormulaEditMode("enter");
     session.syncFormulaEditCursor(afterOp.draft, afterOp.caret, afterOp.caret);
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 3 });
     expect(session.formulaEdit?.activeFormulaRef).toBeNull();
@@ -220,7 +221,7 @@ describe("custom grid overlay navigation", () => {
 
     session.syncFormulaEditCursor("=AndelOutsource+AndelCNC", 16, 24);
     expect(pointAtProjectedCell(session, projection, layout, 1, 3)).toBe(true);
-    expect(session.formulaEdit?.draft).toBe("=AndelOutsource+Vat");
+    expect(session.formulaEdit?.draft).toBe("=AndelOutsource+");
   });
 
   it("treats spreadsheet and overlay clicks as in-grid pointing, not outside clicks", () => {
@@ -274,8 +275,37 @@ describe("custom grid overlay navigation", () => {
       location: [1, 4],
       ref: "AndelCNC",
     });
-    expect(nextPointableCell([1, 1], [0, -1], projection, layout)).toBeUndefined();
-    expect(nextPointableCell([1, 1], [-1, 0], projection, layout)).toBeUndefined();
+    expect(nextPointableCell([1, 1], [0, -1], projection, layout)).toEqual({
+      location: [1, 0],
+      ref: "Params[Value]",
+    });
+    expect(nextPointableCell([1, 1], [-1, 0], projection, layout)).toEqual({
+      location: [0, 1],
+      ref: "Årssalg",
+    });
+  });
+
+  it("writes a Local Formula ref on the Edit cell's Table", () => {
+    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const salg = projectTable(layout, "tbl-salg")!;
+    expect(formulaRefForProjectedCell(salg, layout, 1, 1)).toBe("Salg[Jan][CNC]");
+    expect(formulaRefForProjectedCell(salg, layout, 1, 1, "tbl-salg")).toBe("[Jan][CNC]");
+    expect(formulaRefForProjectedCell(salg, layout, 1, 2, "tbl-salg")).toBe("[Jan][Outsource]");
+    expect(formulaRefForProjectedCell(salg, layout, 1, 1, "tbl-params")).toBe("Salg[Jan][CNC]");
+    expect(
+      formulaRefForProjectedCell(salg, layout, 1, 2, { tableId: "tbl-salg", col: 1, row: 1 }),
+    ).toBe("[@][Outsource]");
+    expect(
+      formulaRefForProjectedCell(salg, layout, 2, 1, { tableId: "tbl-salg", col: 1, row: 1 }),
+    ).toBe("[Feb][@]");
+  });
+
+  it("cycles the Active formula ref with F4", () => {
+    expect(overlayKeyAction("point", { key: "F4" })).toBe("cycle-lock");
+    expect(overlayKeyAction("edit", { key: "F4" })).toBe("cycle-lock");
+    expect(formulaKeyAction("enter", { key: "F4" }, { suggestVisible: false, isFormula: false })).toBe(
+      "caret",
+    );
   });
 
   it("commits a literal edit and selects the clicked cell", () => {
@@ -322,6 +352,9 @@ describe("custom grid overlay navigation", () => {
       formulaKeyAction("enter", { key: "ArrowDown" }, { suggestVisible: false, isFormula: true }),
     ).toBe("point-cell");
     expect(
+      formulaKeyAction("point", { key: "ArrowDown" }, { suggestVisible: true, isFormula: true }),
+    ).toBe("point-cell");
+    expect(
       formulaKeyAction("enter", { key: "Enter" }, { suggestVisible: true, isFormula: true }),
     ).toBe("pick-suggest");
     expect(
@@ -338,7 +371,7 @@ describe("custom grid overlay navigation", () => {
       editCell: { tableId: "tbl-params", col: 1, row: 3 },
     });
     expect(pointAtProjectedCell(session, projection, layout, 1, 3)).toBe(true);
-    expect(session.formulaEdit?.draft).toBe("=Vat");
+    expect(session.formulaEdit?.draft).toBe("=");
     expect(pointAtProjectedCell(session, projection, layout, 1, 4, { extend: true })).toBe(true);
     expect(session.formulaEdit?.draft).toBe("=Vat:AndelCNC");
     expect(session.formulaEdit?.mode).toBe("point");

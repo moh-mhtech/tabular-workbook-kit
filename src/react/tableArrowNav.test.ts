@@ -16,7 +16,7 @@ const inert = { evaluate: () => ({}) };
 /**
  * Wide table: key + Alpha + Gamma + growth (cols 0..3), header + 3 data + growth (rows 0..4).
  * Narrow table: key + Beta + growth (cols 0..2), header + 1 data + growth (rows 0..2).
- * Unused corners: wide (0,0) and (3,4); narrow (0,0) and (2,2).
+ * Unused corner: wide (3,4); narrow (2,2). Table corner (0,0) is selectable.
  */
 function stackedTables(): WorkbookSnapshot {
   return {
@@ -98,16 +98,16 @@ describe("table arrow navigation", () => {
     });
   });
 
-  it("moves right from the last growth-row cell onto the next table header", () => {
+  it("moves right from the last growth-row cell onto the next Table corner", () => {
     expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 2, row: 4 }, "right")).toEqual({
       tableId: "tbl-narrow",
-      col: 1,
+      col: 0,
       row: 0,
     });
   });
 
-  it("moves left from the first header cell onto the previous table growth row", () => {
-    expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-narrow", col: 1, row: 0 }, "left")).toEqual({
+  it("moves left from the Table corner onto the previous table growth row", () => {
+    expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-narrow", col: 0, row: 0 }, "left")).toEqual({
       tableId: "tbl-wide",
       col: 2,
       row: 4,
@@ -138,26 +138,26 @@ describe("table arrow navigation", () => {
     });
   });
 
-  it("lands on the first selectable header of the next table, not a clamped same row", () => {
+  it("lands on the Table corner of the next table, not a clamped same row", () => {
     expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 2, row: 4 }, "right")).toEqual({
       tableId: "tbl-narrow",
-      col: 1,
+      col: 0,
       row: 0,
     });
   });
 
-  it("lands on the first selectable key row instead of the unused top-left corner", () => {
+  it("lands on the Table corner when moving down into the next table key column", () => {
     expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 0, row: 4 }, "down")).toEqual({
       tableId: "tbl-narrow",
       col: 0,
-      row: 1,
+      row: 0,
     });
   });
 
-  it("lands on the first selectable header instead of the unused top-left corner", () => {
+  it("lands on the Table corner when moving right onto the next table header row", () => {
     expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 2, row: 4 }, "right")).toEqual({
       tableId: "tbl-narrow",
-      col: 1,
+      col: 0,
       row: 0,
     });
   });
@@ -185,24 +185,28 @@ describe("table arrow navigation", () => {
     });
   });
 
-  it("skips unused top-left and bottom-right corners", () => {
-    expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 1, row: 0 }, "left")).toBeUndefined();
+  it("skips the unused Growth corner and can land on the Table corner", () => {
+    expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 1, row: 0 }, "left")).toEqual({
+      tableId: "tbl-wide",
+      col: 0,
+      row: 0,
+    });
     expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 2, row: 4 }, "right")).toEqual({
       tableId: "tbl-narrow",
-      col: 1,
+      col: 0,
       row: 0,
     });
     expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 0, row: 4 }, "down")).toEqual({
       tableId: "tbl-narrow",
       col: 0,
-      row: 1,
+      row: 0,
     });
   });
 
   it("does nothing at the first or last table on the sheet", () => {
-    expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 1, row: 0 }, "up")).toBeUndefined();
+    expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 0, row: 0 }, "up")).toBeUndefined();
     expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-narrow", col: 1, row: 2 }, "down")).toBeUndefined();
-    expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 1, row: 0 }, "left")).toBeUndefined();
+    expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-wide", col: 0, row: 0 }, "left")).toBeUndefined();
     expect(adjacentTableArrowTarget(sheetTables(), { tableId: "tbl-narrow", col: 1, row: 2 }, "right")).toBeUndefined();
   });
 
@@ -217,7 +221,7 @@ describe("table arrow navigation", () => {
     });
   });
 
-  it("moves from the bottom growth-column cell onto the growth-row key even when both are table selections", () => {
+  it("moves from the bottom growth-column cell onto the growth-row key as a Growth-cell", () => {
     const snapshot = stackedTables();
     const session = new WorkbookSession(snapshot, inert);
     const layout = layoutWorkbook(snapshot);
@@ -231,7 +235,7 @@ describe("table arrow navigation", () => {
     ).toEqual({ tableId: "tbl-wide", col: 0, row: 4 });
     expect(notified).toBeGreaterThan(0);
     expect(session.gridFocus).toEqual({ tableId: "tbl-wide", col: 0, row: 4 });
-    expect(session.selection).toEqual({ kind: "table", tableId: "tbl-wide" });
+    expect(session.selection).toEqual({ kind: "growth", tableId: "tbl-wide", col: 0, row: 4 });
   });
 
   it("focuses the landing cell without revealing the table as a title click", () => {
@@ -251,7 +255,7 @@ describe("table arrow navigation", () => {
     expect(session.gridFocus).toEqual({ tableId: "tbl-narrow", col: 1, row: 0 });
   });
 
-  it("keeps Salg selected when arrowing onto its locked time-axis growth column", () => {
+  it("lands on Salg's locked time-axis Growth column as a Growth-cell", () => {
     const snapshot = createPlaygroundWorkbook();
     const session = new WorkbookSession(snapshot, inert);
     const layout = layoutWorkbook(snapshot);
@@ -269,7 +273,7 @@ describe("table arrow navigation", () => {
       col: growthCol,
       row: 1,
     });
-    expect(session.selection).toEqual({ kind: "table", tableId: "tbl-salg" });
+    expect(session.selection).toEqual({ kind: "growth", tableId: "tbl-salg", col: growthCol, row: 1 });
     expect(session.gridFocus).toEqual({ tableId: "tbl-salg", col: growthCol, row: 1 });
   });
 });

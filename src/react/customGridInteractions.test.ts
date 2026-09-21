@@ -57,7 +57,7 @@ describe("custom grid interactions", () => {
       columnId: "Value",
     });
     expect(moveSelectionAfterCommit(session, session.getSnapshot(), [0, 1])).toBe(true);
-    expect(session.selection).toEqual({ kind: "table", tableId: "tbl-params" });
+    expect(session.selection).toEqual({ kind: "growth", tableId: "tbl-params", col: 1, row: 8 });
     expect(session.gridFocus).toEqual({ tableId: "tbl-params", col: 1, row: 8 });
   });
 
@@ -68,7 +68,7 @@ describe("custom grid interactions", () => {
     const rowId = notes.rows[0]!.id;
     session.setSelection({ kind: "cell", tableId: notes.id, rowId, columnId });
     expect(moveSelectionAfterCommit(session, session.getSnapshot(), [1, 0])).toBe(true);
-    expect(session.selection).toEqual({ kind: "table", tableId: notes.id });
+    expect(session.selection).toEqual({ kind: "growth", tableId: notes.id, col: 2, row: 1 });
     expect(session.gridFocus).toEqual({ tableId: notes.id, col: 2, row: 1 });
   });
 
@@ -80,7 +80,7 @@ describe("custom grid interactions", () => {
 
     expect(focusAfterCommitMove(session, "tbl-params", [1, 8], [0, 1])).toEqual({
       location: [1, 9],
-      selection: { kind: "table", tableId: "tbl-params" },
+      selection: { kind: "growth", tableId: "tbl-params", col: 1, row: 9 },
     });
     expect(session.gridFocus).toEqual({ tableId: "tbl-params", col: 1, row: 9 });
 
@@ -90,7 +90,7 @@ describe("custom grid interactions", () => {
     expect(applyCustomGridEdits(session, notesProjection, notesLayout, [{ location: [2, 1], value: { data: "7" } }])).toBe(1);
     expect(focusAfterCommitMove(session, notes.id, [2, 1], [1, 0])).toEqual({
       location: [3, 1],
-      selection: { kind: "table", tableId: notes.id },
+      selection: { kind: "growth", tableId: notes.id, col: 3, row: 1 },
     });
   });
 

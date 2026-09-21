@@ -9,10 +9,10 @@ import { layoutWorkbook } from "../model/layout.js";
 import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
 import type { WorkbookSnapshot } from "../model/types.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
-import { Explorer, ScenarioBar, TimeGrainSwitch } from "./components.js";
+import { Explorer, FormulaEditPlacementSwitch, ScenarioBar, TimeGrainSwitch } from "./components.js";
 import { CustomSheetCanvas, evaluatedCells } from "./CustomSheetCanvas.js";
 import { PropertiesPanel } from "./PropertiesPanel.js";
-import { WorkbookProvider } from "./WorkbookProvider.js";
+import { WorkbookProvider, type FormulaEditPlacement } from "./WorkbookProvider.js";
 
 function boxSize(element: HTMLElement, axis: "width" | "height"): number {
   const styled = Number.parseFloat(axis === "width" ? element.style.width : element.style.height);
@@ -60,6 +60,7 @@ export async function renderPlaygroundCanvas(
     snapshot?: WorkbookSnapshot;
     extra?: ReactNode;
     chrome?: boolean;
+    formulaEditPlacement?: FormulaEditPlacement;
   } = {},
 ) {
   const session = new WorkbookSession(
@@ -69,13 +70,14 @@ export async function renderPlaygroundCanvas(
   await session.recalculate();
   await act(async () => {
     render(
-      <WorkbookProvider session={session}>
+      <WorkbookProvider session={session} formulaEditPlacement={options.formulaEditPlacement}>
         <div className="wk-shell">
           {options.chrome ? (
             <>
               <Explorer />
               <ScenarioBar />
               <TimeGrainSwitch />
+              <FormulaEditPlacementSwitch />
             </>
           ) : null}
           <CustomSheetCanvas />

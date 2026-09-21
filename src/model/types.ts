@@ -1,4 +1,5 @@
 export const KEY_COLUMN_ID = "__key__";
+export const HEADER_ROW_ID = "__header__";
 
 export type TimeGrain = "month" | "quarter" | "year";
 
@@ -130,7 +131,9 @@ export type Selection =
   | { kind: "table"; tableId: string }
   | { kind: "column"; tableId: string; columnId: string }
   | { kind: "row"; tableId: string; rowId: string }
-  | { kind: "cell"; tableId: string; rowId: string; columnId: string; range?: CellRef[] };
+  | { kind: "cell"; tableId: string; rowId: string; columnId: string; range?: CellRef[] }
+  | { kind: "corner"; tableId: string }
+  | { kind: "growth"; tableId: string; col: number; row: number };
 
 export function selectedCellRefs(selection: Selection | null): CellRef[] {
   if (!isCellSelection(selection)) return [];

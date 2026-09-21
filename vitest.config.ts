@@ -6,10 +6,5 @@ export default defineConfig({
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     testTimeout: 60_000,
     fileParallelism: false,
-    server: {
-      deps: {
-        inline: [/@univerjs/, "opentype.js"],
-      },
-    },
   },
 });

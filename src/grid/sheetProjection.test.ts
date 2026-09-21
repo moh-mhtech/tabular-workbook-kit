@@ -8,8 +8,11 @@ import {
   cellAfterCommitMove,
   cellsInProjectedRange,
   acceptTableGridSelection,
+  isGrowthCell,
   isGrowthHeaderCell,
+  isTableCorner,
   isUnusedTableCorner,
+  labeledTableRect,
   projectSheet,
   projectTable,
   projectedCell,
@@ -105,7 +108,7 @@ describe("sheet grid projection", () => {
     expect(cellAfterCommitMove(params, layout, [1, 3], [1, 0])).toBeUndefined();
     expect(cellAfterCommitMove(params, layout, [1, 7], [0, 1])).toEqual({
       location: [1, 8],
-      selection: { kind: "table", tableId: "tbl-params" },
+      selection: { kind: "growth", tableId: "tbl-params", col: 1, row: 8 },
     });
 
     expect(cellAfterCommitMove(salg, layout, [1, 1], [1, 0])).toEqual({
@@ -118,7 +121,7 @@ describe("sheet grid projection", () => {
     });
     expect(cellAfterCommitMove(salg, layout, [1, 4], [0, 1])).toEqual({
       location: [1, 5],
-      selection: { kind: "table", tableId: "tbl-salg" },
+      selection: { kind: "growth", tableId: "tbl-salg", col: 1, row: 5 },
     });
   });
 
@@ -149,14 +152,18 @@ describe("sheet grid projection", () => {
     expect(projection.rowCount).toBe(9);
     expect(projection.originRow).toBe(0);
     expect(projectedCell(projection, layout, 0, 0)).toEqual({ kind: "readonly", row: 0, col: 0 });
-    expect(isUnusedTableCorner(projection, 0, 0)).toBe(true);
-    expect(acceptTableGridSelection(projection, [0, 0])).toBe(false);
+    expect(isUnusedTableCorner(projection, 0, 0)).toBe(false);
+    expect(isTableCorner(projection, 0, 0)).toBe(true);
+    expect(acceptTableGridSelection(projection, [0, 0])).toBe(true);
     expect(acceptTableGridSelection(projection, [1, 1])).toBe(true);
     expect(projectedCell(projection, layout, 0, 1)).toMatchObject({
       kind: "table",
       hit: { kind: "key", tableId: "tbl-params", rowId: "row-aarsalg" },
     });
     expect(isGrowthHeaderCell(projection, 0, 8)).toBe(true);
+    expect(isGrowthCell(projection, 0, 8)).toBe(true);
+    expect(isGrowthCell(projection, 1, 8)).toBe(true);
+    expect(isGrowthHeaderCell(projection, 1, 8)).toBe(false);
     expect(isGrowthHeaderCell(projection, 1, 0)).toBe(false);
     expect(isGrowthHeaderCell(projection, 0, 0)).toBe(false);
     expect(isGrowthHeaderCell(projection, 1, 1)).toBe(false);
@@ -196,17 +203,21 @@ describe("sheet grid projection", () => {
     });
   });
 
-  it("keeps a time-axis growth column selected as the table, not the sheet", () => {
+  it("selects time-axis Growth cells as Growth, not the Sheet", () => {
     const layout = layoutWorkbook(createPlaygroundWorkbook());
     const salg = projectTable(layout, "tbl-salg")!;
     const growthCol = salg.colCount - 1;
     expect(selectionForProjectedCell(salg, layout, growthCol, 0)).toEqual({
-      kind: "table",
+      kind: "growth",
       tableId: "tbl-salg",
+      col: growthCol,
+      row: 0,
     });
     expect(selectionForProjectedCell(salg, layout, growthCol, 1)).toEqual({
-      kind: "table",
+      kind: "growth",
       tableId: "tbl-salg",
+      col: growthCol,
+      row: 1,
     });
   });
 });

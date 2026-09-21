@@ -7,8 +7,8 @@ import {
   type FormulaEditMode,
 } from "../react/customGridOverlay.js";
 import { effectiveCell, readComputed } from "../engine/compileWorkbook.js";
+import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import type { FormulaEngine, SheetGrid } from "../engine/types.js";
-import { UniverEngine } from "../engine/univer.js";
 import { buildPeriods, quarterId, yearId } from "../model/calendar.js";
 import { layoutWorkbook } from "../model/layout.js";
 import {
@@ -52,6 +52,8 @@ import {
 } from "../model/yearColumns.js";
 import {
   assertTableName,
+  defaultColumnNameAt,
+  defaultRowKeyAt,
   emptyCells,
   nextColumnIdentifier,
   nextRowIdentifier,
@@ -114,7 +116,7 @@ export class WorkbookSession {
   revealNonce = 0;
   gridFocus: { tableId: string; col: number; row: number } | null = null;
 
-  constructor(snapshot: WorkbookSnapshot, engine: FormulaEngine = new UniverEngine()) {
+  constructor(snapshot: WorkbookSnapshot, engine: FormulaEngine = new HyperFormulaEngine()) {
     this.snapshot = cloneSnapshot(snapshot);
     this.engine = engine;
   }
@@ -489,12 +491,28 @@ export class WorkbookSession {
       return;
     }
     if (hit.kind === "key") {
-      if (raw.trim()) this.renameRow(hit.tableId, hit.rowId, raw);
+      const table = requireTable(this.snapshot, hit.tableId);
+      const index = table.rows.findIndex((row) => row.id === hit.rowId);
+      const next = raw.trim() || (index >= 0 ? defaultRowKeyAt(table, index) : "");
+      if (!next) return;
+      try {
+        this.renameRow(hit.tableId, hit.rowId, next);
+      } catch {
+        /* keep the existing Key — illegal paste must not look like a rename */
+      }
       return;
     }
     if (hit.kind === "header") {
       if (hit.columnId === KEY_COLUMN_ID) return;
-      if (raw.trim()) this.renameColumn(hit.tableId, hit.columnId, raw);
+      const table = requireTable(this.snapshot, hit.tableId);
+      const index = table.attributeColumns.findIndex((column) => column.id === hit.columnId);
+      const next = raw.trim() || (index >= 0 ? defaultColumnNameAt(index) : "");
+      if (!next) return;
+      try {
+        this.renameColumn(hit.tableId, hit.columnId, next);
+      } catch {
+        /* keep the existing Header — year labels and illegal names stay put */
+      }
       return;
     }
     const plan = raw.trim() ? planExpansion(view, this.snapshot, row, col, periods) : null;
@@ -554,6 +572,7 @@ export class WorkbookSession {
     const keyChanged = key !== this.formulaEdit.activeFormulaRefKey;
     const draftChanged = text !== this.formulaEdit.draft;
     const inserting = keyChanged && !span && isValidInsertPoint(text, selectionStart);
+    const resetPoint = inserting && this.formulaEdit.mode !== "point";
     if (
       !draftChanged &&
       !keyChanged &&
@@ -572,8 +591,8 @@ export class WorkbookSession {
       selectionStart,
       selectionEnd,
       activeFormulaRefKey: key,
-      targetCell: inserting ? this.formulaEdit.editCell : this.formulaEdit.targetCell,
-      rangeAnchor: inserting ? undefined : this.formulaEdit.rangeAnchor,
+      targetCell: resetPoint ? this.formulaEdit.editCell : this.formulaEdit.targetCell,
+      rangeAnchor: resetPoint ? undefined : this.formulaEdit.rangeAnchor,
     };
     if (draftChanged || keyChanged) {
       for (const listener of this.listeners) listener();
@@ -601,7 +620,7 @@ export class WorkbookSession {
       pointing: true,
       mode: "point",
       activeFormulaRef: applied.span,
-      selectionStart: applied.span.start,
+      selectionStart: applied.span.end,
       selectionEnd: applied.span.end,
       activeFormulaRefKey: activeFormulaRefKey(applied.span, applied.draft),
       targetCell: targetCell ?? this.formulaEdit.targetCell,
@@ -672,6 +691,7 @@ export class WorkbookSession {
     const row = table?.rows.find((r) => r.id === edit.rowId);
     if (table && row) this.writeCell(table.name, row.key, edit.columnId, edit.draft);
     this.formulaEdit = null;
+    for (const listener of this.listeners) listener();
   }
 
   cancelFormulaEdit() {
@@ -722,7 +742,9 @@ export class WorkbookSession {
     this.checkpoint();
     const previous = row.key;
     row.key = next;
-    rewriteFormulas(this.snapshot, (formula) => rewriteRowKey(formula, table.name, previous, next));
+    rewriteFormulas(this.snapshot, (formula) =>
+      rewriteRowKey(formula, table.name, previous, next, Boolean(table.promoteRowKeys)),
+    );
     this.emit();
   }
 

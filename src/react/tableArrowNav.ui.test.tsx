@@ -8,49 +8,14 @@ import { selectedCellRefs, type WorkbookSnapshot } from "../model/types.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 import { WorkbookProvider } from "./WorkbookProvider.js";
-import { pressTableKey, renderPlaygroundCanvas, selectProjectedCell } from "./playgroundCanvasTest.js";
+import { installGridDom, pressTableKey, renderPlaygroundCanvas, selectProjectedCell } from "./playgroundCanvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-function installGridDom() {
-  class ResizeObserverMock {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  }
-  vi.stubGlobal("ResizeObserver", ResizeObserverMock);
-  HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
-    fillRect: vi.fn(),
-    clearRect: vi.fn(),
-    getImageData: vi.fn(() => ({ data: [] })),
-    putImageData: vi.fn(),
-    createImageData: vi.fn(() => []),
-    setTransform: vi.fn(),
-    drawImage: vi.fn(),
-    save: vi.fn(),
-    fillText: vi.fn(),
-    restore: vi.fn(),
-    beginPath: vi.fn(),
-    moveTo: vi.fn(),
-    lineTo: vi.fn(),
-    closePath: vi.fn(),
-    stroke: vi.fn(),
-    translate: vi.fn(),
-    scale: vi.fn(),
-    rotate: vi.fn(),
-    arc: vi.fn(),
-    fill: vi.fn(),
-    measureText: vi.fn(() => ({ width: 0 })),
-    transform: vi.fn(),
-    rect: vi.fn(),
-    clip: vi.fn(),
-  })) as never;
-}
 
 /**
  * Wide: key + Alpha + Gamma + growth (cols 0..3), header + 3 data + growth (rows 0..4).
  * Narrow: key + Beta + growth (cols 0..2), header + 1 data + growth (rows 0..2).
- * Unused corners: wide (0,0)/(3,4); narrow (0,0)/(2,2).
+ * Unused corner: wide (3,4); narrow (2,2). Table corner (0,0) is selectable.
  */
 function navigationWorkbook(): WorkbookSnapshot {
   return {
@@ -152,12 +117,12 @@ describe("arrow navigation UI", () => {
     focus.expectAt("tbl-wide", 0, 4);
   });
 
-  it("moves right from the last growth-row cell onto the first available cell of the next table", async () => {
+  it("moves right from the last growth-row cell onto the Table corner of the next table", async () => {
     const { session } = await renderNavSheet();
     const focus = trackFocus(session);
     await selectCell(session, "tbl-wide", 2, 4);
     await pressArrow("tbl-wide", "ArrowRight");
-    focus.expectAt("tbl-narrow", 1, 0);
+    focus.expectAt("tbl-narrow", 0, 0);
   });
 
   it("wraps left from a key cell onto the growth cell of the previous row", async () => {
@@ -168,10 +133,18 @@ describe("arrow navigation UI", () => {
     focus.expectAt("tbl-wide", 3, 1);
   });
 
-  it("moves left from the first header cell onto the last available cell of the previous table", async () => {
+  it("moves left from a Header cell onto the Table corner", async () => {
     const { session } = await renderNavSheet();
     const focus = trackFocus(session);
     await selectCell(session, "tbl-narrow", 1, 0);
+    await pressArrow("tbl-narrow", "ArrowLeft");
+    focus.expectAt("tbl-narrow", 0, 0);
+  });
+
+  it("moves left from the Table corner onto the last available cell of the previous table", async () => {
+    const { session } = await renderNavSheet();
+    const focus = trackFocus(session);
+    await selectCell(session, "tbl-narrow", 0, 0);
     await pressArrow("tbl-narrow", "ArrowLeft");
     focus.expectAt("tbl-wide", 2, 4);
   });
@@ -192,12 +165,12 @@ describe("arrow navigation UI", () => {
     focus.expectAt("tbl-narrow", 1, 0);
   });
 
-  it("skips the unused top-left corner when moving down into the next table key column", async () => {
+  it("lands on the Table corner when moving down into the next table key column", async () => {
     const { session } = await renderNavSheet();
     const focus = trackFocus(session);
     await selectCell(session, "tbl-wide", 0, 4);
     await pressArrow("tbl-wide", "ArrowDown");
-    focus.expectAt("tbl-narrow", 0, 1);
+    focus.expectAt("tbl-narrow", 0, 0);
   });
 
   it("moves up from the first header onto the same column in the previous table", async () => {

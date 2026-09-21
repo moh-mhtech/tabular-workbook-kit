@@ -224,7 +224,14 @@ describe("custom grid editor UI", () => {
       maxHeight: 28,
       boxShadow: "none",
     });
-    expect(overlayProvideOptions(false, 110, 28).styleOverride).toMatchObject({ minWidth: 220 });
+    expect(overlayProvideOptions(false, 110, 28).styleOverride).toMatchObject({
+      minWidth: 110,
+    });
+    expect(overlayProvideOptions(false, 110, 28, "inline").styleOverride).toMatchObject({
+      width: 110,
+      height: 28,
+      boxShadow: "none",
+    });
   });
 
   it("marks an Invalid draft on a Growth-row Key cell", () => {
@@ -260,12 +267,12 @@ describe("custom grid editor UI", () => {
     act(() => {
       pointAtProjectedCell(session, projection, layout, 1, 3);
     });
-    expect(cellEditor().value).toBe("=Vat");
+    expect(cellEditor().value).toBe("=");
     expect(document.activeElement).toBe(cellEditor());
 
     fireEvent.keyDown(cellEditor(), { key: "F2" });
     fireEvent.keyDown(cellEditor(), { key: "ArrowDown" });
-    expect(cellEditor().value).toBe("=Vat");
+    expect(cellEditor().value).toBe("=");
   });
 
   it("moves the Caret after a mouse Formula range then a click in Formula text", async () => {
@@ -392,5 +399,16 @@ describe("custom grid editor UI", () => {
     expect(editor.value).toBe("=AndelCNC)");
     expect(session.formulaEdit?.draft).toBe("=AndelCNC)");
     expect(session.formulaEdit?.mode).toBe("edit");
+  });
+
+  it("grows the Formula-edit popup from 110px toward 400px then 120px", () => {
+    renderEditor("stable");
+    const editor = cellEditor();
+    fireEvent.change(editor, { target: { value: "=" } });
+    expect(Number.parseFloat(editor.style.minWidth || editor.style.width)).toBe(110);
+    expect(Number.parseFloat(editor.style.height)).toBe(28);
+    fireEvent.change(editor, { target: { value: `=${"Vat+".repeat(40)}Vat` } });
+    expect(Number.parseFloat(editor.style.width)).toBe(400);
+    expect(Number.parseFloat(editor.style.maxHeight || editor.style.height)).toBe(120);
   });
 });

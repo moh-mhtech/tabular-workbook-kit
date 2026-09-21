@@ -124,10 +124,10 @@ function cellFromTokens(
   second: string | undefined,
   ctx: CompileContext,
 ): { table: TableLayout; rowId: string; columnId: string } | undefined {
-  const colToken = resolveAt(first, table, ctx, "column");
+  const colToken = resolveAt(unlockRefToken(first), table, ctx, "column");
   const asColumn = tryColumn(table, colToken, ctx);
   if (second !== undefined) {
-    const rowToken = resolveAt(second, table, ctx, "row");
+    const rowToken = resolveAt(unlockRefToken(second), table, ctx, "row");
     const row = isThisRow(rowToken, table, ctx)
       ? table.rows.find((candidate) => candidate.rowIndex === ctx.currentRowIndex)
       : table.rows.find((candidate) => candidate.key.toLowerCase() === rowToken.toLowerCase());
@@ -153,8 +153,8 @@ function compileRef(
   local: boolean,
 ): string {
   const name = table.table.name;
-  const colToken = resolveAt(first, table, ctx, "column");
-  const rowToken = second !== undefined ? resolveAt(second, table, ctx, "row") : undefined;
+  const colToken = resolveAt(unlockRefToken(first), table, ctx, "column");
+  const rowToken = second !== undefined ? resolveAt(unlockRefToken(second), table, ctx, "row") : undefined;
 
   const timeCols = timeColumns(table, colToken, ctx);
 
@@ -209,6 +209,10 @@ function compileRef(
   }
 
   throw new Error(`Unknown ref "${first}"`);
+}
+
+function unlockRefToken(token: string): string {
+  return token.startsWith("$") ? token.slice(1) : token;
 }
 
 function isThisRow(token: string, table: TableLayout, ctx: CompileContext): boolean {

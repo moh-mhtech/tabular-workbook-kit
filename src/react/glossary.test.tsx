@@ -30,8 +30,10 @@ describe("glossary", () => {
     const terms = doc.sections.flatMap((section) => section.terms.map((term) => term.term));
     expect(terms).toContain("Workbook");
     expect(terms).toContain("Year column");
-    expect(terms).toContain("Growth row");
+    expect(terms).toContain("Growth header");
+    expect(terms).toContain("Growth-cell");
     expect(terms).toContain("Unused corner");
+    expect(terms).toContain("Table corner");
     expect(terms).toContain("Key cell");
     expect(terms).toContain("Header cell");
     expect(terms).toContain("Fill");
@@ -51,6 +53,14 @@ describe("glossary", () => {
     expect(terms).toContain("Edit mode");
     expect(terms).toContain("Point");
     expect(terms).toContain("Insert point");
+    expect(terms).toContain("Local Formula ref");
+    expect(terms).toContain("This-row");
+    expect(terms).toContain("This-column");
+    expect(terms).toContain("Relative");
+    expect(terms).toContain("Fixed");
+    expect(terms).toContain("F4");
+    expect(terms).toContain("Inline");
+    expect(terms).toContain("Popup");
     expect(terms).toContain("Invalid draft");
     expect(terms).toContain("Commit");
     expect(terms).toContain("Arrow navigation");

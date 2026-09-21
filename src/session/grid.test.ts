@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { snapshotToUniverData } from "../engine/compileWorkbook.js";
+import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import type { FormulaEngine } from "../engine/types.js";
 import { layoutSheets } from "../model/sheetView.js";
 import type { CellSnapshot, TableSnapshot } from "../model/types.js";
@@ -250,14 +250,16 @@ describe("sheet extent", () => {
     expect(extent(session, sheetId)).toEqual({ rowCount: 4, colCount: 3 });
   });
 
-  it("hands the grown extent and the loose value to Univer", () => {
+  it("hands the grown extent and the loose value to HyperFormula", () => {
     const { session, sheetId } = scratch();
     session.writeGridCell(sheetId, 2, 2, "x");
 
-    const sheet = snapshotToUniverData(session.getSnapshot()).data.sheets[sheetId];
-    expect(sheet.rowCount).toBe(4);
-    expect(sheet.columnCount).toBe(4);
-    expect(sheet.cellData![2][2]).toEqual({ v: "x" });
+    const snapshot = session.getSnapshot();
+    const sheetName = snapshot.sheets.find((sheet) => sheet.id === sheetId)!.name;
+    const values = new HyperFormulaEngine().evaluate(snapshot);
+    expect(values[sheetName]).toHaveLength(4);
+    expect(values[sheetName]![0]).toHaveLength(4);
+    expect(values[sheetName]![2]![2]).toBe("x");
   });
 });
 

@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { applySuggestion, suggestFormula } from "../formula/formulaSuggest.js";
+import { formulaErrorReason } from "../formula/formulaError.js";
 import { layoutWorkbook } from "../model/layout.js";
 import { formatDisplayValue, resolveCellFormat } from "../model/numberFormat.js";
-import { KEY_COLUMN_ID, isCellSelection, selectedCellRefs, sharedOrStar } from "../model/types.js";
+import { HEADER_ROW_ID, KEY_COLUMN_ID, isCellSelection, selectedCellRefs, sharedOrStar, type CellRef, type Selection } from "../model/types.js";
 import { projectTable, projectedLocationForRef } from "../grid/sheetProjection.js";
 import { blurOnEnter } from "./blurOnEnter.js";
+import { FormulaColoredText } from "./FormulaColoredText.js";
 import { FormulaSuggestList } from "./FormulaSuggestList.js";
 import { OutlinedField } from "./OutlinedField.js";
 import { moveSelectionAfterCommit } from "./customGridInteractions.js";
@@ -12,6 +14,7 @@ import {
   applyFormulaOperator,
   canPointFromDraft,
   commitKeyMovement,
+  cycleActiveFormulaRef,
   formulaKeyAction,
   overlayArrowMovement,
   pointFromArrow,
@@ -31,9 +34,14 @@ export type HostInspectors = {
   table?: () => ReactNode;
 };
 
-function selectionTitle(selection: { kind: string } | null): string {
+function selectionTitle(selection: Selection | null): string {
+  if (selection?.kind === "growth") return "Growth cell";
   const kind = selection?.kind ?? "workbook";
   return kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+function inspectorRefsAreData(refs: readonly CellRef[]): boolean {
+  return refs.length > 0 && refs.every((ref) => ref.columnId !== KEY_COLUMN_ID && ref.rowId !== HEADER_ROW_ID);
 }
 
 function tryCall(fn: () => void) {
@@ -52,17 +60,20 @@ export function PropertiesPanel({
   workbookLabel?: string;
 }) {
   const { session } = useWorkbook();
+  const snapshot = useSnapshot();
   const selection = session.selection;
-
   return (
     <aside className="wk-properties">
-      <h2>{selectionTitle(selection)}</h2>
-      {selection?.kind === "cell" ? (
+      {selection?.kind === "corner" ? null : <h2>{selectionTitle(selection)}</h2>}
+      {(selection?.kind === "cell" && inspectorRefsAreData(selectedCellRefs(selection))) || session.formulaEdit ? (
         <>
-          <CellNameField tableId={selection.tableId} rowId={selection.rowId} columnId={selection.columnId} />
+          {selection?.kind === "cell" ? (
+            <CellNameField tableId={selection.tableId} rowId={selection.rowId} columnId={selection.columnId} />
+          ) : null}
           <FormulaField />
         </>
       ) : null}
+      {selection?.kind === "growth" && !session.formulaEdit ? <GrowthValueField /> : null}
       {!selection || selection.kind === "workbook" ? (
         <>
           <WorkbookInspector label={workbookLabel} />
@@ -83,7 +94,7 @@ export function PropertiesPanel({
       ) : null}
       {selection?.kind === "column" ? <ColumnInspector tableId={selection.tableId} columnId={selection.columnId} /> : null}
       {selection?.kind === "row" ? <RowInspector tableId={selection.tableId} rowId={selection.rowId} /> : null}
-      {selection?.kind === "cell" ? (
+      {selection?.kind === "cell" && inspectorRefsAreData(selectedCellRefs(selection)) ? (
         <CellInspector tableId={selection.tableId} rowId={selection.rowId} columnId={selection.columnId} />
       ) : null}
       {!selection ? <p className="wk-muted">Select a sheet, table, or cell.</p> : null}
@@ -119,7 +130,7 @@ function cellEvaluated(session: ReturnType<typeof useWorkbook>["session"], snaps
 }
 
 function FormulaField() {
-  const { session, version } = useWorkbook();
+  const { session, version, setActiveSheetId } = useWorkbook();
   const snapshot = useSnapshot();
   const edit = session.formulaEdit;
   const selection = session.selection;
@@ -132,6 +143,7 @@ function FormulaField() {
   const committed = refs.length ? sharedOrStar(committedValues) : "";
   const firstCommitted = committedValues[0] ?? "";
   const evaluated = refs.length ? sharedOrStar(evaluatedValues) : undefined;
+  const errorReason = cellErrorReason(session, snapshot, refs[0]);
   const display = edit?.draft ?? committed;
   const resetKey = `${refs.map((ref) => `${ref.tableId}:${ref.rowId}:${ref.columnId}`).join(",")}:${version}:${committed}`;
 
@@ -177,6 +189,7 @@ function FormulaField() {
       committed={display}
       firstValue={firstCommitted}
       evaluated={evaluated}
+      errorReason={errorReason}
       disabled={!refs.length}
       resetKey={resetKey}
       onChange={(next) => {
@@ -199,11 +212,26 @@ function FormulaField() {
         });
       }}
       onCommit={(next, movement) => {
-        if (!refs.length) return;
         if (next === "*" && committed === "*") return;
         tryCall(() => {
+          const edit = session.formulaEdit;
+          if (edit) {
+            const sheet = snapshot.sheets.find((item) => item.tableIds.includes(edit.tableId));
+            if (sheet) setActiveSheetId(sheet.id);
+            session.setFormulaEditDraft(next);
+            session.commitFormulaEdit();
+            session.setSelection({
+              kind: "cell",
+              tableId: edit.tableId,
+              rowId: edit.rowId,
+              columnId: edit.columnId,
+            });
+            if (edit.editCell) session.setGridFocus(edit.editCell);
+            if (movement) moveSelectionAfterCommit(session, snapshot, movement);
+            return;
+          }
+          if (!refs.length) return;
           session.transact(() => {
-            if (session.formulaEdit) session.cancelFormulaEdit();
             for (const ref of refs) {
               const targetTable = snapshot.tables.find((candidate) => candidate.id === ref.tableId);
               const targetRow = targetTable?.rows.find((candidate) => candidate.id === ref.rowId);
@@ -215,15 +243,39 @@ function FormulaField() {
           if (movement) moveSelectionAfterCommit(session, snapshot, movement);
         });
       }}
-      onCancel={() => session.cancelFormulaEdit()}
+      onCancel={() => {
+        const edit = session.formulaEdit;
+        const sheet = edit ? snapshot.sheets.find((item) => item.tableIds.includes(edit.tableId)) : undefined;
+        if (sheet) setActiveSheetId(sheet.id);
+        session.cancelFormulaEdit();
+      }}
     />
   );
+}
+
+function cellErrorReason(
+  session: ReturnType<typeof useWorkbook>["session"],
+  snapshot: ReturnType<typeof useSnapshot>,
+  ref: { tableId: string; rowId: string; columnId: string } | undefined,
+): string | undefined {
+  if (!ref) return undefined;
+  const table = snapshot.tables.find((item) => item.id === ref.tableId);
+  const row = table?.rows.find((item) => item.id === ref.rowId);
+  if (!table || !row || ref.columnId === KEY_COLUMN_ID) return undefined;
+  try {
+    const cell = session.getCell(table.name, row.key, ref.columnId);
+    if (!cell.error) return undefined;
+    return formulaErrorReason(cell.error, cell.formula, layoutWorkbook(snapshot));
+  } catch {
+    return undefined;
+  }
 }
 
 function FormulaDraft({
   committed,
   firstValue,
   evaluated,
+  errorReason,
   disabled,
   resetKey,
   onChange,
@@ -233,6 +285,7 @@ function FormulaDraft({
   committed: string;
   firstValue: string;
   evaluated?: string;
+  errorReason?: string;
   disabled: boolean;
   resetKey: string;
   onChange: (value: string) => void;
@@ -295,6 +348,7 @@ function FormulaDraft({
   return (
     <div className="wk-formula-bar click-outside-ignore" onPointerDown={placeCaretInFormulaText}>
       <OutlinedField label="Value" endLabel={evaluated || undefined}>
+        <FormulaColoredText draft={draft} active={Boolean(session.formulaEdit && canPointFromDraft(draft))} />
         <textarea
           ref={areaRef}
           rows={1}
@@ -302,6 +356,11 @@ function FormulaDraft({
           aria-label="Value"
           placeholder={disabled ? "Select a cell" : " "}
           value={draft}
+          style={
+            session.formulaEdit && canPointFromDraft(draft)
+              ? { color: "transparent", caretColor: "#1e3a5f" }
+              : undefined
+          }
           onFocus={() => {
             if (draft === "*") setDraft(firstValue);
           }}
@@ -370,6 +429,18 @@ function FormulaDraft({
               session.setFormulaEditMode(toggleOverlayNavMode(liveMode));
               return;
             }
+            if (action === "cycle-lock") {
+              e.preventDefault();
+              const edit = session.formulaEdit;
+              const tableId =
+                edit?.tableId ??
+                (session.selection && "tableId" in session.selection ? session.selection.tableId : undefined);
+              const projection = tableId ? projectTable(layout, tableId) : null;
+              const applied = cycleActiveFormulaRef(session, e.currentTarget.value, layout, projection);
+              if (!applied) return;
+              applyDraft(applied.draft, applied.end);
+              return;
+            }
             if (action === "formula-operator") {
               e.preventDefault();
               const applied = applyFormulaOperator(
@@ -379,8 +450,8 @@ function FormulaDraft({
                 e.currentTarget.selectionEnd ?? draft.length,
                 e.key,
               );
-              applyDraft(applied.draft, applied.caret);
               session.setFormulaEditMode("enter");
+              applyDraft(applied.draft, applied.caret);
               return;
             }
             if (action === "point-cell" || action === "extend-range") {
@@ -410,6 +481,7 @@ function FormulaDraft({
           }}
         />
       </OutlinedField>
+      {errorReason ? <p className="wk-formula-error">{errorReason}</p> : null}
       <FormulaSuggestList
         items={suggestions}
         active={activeSuggest}
@@ -419,6 +491,45 @@ function FormulaDraft({
         }}
       />
     </div>
+  );
+}
+
+function GrowthValueField() {
+  const { session } = useWorkbook();
+  const snapshot = useSnapshot();
+  const selection = session.selection;
+  const [draft, setDraft] = useState("");
+  if (selection?.kind !== "growth") return null;
+  const sheet = snapshot.sheets.find((item) => item.tableIds.includes(selection.tableId));
+  const layout = layoutWorkbook(snapshot);
+  const projection = projectTable(layout, selection.tableId);
+  const commit = (raw: string) => {
+    if (!sheet || !projection) return;
+    tryCall(() => {
+      session.writeGridCell(
+        sheet.id,
+        selection.row + projection.originRow,
+        selection.col + projection.originCol,
+        raw,
+      );
+    });
+  };
+  return (
+    <OutlinedField label="Value">
+      <textarea
+        aria-label="Value"
+        placeholder=" "
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => commit(draft)}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" || event.shiftKey) return;
+          event.preventDefault();
+          commit(draft);
+          (event.currentTarget as HTMLTextAreaElement).blur();
+        }}
+      />
+    </OutlinedField>
   );
 }
 

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { projectTable } from "../grid/sheetProjection.js";
 import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
-import { formulaBar, installGridDom, renderPlaygroundCanvas, selectProjectedCell, trackFocus } from "./playgroundCanvasTest.js";
+import { formulaBar, installGridDom, renderPlaygroundCanvas, selectProjectedCell, trackFocus, typeEqualsOnProjectedCell } from "./playgroundCanvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -15,6 +15,16 @@ afterEach(() => {
 });
 
 describe("playground chrome UI", () => {
+  it("toggles Formula-edit placement between Popup and Inline", async () => {
+    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    expect(screen.getByRole("group", { name: "Formula-edit placement" })).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Inline" }));
+    });
+    await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
+    expect(document.querySelector(".wk-overlay-editor-host")!.classList.contains("is-inline")).toBe(true);
+  });
+
   it("selects a sheet from the explorer and paints that sheet's tables", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
@@ -107,6 +117,19 @@ describe("playground chrome UI", () => {
     expect(
       session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-12"]?.formula,
     ).toBeTruthy();
+  });
+
+  it("opens the Sheet and Reveals a Table created from Explorer", async () => {
+    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const before = session.getSnapshot().tables.map((table) => table.id);
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "New table" })[1]!);
+    });
+    const added = session.getSnapshot().tables.find((table) => !before.includes(table.id));
+    expect(added).toBeTruthy();
+    expect(session.selection).toEqual({ kind: "table", tableId: added!.id });
+    expect(document.querySelector(`[data-table-id="${added!.id}"]`)).toBeTruthy();
+    expect(document.querySelector('[data-table-id="tbl-params"]')).toBeFalsy();
   });
 
   it("adds a sheet and a table from the explorer", async () => {
@@ -350,7 +373,12 @@ describe("playground chrome UI", () => {
     await act(async () => {
       fireEvent.keyDown(host!, { key: "ArrowRight" });
     });
-    expect(session.selection).toEqual({ kind: "table", tableId: "tbl-salg" });
+    expect(session.selection).toEqual({
+      kind: "growth",
+      tableId: "tbl-salg",
+      col: salg.colCount - 1,
+      row: 1,
+    });
     focus.expectAt("tbl-salg", salg.colCount - 1, 1);
   });
 

@@ -1,9 +1,7 @@
 import { selectedYearColumn } from "../model/yearColumns.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
-import { SheetCanvas } from "./SheetCanvas.js";
 import "./workbook.css";
 
-export { SheetCanvas } from "./SheetCanvas.js";
 export { PropertiesPanel } from "./PropertiesPanel.js";
 
 function tryCall(fn: () => void) {
@@ -59,7 +57,13 @@ export function Explorer({ workbookLabel = "Workbook" }: { workbookLabel?: strin
                 type="button"
                 className="wk-explorer-table wk-explorer-new"
                 aria-label="New table"
-                onClick={() => tryCall(() => session.addTable(sheet.id))}
+                onClick={() =>
+                  tryCall(() => {
+                    const table = session.addTable(sheet.id);
+                    setActiveSheetId(sheet.id);
+                    session.revealTable(table.id);
+                  })
+                }
               >
                 <span className="wk-explorer-new-glyph" aria-hidden="true">
                   +
@@ -137,6 +141,28 @@ export function FormulaBar() {
   return null;
 }
 
+export function FormulaEditPlacementSwitch() {
+  const { formulaEditPlacement, setFormulaEditPlacement } = useWorkbook();
+  return (
+    <div className="wk-grain" role="group" aria-label="Formula-edit placement">
+      <button
+        type="button"
+        className={formulaEditPlacement === "popup" ? "is-active" : ""}
+        onClick={() => setFormulaEditPlacement("popup")}
+      >
+        Popup
+      </button>
+      <button
+        type="button"
+        className={formulaEditPlacement === "inline" ? "is-active" : ""}
+        onClick={() => setFormulaEditPlacement("inline")}
+      >
+        Inline
+      </button>
+    </div>
+  );
+}
+
 export function TimeGrainSwitch() {
   const { session } = useWorkbook();
   const snapshot = useSnapshot();
@@ -158,6 +184,3 @@ export function TimeGrainSwitch() {
   );
 }
 
-export function GroupCanvas() {
-  return <SheetCanvas />;
-}

@@ -6,7 +6,7 @@ import {
   type HitTestResult,
   type SheetView,
 } from "../model/sheetView.js";
-import { overlayKey, type CellRef, type Selection } from "../model/types.js";
+import { overlayKey, HEADER_ROW_ID, KEY_COLUMN_ID, type CellRef, type Selection } from "../model/types.js";
 import { hideGrowthColumn, visibleTimeSlots } from "../model/yearColumns.js";
 
 export const TABLE_KEY_COLUMN_WIDTH = 48;
@@ -110,33 +110,65 @@ export function projectTable(layout: WorkbookLayout, tableId: string): SheetGrid
   };
 }
 
+/** Any selectable cell on the Growth row or Growth column. */
+export function isGrowthCell(
+  projection: SheetGridProjection,
+  col: number,
+  row: number,
+): boolean {
+  if (!projection.tableId || isUnusedTableCorner(projection, col, row) || isTableCorner(projection, col, row)) {
+    return false;
+  }
+  return (
+    row === projection.rowCount - 1 ||
+    Boolean(projection.growthColumn && col === projection.colCount - 1)
+  );
+}
+
 /** Growth-row key and growth-column header — the add-row / add-column affordances. */
 export function isGrowthHeaderCell(
   projection: SheetGridProjection,
   col: number,
   row: number,
 ): boolean {
-  if (isUnusedTableCorner(projection, col, row)) return false;
+  if (!isGrowthCell(projection, col, row)) return false;
   return (
     (col === 0 && row === projection.rowCount - 1) ||
     (projection.growthColumn && row === 0 && col === projection.colCount - 1)
   );
 }
 
-/** Key header and unused growth corner — not fields, not expansion cells. */
+/** Bottom-right Growth unused corner — not a Cell, not Growth, not selectable. */
 export function isUnusedTableCorner(
   projection: SheetGridProjection,
   col: number,
   row: number,
 ): boolean {
+  if (!projection.growthColumn) return false;
   const sheetRow = row + projection.originRow;
   const sheetCol = col + projection.originCol;
   return projection.view.bands.some((band) => {
-    const topLeft = sheetRow === band.headerRow && sheetCol === band.startCol;
-    const bottomRight =
-      sheetRow === band.headerRow + band.rowCount && sheetCol === band.startCol + band.colCount;
-    return topLeft || bottomRight;
+    return sheetRow === band.headerRow + band.rowCount && sheetCol === band.startCol + band.colCount;
   });
+}
+
+/** Top-left key×header intersection. Selectable, not editable. */
+export function isTableCorner(
+  projection: SheetGridProjection,
+  col: number,
+  row: number,
+): boolean {
+  return Boolean(projection.tableId) && col === 0 && row === 0;
+}
+
+/** Key cells + Header cells + data; not Growth. */
+export function labeledTableRect(projection: SheetGridProjection): { x: number; y: number; width: number; height: number } {
+  return {
+    x: 0,
+    y: 0,
+    width: projection.growthColumn ? projection.colCount - 1 : projection.colCount,
+    height: Math.max(1, projection.rowCount - 1),
+  };
 }
 
 export function acceptTableGridSelection(
@@ -161,6 +193,9 @@ export function projectedCell(
   if (isUnusedTableCorner(projection, col, row)) {
     return { kind: "readonly", row, col };
   }
+  if (isTableCorner(projection, col, row)) {
+    return { kind: "readonly", row, col };
+  }
   const hit = hitTest(projection.view, layout.snapshot, sheetRow, sheetCol, layout.periods);
   if (hit.kind !== "outside" && hit.kind !== "gap") {
     return { kind: "table", row, col, hit };
@@ -183,6 +218,12 @@ export function selectionForProjectedCell(
   row: number,
 ): Selection {
   const cell = projectedCell(projection, layout, col, row);
+  if (isTableCorner(projection, col, row) && projection.tableId) {
+    return { kind: "corner", tableId: projection.tableId };
+  }
+  if (isGrowthCell(projection, col, row) && projection.tableId) {
+    return { kind: "growth", tableId: projection.tableId, col, row };
+  }
   if (cell.kind === "extension") return { kind: "table", tableId: cell.expansion.tableId };
   if (cell.kind === "readonly") {
     if (projection.tableId && isLockedGrowthMargin(projection, col, row)) {
@@ -210,14 +251,15 @@ export function projectedLocationForRef(
 ): readonly [number, number] | undefined {
   const table = layout.tables.get(ref.tableId);
   if (!table || (projection.tableId && projection.tableId !== ref.tableId)) return undefined;
-  const row = table.rows.findIndex((candidate) => candidate.id === ref.rowId);
-  if (row < 0) return undefined;
   const col = projection.columns.findIndex((column) => {
     if (column.id === ref.columnId) return true;
     const slot = visibleTimeSlots(table.table, layout.periods).find((candidate) => candidate.id === column.id);
     return Boolean(slot?.periodIds.includes(ref.columnId));
   });
   if (col < 0) return undefined;
+  if (ref.rowId === HEADER_ROW_ID) return [col, 0];
+  const row = table.rows.findIndex((candidate) => candidate.id === ref.rowId);
+  if (row < 0) return undefined;
   return [col, row + 1];
 }
 
@@ -232,6 +274,9 @@ export function cellAfterCommitMove(
   let col = from[0] + movement[0];
   let row = from[1] + movement[1];
   while (col >= 0 && row >= 0 && col < projection.colCount && row < projection.rowCount) {
+    if (isTableCorner(projection, col, row)) {
+      return { location: [col, row], selection: selectionForProjectedCell(projection, layout, col, row) };
+    }
     const projected = projectedCell(projection, layout, col, row);
     if (projected.kind === "extension" || projected.kind === "table") {
       return { location: [col, row], selection: selectionForProjectedCell(projection, layout, col, row) };
@@ -252,11 +297,26 @@ export function cellsInProjectedRange(
   for (let row = range.y; row < range.y + range.height; row++) {
     for (let col = range.x; col < range.x + range.width; col++) {
       const selection = selectionForProjectedCell(projection, layout, col, row);
-      if (selection.kind !== "cell") continue;
-      const key = overlayKey(selection.tableId, selection.rowId, selection.columnId);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      cells.push({ tableId: selection.tableId, rowId: selection.rowId, columnId: selection.columnId });
+      if (selection.kind === "cell") {
+        const key = overlayKey(selection.tableId, selection.rowId, selection.columnId);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        cells.push({ tableId: selection.tableId, rowId: selection.rowId, columnId: selection.columnId });
+        continue;
+      }
+      if (selection.kind === "row") {
+        const key = overlayKey(selection.tableId, selection.rowId, KEY_COLUMN_ID);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        cells.push({ tableId: selection.tableId, rowId: selection.rowId, columnId: KEY_COLUMN_ID });
+        continue;
+      }
+      if (selection.kind === "column") {
+        const key = overlayKey(selection.tableId, HEADER_ROW_ID, selection.columnId);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        cells.push({ tableId: selection.tableId, rowId: HEADER_ROW_ID, columnId: selection.columnId });
+      }
     }
   }
   return cells;

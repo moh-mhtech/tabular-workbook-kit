@@ -64,6 +64,15 @@ function columnIdentifier(index: number): string {
   return out;
 }
 
+export function defaultRowKeyAt(table: { promoteRowKeys?: boolean }, index: number): string {
+  if (table.promoteRowKeys) return index === 0 ? "Param" : `Param${index + 1}`;
+  return String(index + 1);
+}
+
+export function defaultColumnNameAt(index: number): string {
+  return columnIdentifier(index);
+}
+
 export function rewriteFormulas(snapshot: WorkbookSnapshot, rewrite: (formula: string) => string) {
   for (const table of snapshot.tables) {
     for (const row of table.rows) {
@@ -74,28 +83,116 @@ export function rewriteFormulas(snapshot: WorkbookSnapshot, rewrite: (formula: s
       }
     }
   }
+  for (const sheet of snapshot.sheets) {
+    if (!sheet.looseCells) continue;
+    for (const cell of Object.values(sheet.looseCells)) {
+      if (cell.kind === "formula" && cell.formula) {
+        cell.formula = rewrite(cell.formula);
+      }
+    }
+  }
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const ATOM_REF = `(?:(?:${IDENTIFIER}\\.)?(${IDENTIFIER})\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|${IDENTIFIER}(?![${IDENT_CONT}]|\\s*\\())`;
+const FORMULA_REF = new RegExp(`(?:${ATOM_REF})(?::(?:${ATOM_REF}))?`, "gu");
+
+function mapFormulaRefs(formula: string, rewriteToken: (token: string) => string): string {
+  FORMULA_REF.lastIndex = 0;
+  let output = "";
+  let cursor = 0;
+  for (const match of formula.matchAll(FORMULA_REF)) {
+    const start = match.index;
+    const token = match[0];
+    output += formula.slice(cursor, start);
+    output += rewriteToken(token);
+    cursor = start + token.length;
+  }
+  return output + formula.slice(cursor);
+}
+
+function splitRangeAtoms(token: string): string[] {
+  let depth = 0;
+  for (let index = 0; index < token.length; index++) {
+    if (token[index] === "[") depth += 1;
+    else if (token[index] === "]") depth -= 1;
+    else if (token[index] === ":" && depth === 0) {
+      return [token.slice(0, index), token.slice(index + 1)];
+    }
+  }
+  return [token];
+}
+
+function rewriteAtoms(token: string, rewriteAtom: (atom: string) => string): string {
+  return splitRangeAtoms(token).map(rewriteAtom).join(":");
 }
 
 export function rewriteTableName(formula: string, from: string, to: string): string {
-  return formula.replace(new RegExp(`\\b${escapeRegExp(from)}\\[`, "g"), `${to}[`);
+  return mapFormulaRefs(formula, (token) =>
+    rewriteAtoms(token, (atom) => {
+      const qualified = atom.match(new RegExp(`^(${IDENTIFIER})\\[`, "u"));
+      if (qualified?.[1] === from) return `${to}${atom.slice(from.length)}`;
+      const sheeted = atom.match(new RegExp(`^(${IDENTIFIER})\\.(${IDENTIFIER})\\[`, "u"));
+      if (sheeted?.[2] === from) return `${sheeted[1]}.${to}${atom.slice(sheeted[0].length - 1)}`;
+      return atom;
+    }),
+  );
 }
 
-export function rewriteRowKey(formula: string, tableName: string, from: string, to: string): string {
-  const table = escapeRegExp(tableName);
-  const src = escapeRegExp(from);
-  return formula
-    .replace(new RegExp(`(\\[[^\\]]+\\])\\[${src}\\]`, "g"), `$1[${to}]`)
-    .replace(new RegExp(`\\b${table}\\[${src}\\](?!\\[)`, "g"), `${tableName}[${to}]`);
+export function rewriteRowKey(
+  formula: string,
+  tableName: string,
+  from: string,
+  to: string,
+  definedName = false,
+): string {
+  const qualified = new RegExp(
+    `^(?:(${IDENTIFIER})\\.)?(${IDENTIFIER})\\[([^\\]]+)\\](?:\\[([^\\]]+)\\])?$`,
+    "u",
+  );
+  return mapFormulaRefs(formula, (token) =>
+    rewriteAtoms(token, (atom) => {
+      if (definedName && atom === from) return to;
+      const match = atom.match(qualified);
+      if (match) {
+        const sheet = match[1];
+        const table = match[2]!;
+        const first = match[3]!;
+        const second = match[4];
+        const prefix = sheet ? `${sheet}.` : "";
+        if (second === from) return `${prefix}${table}[${first}][${to}]`;
+        if (second === undefined && table === tableName && first === from) {
+          return `${prefix}${table}[${to}]`;
+        }
+        return atom;
+      }
+      const local = atom.match(/^\[([^\]]+)\]\[([^\]]+)\]$/);
+      if (local?.[2] === from) return `[${local[1]}][${to}]`;
+      return atom;
+    }),
+  );
 }
 
 export function rewriteColumnName(formula: string, from: string, to: string): string {
-  const src = escapeRegExp(from);
-  return formula.replace(new RegExp(`\\[@?${src}\\]`, "g"), (full) =>
-    full.startsWith("[@") ? `[@${to}]` : `[${to}]`,
+  const qualified = new RegExp(
+    `^(?:(${IDENTIFIER})\\.)?(${IDENTIFIER})\\[([^\\]]+)\\](?:\\[([^\\]]+)\\])?$`,
+    "u",
+  );
+  return mapFormulaRefs(formula, (token) =>
+    rewriteAtoms(token, (atom) => {
+      const match = atom.match(qualified);
+      if (match && match[3] === from) {
+        const sheet = match[1];
+        const table = match[2]!;
+        const second = match[4];
+        const prefix = sheet ? `${sheet}.` : "";
+        return `${prefix}${table}[${to}]${second !== undefined ? `[${second}]` : ""}`;
+      }
+      const local = atom.match(/^\[(@)?([^\]]+)\](?:\[([^\]]+)\])?$/);
+      if (local?.[2] === from) {
+        return `[${local[1] ?? ""}${to}]${local[3] !== undefined ? `[${local[3]}]` : ""}`;
+      }
+      return atom;
+    }),
   );
 }
 

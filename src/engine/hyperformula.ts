@@ -7,7 +7,7 @@ import {
   type TableLayout,
   type WorkbookLayout,
 } from "../model/layout.js";
-import { promotedNames } from "../model/names.js";
+import { canRegisterDefinedName, promotedNames } from "../model/names.js";
 import { parseLooseCellKey, type Primitive, type WorkbookSnapshot } from "../model/types.js";
 import { effectiveCell } from "./compileWorkbook.js";
 import type { FormulaEngine, SheetGrid } from "./types.js";
@@ -38,14 +38,22 @@ export class HyperFormulaEngine implements FormulaEngine {
     const layout = layoutWorkbook(snapshot);
     const sheets = buildSheets(snapshot, layout);
     const namedExpressions = buildNamedExpressions(layout);
-    const engine = HyperFormula.buildFromSheets(
-      sheets,
-      {
+    let engine: HyperFormula;
+    try {
+      engine = HyperFormula.buildFromSheets(
+        sheets,
+        {
+          licenseKey: this.licenseKey,
+          smartRounding: false,
+        },
+        namedExpressions,
+      );
+    } catch {
+      engine = HyperFormula.buildFromSheets(sheets, {
         licenseKey: this.licenseKey,
         smartRounding: false,
-      },
-      namedExpressions,
-    );
+      });
+    }
 
     try {
       const values: Record<string, SheetGrid> = {};
@@ -134,10 +142,10 @@ function compileForHyperFormula(
     part.replace(/\b(TRUE|FALSE)\b(?!\s*\()/gi, "$1()"),
   );
 
-  // Its named-expression parser only tokenizes ASCII identifiers. Keep the
-  // workbook names registered, while compiling non-ASCII uses to their cells.
-  for (const item of buildNamedExpressions(layout)) {
-    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(item.name)) continue;
+  // HyperFormula named expressions are ASCII and cannot be A1-shaped (Param2).
+  // Keep authoring names; compile unregistered uses to their cells.
+  for (const item of promotedCellRefs(layout)) {
+    if (canRegisterDefinedName(item.name)) continue;
     const escaped = item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const token = new RegExp(`(^|[^\\p{L}\\p{N}\\p{M}_])${escaped}(?![\\p{L}\\p{N}\\p{M}_])`, "gu");
     compiled = transformOutsideStrings(compiled, (part) =>
@@ -172,7 +180,7 @@ function transformOutsideStrings(source: string, transform: (part: string) => st
   return output + transform(source.slice(plainStart));
 }
 
-function buildNamedExpressions(layout: WorkbookLayout): { name: string; expression: string }[] {
+function promotedCellRefs(layout: WorkbookLayout): { name: string; expression: string }[] {
   return promotedNames(layout.snapshot).flatMap((item) => {
     const table = layout.tables.get(item.tableId);
     const row = table?.rows.find((candidate) => candidate.id === item.rowId);
@@ -181,6 +189,10 @@ function buildNamedExpressions(layout: WorkbookLayout): { name: string; expressi
     const sheet = `'${table.sheetName.replace(/'/g, "''")}'`;
     return [{ name: item.name, expression: `=${sheet}!$${columnLetters(col.colIndex)}$${row.rowIndex + 1}` }];
   });
+}
+
+function buildNamedExpressions(layout: WorkbookLayout): { name: string; expression: string }[] {
+  return promotedCellRefs(layout).filter((item) => canRegisterDefinedName(item.name));
 }
 
 function coerceInput(value: Primitive): RawCellContent {

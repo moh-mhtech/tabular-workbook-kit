@@ -44,9 +44,9 @@ export function promotedNames(snapshot: WorkbookSnapshot): { name: string; table
   return out;
 }
 
-/** ASCII-only names the calc engine can register as workbook named expressions. */
+/** ASCII names HyperFormula can register (not A1-shaped like Param2). */
 export function canRegisterDefinedName(name: string): boolean {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !/^[A-Za-z]+[0-9]+$/.test(name);
 }
 
 export function assertGlobalName(

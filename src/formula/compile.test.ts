@@ -36,6 +36,23 @@ describe("column-first compile", () => {
     );
   });
 
+  it("strips Fixed $ before compiling", () => {
+    const snapshot = createPlaygroundWorkbook();
+    const layout = layoutWorkbook(snapshot);
+    const salg = layout.tablesByName.get("salg")!;
+    const outsource = salg.keyByLower.get("outsource")!;
+    const jan = salg.columns.find((c) => c.name === "Jan")!;
+    expect(
+      compileFormula("=[$Jan][$CNC]", {
+        layout,
+        currentTable: salg,
+        currentRowIndex: outsource.rowIndex,
+        currentPeriodId: jan.periodId,
+        currentColumnId: jan.id,
+      }),
+    ).toBe('=INDEX(Salg[Jan],MATCH("CNC",Salg[key],0))');
+  });
+
   it("resolves @-1 on the period axis", () => {
     const snapshot = createPlaygroundWorkbook();
     const layout = layoutWorkbook(snapshot);

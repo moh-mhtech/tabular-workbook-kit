@@ -171,6 +171,12 @@
   color: #1e3a5f;
 }
 
+.wk-formula-error {
+  margin: 0;
+  color: #b42318;
+  font: 12px/1.3 "Segoe UI", sans-serif;
+}
+
 .wk-formula-suggest {
   margin: 4px 0 0;
   padding: 4px 0;
@@ -839,27 +845,6 @@
   font-size: 11px;
 }
 
-.wk-univer {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  padding: 0;
-  overflow: hidden;
-  position: relative;
-  background: #fff;
-}
-
-.wk-univer-host {
-  position: absolute;
-  inset: 0;
-}
-
-.wk-univer-error {
-  padding: 16px 20px;
-  color: #b42318;
-  font: 13px/1.4 "Segoe UI", sans-serif;
-}
-
 .wk-table-canvases {
   display: flex;
   flex-direction: column;
@@ -981,8 +966,62 @@
 }
 
 .wk-overlay-editor-host {
+  position: relative;
   width: 100%;
   height: 100%;
+}
+
+.wk-overlay-editor-host.is-popup {
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px #2a6f97,
+    0 6px 12px rgba(62, 65, 86, 0.15);
+}
+
+.wk-overlay-editor-host.is-inline {
+  background: #fff;
+}
+
+.wk-overlay-editor-host.is-inline .wk-overlay-editor,
+.wk-overlay-editor-host.is-inline .wk-formula-color-mirror {
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 3px 8px;
+}
+
+.wk-overlay-editor-host.is-inline .wk-overlay-editor::-webkit-scrollbar,
+.wk-overlay-editor-host.is-inline .wk-formula-color-mirror::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.wk-formula-color-mirror {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow: hidden;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.wk-formula-bar .wk-outlined {
+  position: relative;
+}
+
+.wk-formula-bar .wk-formula-color-mirror {
+  padding: 10px 12px 8px;
+}
+
+.wk-formula-ref {
+  font: inherit;
 }
 
 .wk-overlay-editor {
@@ -1010,8 +1049,14 @@
   background: #fde8e8;
 }
 
-#portal .gdg-unstyle {
+#portal .gdg-unstyle,
+#portal .gdg-style {
   max-width: none;
+  max-height: none;
+}
+
+#portal .gdg-clip-region {
+  overflow: visible;
 }
 
 #portal {

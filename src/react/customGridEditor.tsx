@@ -10,13 +10,24 @@ import {
   applyFormulaOperator,
   canPointFromDraft,
   commitKeyMovement,
+  cycleActiveFormulaRef,
   formulaKeyAction,
   overlayArrowMovement,
   pointFromArrow,
   toggleOverlayNavMode,
   type OverlayNavMode,
 } from "./customGridOverlay.js";
-import { useWorkbook } from "./WorkbookProvider.js";
+import {
+  FORMULA_EDITOR_MAX_HEIGHT,
+  FORMULA_EDITOR_MAX_WIDTH,
+  FORMULA_EDITOR_MIN_WIDTH,
+  inlineCaretScrollLeft,
+  measureFormulaDraftSize,
+  placeFormulaEditor,
+  type FormulaEditorRect,
+} from "./formulaEditorPopup.js";
+import { FormulaColoredText } from "./FormulaColoredText.js";
+import { useWorkbook, type FormulaEditPlacement } from "./WorkbookProvider.js";
 
 export type OverlayEditorProps = {
   value: GridCell;
@@ -44,21 +55,39 @@ export function isIdentifierEdit(editing: ProjectedCell, snapshot: WorkbookSnaps
   return editing.expansion.rowId === null;
 }
 
-export function overlayProvideOptions(identifier: boolean, columnWidth: number, rowHeight: number) {
-  if (!identifier) return { styleOverride: { minWidth: columnWidth * 2 } };
+export const GRID_CELL_PAD_X = 8;
+export const GRID_CELL_PAD_Y = 3;
+
+export function overlayProvideOptions(
+  identifier: boolean,
+  columnWidth: number,
+  rowHeight: number,
+  placement: FormulaEditPlacement = "popup",
+) {
+  if (identifier || placement === "inline") {
+    return {
+      disablePadding: true,
+      disableStyling: true,
+      styleOverride: {
+        width: columnWidth,
+        minWidth: columnWidth,
+        maxWidth: columnWidth,
+        height: rowHeight,
+        minHeight: rowHeight,
+        maxHeight: rowHeight,
+        padding: 0,
+        boxShadow: "none",
+        borderRadius: 0,
+      },
+    };
+  }
   return {
     disablePadding: true,
     disableStyling: true,
     styleOverride: {
-      width: columnWidth,
-      minWidth: columnWidth,
-      maxWidth: columnWidth,
-      height: rowHeight,
-      minHeight: rowHeight,
-      maxHeight: rowHeight,
+      minWidth: FORMULA_EDITOR_MIN_WIDTH,
       padding: 0,
       boxShadow: "none",
-      borderRadius: 0,
     },
   };
 }
@@ -139,8 +168,9 @@ export function SpreadsheetTextEditor({
   projection: SheetGridProjection;
   layout: WorkbookLayout;
 }) {
-  const { session } = useWorkbook();
+  const { session, formulaEditPlacement } = useWorkbook();
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef({ start: 0, end: 0 });
   const applyingSelectionRef = useRef(false);
   const onChangeRef = useRef(onChange);
@@ -155,6 +185,11 @@ export function SpreadsheetTextEditor({
   const mode = session.formulaEdit?.mode ?? initialNavMode;
   const suggestCursor = selectionRef.current.start || draft.length;
   const suggestions = suggestOpen ? suggestFormula(draft, suggestCursor, layout) : [];
+  const columnWidth = projection.columns[editingLocation[0]]?.width ?? FORMULA_EDITOR_MIN_WIDTH;
+  const rowHeight = 28;
+  const inline = formulaEditPlacement === "inline";
+  const measured = measureFormulaDraftSize(draft, rowHeight);
+  const popup = inline ? { width: columnWidth, height: rowHeight, overflow: "hidden" as const } : measured;
 
   const rememberSelection = (start: number, end: number) => {
     selectionRef.current = { start, end };
@@ -199,6 +234,62 @@ export function SpreadsheetTextEditor({
   }, []);
 
   useLayoutEffect(() => {
+    const host = hostRef.current;
+    const overlay = host?.closest<HTMLElement>(".gdg-style, .gdg-unstyle");
+    if (!host || !overlay) return;
+    overlay.style.width = `${popup.width}px`;
+    overlay.style.height = `${popup.height}px`;
+    overlay.style.minWidth = `${popup.width}px`;
+    overlay.style.minHeight = `${popup.height}px`;
+    overlay.style.maxWidth = `${inline ? popup.width : FORMULA_EDITOR_MAX_WIDTH}px`;
+    overlay.style.maxHeight = `${inline ? popup.height : FORMULA_EDITOR_MAX_HEIGHT}px`;
+    overlay.style.padding = "0";
+    if (inline) {
+      overlay.style.boxShadow = "none";
+      return;
+    }
+    const canvas = document.querySelector<HTMLElement>(".wk-canvas");
+    if (!canvas) return;
+    const canvasRect = canvas.getBoundingClientRect();
+    const targetX = Number.parseFloat(overlay.getAttribute("targetx") ?? overlay.style.left);
+    const targetY = Number.parseFloat(overlay.getAttribute("targety") ?? overlay.style.top);
+    const cell = {
+      left: Number.isFinite(targetX) ? targetX : overlay.getBoundingClientRect().left,
+      top: Number.isFinite(targetY) ? targetY : overlay.getBoundingClientRect().top,
+      width: columnWidth,
+      height: rowHeight,
+    };
+    const edit = session.formulaEdit;
+    const flipX = Boolean(edit?.targetCell && edit.editCell && edit.targetCell.col > edit.editCell.col);
+    const flipY = Boolean(edit?.targetCell && edit.editCell && edit.targetCell.row > edit.editCell.row);
+    let avoid: FormulaEditorRect | undefined;
+    if (edit?.targetCell && edit.editCell && (edit.targetCell.col !== edit.editCell.col || edit.targetCell.row !== edit.editCell.row)) {
+      const leftCol = edit.rangeAnchor ? Math.min(edit.rangeAnchor.col, edit.targetCell.col) : edit.targetCell.col;
+      const topRow = edit.rangeAnchor ? Math.min(edit.rangeAnchor.row, edit.targetCell.row) : edit.targetCell.row;
+      const rightCol = edit.rangeAnchor ? Math.max(edit.rangeAnchor.col, edit.targetCell.col) : edit.targetCell.col;
+      const bottomRow = edit.rangeAnchor ? Math.max(edit.rangeAnchor.row, edit.targetCell.row) : edit.targetCell.row;
+      avoid = {
+        left: cell.left + (leftCol - edit.editCell.col) * columnWidth,
+        top: cell.top + (topRow - edit.editCell.row) * rowHeight,
+        width: (rightCol - leftCol + 1) * columnWidth,
+        height: (bottomRow - topRow + 1) * rowHeight,
+      };
+    }
+    const placed = placeFormulaEditor(cell, popup, canvasRect, { avoid, flipX, flipY });
+    overlay.style.left = `${placed.left}px`;
+    overlay.style.top = `${placed.top}px`;
+  }, [
+    popup.width,
+    popup.height,
+    inline,
+    columnWidth,
+    rowHeight,
+    session.formulaEdit?.targetCell,
+    session.formulaEdit?.rangeAnchor,
+    session.formulaEdit?.editCell,
+  ]);
+
+  useLayoutEffect(() => {
     const input = inputRef.current;
     if (!input) return;
     const edit = session.formulaEdit;
@@ -226,7 +317,7 @@ export function SpreadsheetTextEditor({
     if (sessionDraft === undefined || sessionDraft === draft) return;
     setDraft(sessionDraft);
     const span = session.formulaEdit?.activeFormulaRef;
-    rememberSelection(span?.start ?? sessionDraft.length, span?.end ?? sessionDraft.length);
+    rememberSelection(span?.end ?? sessionDraft.length, span?.end ?? sessionDraft.length);
     const current = valueRef.current;
     if (current.kind === GridCellKind.Text) {
       onChangeRef.current({ ...current, data: sessionDraft });
@@ -240,6 +331,26 @@ export function SpreadsheetTextEditor({
     session.syncFormulaEditCursor(nextText, selectionStart, selectionEnd);
   };
 
+  const scrollInlineCaret = (input: HTMLTextAreaElement) => {
+    if (!inline) return;
+    const caret = selectionRef.current.end;
+    input.scrollLeft = inlineCaretScrollLeft(
+      input.scrollLeft,
+      caret,
+      input.value.length,
+      input.clientWidth - GRID_CELL_PAD_X * 2,
+      input.scrollWidth,
+    );
+    const mirror = hostRef.current?.querySelector<HTMLElement>(".wk-formula-color-mirror");
+    if (mirror) mirror.scrollLeft = input.scrollLeft;
+  };
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    scrollInlineCaret(input);
+  });
+
   const syncInputCursor = (input: HTMLTextAreaElement) => {
     if (applyingSelectionRef.current) return;
     if (session.formulaEdit && input.value !== session.formulaEdit.draft) return;
@@ -247,16 +358,41 @@ export function SpreadsheetTextEditor({
     const end = input.selectionEnd ?? start;
     rememberSelection(start, end);
     session.syncFormulaEditCursor(input.value, start, end);
+    scrollInlineCaret(input);
   };
 
   return (
     <>
-    <div className="wk-overlay-editor-host" onPointerDown={placeCaretInFormulaText}>
+    <div
+      ref={hostRef}
+      className={`wk-overlay-editor-host ${inline ? "is-inline" : "is-popup"}`}
+      onPointerDown={placeCaretInFormulaText}
+      style={{ width: popup.width, height: popup.height }}
+    >
+    <FormulaColoredText draft={draft} active={canPointFromDraft(draft)} />
     <textarea
       ref={inputRef}
       className="wk-overlay-editor"
       aria-label="Cell editor"
+      wrap={inline ? "off" : undefined}
       value={draft}
+      style={{
+        width: popup.width,
+        minWidth: inline ? popup.width : FORMULA_EDITOR_MIN_WIDTH,
+        maxWidth: inline ? popup.width : FORMULA_EDITOR_MAX_WIDTH,
+        height: popup.height,
+        maxHeight: inline ? popup.height : FORMULA_EDITOR_MAX_HEIGHT,
+        overflow: popup.overflow,
+        whiteSpace: inline ? "nowrap" : undefined,
+        overflowX: inline ? "auto" : undefined,
+        overflowY: inline ? "hidden" : undefined,
+        padding: inline ? `${GRID_CELL_PAD_Y}px ${GRID_CELL_PAD_X}px` : undefined,
+        ...(canPointFromDraft(draft) ? { color: "transparent", caretColor: "#1e3a5f" } : {}),
+      }}
+      onScroll={(event) => {
+        const mirror = hostRef.current?.querySelector<HTMLElement>(".wk-formula-color-mirror");
+        if (mirror) mirror.scrollLeft = event.currentTarget.scrollLeft;
+      }}
       onChange={(event) => {
         const input = event.currentTarget;
         setSuggestOpen(true);
@@ -280,7 +416,10 @@ export function SpreadsheetTextEditor({
           setSuggestOpen(false);
           return;
         }
-        if (action === "cancel") return;
+        if (action === "cancel") {
+          session.cancelFormulaEdit();
+          return;
+        }
         if (action === "move-suggest") {
           event.preventDefault();
           event.stopPropagation();
@@ -321,6 +460,14 @@ export function SpreadsheetTextEditor({
           }
           return;
         }
+        if (action === "cycle-lock") {
+          event.preventDefault();
+          event.stopPropagation();
+          const applied = cycleActiveFormulaRef(session, input.value, layout, projection);
+          if (!applied) return;
+          writeDraft(applied.draft, applied.end, applied.end);
+          return;
+        }
         if (action === "formula-operator") {
           event.preventDefault();
           event.stopPropagation();
@@ -332,11 +479,12 @@ export function SpreadsheetTextEditor({
             input.selectionEnd ?? input.value.length,
             event.key,
           );
-          writeDraft(applied.draft, applied.caret, applied.caret);
           session.setFormulaEditMode("enter");
+          writeDraft(applied.draft, applied.caret, applied.caret);
           return;
         }
         if (action !== "point-cell" && action !== "extend-range") {
+          if (inline && event.key === "Enter") event.preventDefault();
           event.stopPropagation();
           return;
         }
@@ -350,7 +498,7 @@ export function SpreadsheetTextEditor({
         if (!pointed || !session.formulaEdit) return;
         const nextDraft = session.formulaEdit.draft;
         const span = session.formulaEdit.activeFormulaRef;
-        writeDraft(nextDraft, span?.start ?? nextDraft.length, span?.end ?? nextDraft.length);
+        writeDraft(nextDraft, span?.end ?? nextDraft.length, span?.end ?? nextDraft.length);
       }}
     />
     </div>

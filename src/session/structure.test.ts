@@ -32,6 +32,36 @@ describe("table structure editing", () => {
     expect(session.getCell("Staff", "CamLead", "Salary").computed).toBe(45000);
   });
 
+  it("rewrites Defined name Formula refs when a Key is renamed", async () => {
+    const session = await open();
+    const extra = session.addRow("Params");
+    expect(extra.key).toBe("Param");
+    const param2 = session.addRow("Params");
+    expect(param2.key).toBe("Param2");
+    session.setInput("Params", param2.id, "Value", 1);
+    session.setFormula("Params", "AndelOutsource", "Value", "=Vat");
+    session.setFormula("Params", extra.id, "Value", "=Vat:AndelCNC");
+    session.setFormula("Params", "AndelPladebuk", "Value", "=Param2");
+    session.renameRow("Params", "Vat", "Moms");
+    await session.recalculate();
+    expect(session.getTable("Params").rows.find((row) => row.id === "row-andel-out")!.cells.Value.formula).toBe("=Moms");
+    expect(session.getTable("Params").rows.find((row) => row.id === extra.id)!.cells.Value.formula).toBe("=Moms:AndelCNC");
+    expect(session.getTable("Params").rows.find((row) => row.id === "row-andel-plade")!.cells.Value.formula).toBe(
+      "=Param2",
+    );
+    expect(session.getCell("Params", "AndelOutsource", "Value").computed).toBe(0.25);
+    expect(session.getCell("Params", extra.key, "Value").computed).toBe(1.05);
+
+    session.setFormula("Params", "AndelCNC", "Value", "=Param");
+    session.renameRow("Params", extra.id, "Keep");
+    await session.recalculate();
+    expect(session.getTable("Params").rows.find((row) => row.id === "row-andel-cnc")!.cells.Value.formula).toBe("=Keep");
+    expect(session.getTable("Params").rows.find((row) => row.id === "row-andel-plade")!.cells.Value.formula).toBe(
+      "=Param2",
+    );
+    expect(session.getCell("Params", "AndelPladebuk", "Value").computed).toBe(1);
+  });
+
   it("adds and deletes rows and attribute columns", async () => {
     const session = await open();
     const row = session.addRow("Params", "Årssalg");

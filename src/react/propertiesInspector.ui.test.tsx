@@ -1,7 +1,13 @@
 /** @vitest-environment jsdom */
+import { useMemo } from "react";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { layoutWorkbook } from "../model/layout.js";
+import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { projectTable } from "../grid/sheetProjection.js";
+import { evaluatedCells, gridCell } from "./CustomSheetCanvas.js";
 import { COLOR_PALETTE } from "./inspectors/StyleField.js";
+import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 import { installGridDom, pressTableKey, renderPlaygroundCanvas, selectProjectedCell } from "./playgroundCanvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -27,6 +33,24 @@ function luminance(hex: string) {
   const g = (n >> 8) & 255;
   const b = n & 255;
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function GridCellProbe({ col, row }: { col: number; row: number }) {
+  const { session } = useWorkbook();
+  const snapshot = useSnapshot();
+  const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
+  const projection = useMemo(() => projectTable(layout, "tbl-params")!, [layout]);
+  const values = useMemo(() => evaluatedCells(session, snapshot), [session, snapshot]);
+  const cell = gridCell(projection, layout, values, [col, row]);
+  return (
+    <pre data-testid="grid-cell">
+      {JSON.stringify({
+        displayData: cell.displayData,
+        data: "data" in cell ? cell.data : undefined,
+        themeOverride: cell.themeOverride,
+      })}
+    </pre>
+  );
 }
 
 describe("properties inspector UI", () => {
@@ -196,5 +220,32 @@ describe("properties inspector UI", () => {
     expect(screen.getByRole("tooltip").parentElement).toBe(document.body);
     fireEvent.mouseLeave(help.closest(".wk-help")!);
     expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("shows a red Error token and names the failing Formula ref", async () => {
+    const snapshot = createPlaygroundWorkbook();
+    snapshot.tables
+      .find((table) => table.id === "tbl-params")!
+      .rows.find((row) => row.id === "row-andel-cnc")!.cells.Value = {
+      kind: "formula",
+      formula: "=MissingName",
+    };
+    const { session } = await renderPlaygroundCanvas({
+      chrome: true,
+      snapshot,
+      extra: <GridCellProbe col={1} row={4} />,
+    });
+    await selectParamsCell(session, "row-andel-cnc");
+    expect(session.getCell("Params", "AndelCNC", "Value").computed).toBe("#NAME?");
+    const painted = JSON.parse(screen.getByTestId("grid-cell").textContent ?? "{}") as {
+      displayData: string;
+      data: string;
+      themeOverride?: { textDark?: string };
+    };
+    expect(painted.displayData).toBe("#NAME?");
+    expect(painted.data).toBe("=MissingName");
+    expect(painted.themeOverride?.textDark).toBe("#b42318");
+    expect((screen.getByLabelText("Value") as HTMLTextAreaElement).value).toBe("=MissingName");
+    expect(screen.getByText("Invalid name MissingName")).toBeTruthy();
   });
 });

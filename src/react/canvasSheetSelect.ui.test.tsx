@@ -7,43 +7,9 @@ import { WorkbookSession } from "../session/WorkbookSession.js";
 import { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 import { PropertiesPanel } from "./PropertiesPanel.js";
 import { WorkbookProvider } from "./WorkbookProvider.js";
+import { installGridDom } from "./playgroundCanvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-function installGridDom() {
-  class ResizeObserverMock {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  }
-  vi.stubGlobal("ResizeObserver", ResizeObserverMock);
-  HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
-    fillRect: vi.fn(),
-    clearRect: vi.fn(),
-    getImageData: vi.fn(() => ({ data: [] })),
-    putImageData: vi.fn(),
-    createImageData: vi.fn(() => []),
-    setTransform: vi.fn(),
-    drawImage: vi.fn(),
-    save: vi.fn(),
-    fillText: vi.fn(),
-    restore: vi.fn(),
-    beginPath: vi.fn(),
-    moveTo: vi.fn(),
-    lineTo: vi.fn(),
-    closePath: vi.fn(),
-    stroke: vi.fn(),
-    translate: vi.fn(),
-    scale: vi.fn(),
-    rotate: vi.fn(),
-    arc: vi.fn(),
-    fill: vi.fn(),
-    measureText: vi.fn(() => ({ width: 0 })),
-    transform: vi.fn(),
-    rect: vi.fn(),
-    clip: vi.fn(),
-  })) as never;
-}
 
 async function renderPlayground() {
   const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());

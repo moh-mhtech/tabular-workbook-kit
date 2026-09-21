@@ -146,7 +146,7 @@ describe("year-column canvas", () => {
     );
   });
 
-  it("still table-selects the Salg growth column after a grain change", async () => {
+  it("selects the Salg data Growth cell as Growth after a grain change", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Salg" }));
@@ -156,6 +156,11 @@ describe("year-column canvas", () => {
     });
     const salg = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-salg")!;
     await selectProjectedCell(session, "tbl-salg", salg.colCount - 1, 1);
-    expect(session.selection).toEqual({ kind: "table", tableId: "tbl-salg" });
+    expect(session.selection).toEqual({
+      kind: "growth",
+      tableId: "tbl-salg",
+      col: salg.colCount - 1,
+      row: 1,
+    });
   });
 });

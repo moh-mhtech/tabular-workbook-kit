@@ -81,12 +81,20 @@ The empty column right of a Table’s last data column. Typing here appends an a
 _Avoid_: New column, spare column
 
 **Growth header**:
-The `+` affordance on the Growth-row key or Growth-column header. It is selectable; the Unused corners are not. Selecting a Growth cell selects the Table until Auto-expansion creates a Cell.
+The `+` affordance on the Growth-row key or Growth-column header. It is selectable; the Unused corner is not.
 _Avoid_: Autofill handle, insert button
 
+**Growth-cell**:
+A 1×1 Selection on Growth — the Growth header or a data Growth cell. The Properties panel shows Growth cell (Value only). Typing still Auto-expands.
+_Avoid_: Table inspector (when you mean Growth)
+
+**Table corner**:
+The top-left key×header intersection. Not a Cell. Selectable, not editable. A click selects the Table’s Key cells, Header cells, and data (not Growth); drag adjusts that Cell range. Without it, a Cell range cannot include keys and headers.
+_Avoid_: Unused corner, corner cell (as a Cell)
+
 **Unused corner**:
-The Table’s top-left key header and bottom-right Growth corner. Not a Cell, not Growth, not selectable.
-_Avoid_: Corner cell, empty cell (when you mean these)
+The bottom-right Growth unused corner. Not a Cell, not Growth, not selectable. Arrow navigation skips it.
+_Avoid_: Table corner, empty cell (when you mean this)
 
 **Auto-expansion**:
 Typing in Growth appends a row or an attribute column when that edge is otherwise empty. The value and the shape change are one undo step. Pasting a range that does not fit also grows the Table (**Paste-grow**).
@@ -119,7 +127,7 @@ One Scenario replacement for a single Input. Formulas are never overlaid. The gr
 _Avoid_: Patch, delta, what-if cell
 
 **Error**:
-A Formula whose evaluation failed. The grid shows the error token in red (`#DIV/0!`). Number format is not applied. An Error in any stored month makes that Grain total an Error.
+A Formula whose evaluation failed. The grid shows the error token in red (`#DIV/0!`), never the Stored Formula. Number format is not applied. The Properties panel shows a short reason (`Divide by zero`, `Invalid name`, `Invalid cell reference`); for `#NAME?` and `#REF!` the reason names the Formula ref. An Error in any stored month makes that Grain total an Error.
 _Avoid_: Invalid, NaN, crash (when you mean a Formula Error)
 
 **Blank**:
@@ -179,8 +187,32 @@ A Workbook-wide name for one Cell. A key-value Table registers each row key as t
 _Avoid_: Name-as-formula (`=@-1`), P table, ASCII-only names
 
 **Formula ref**:
-One complete structured-ref or Defined name token in Formula text (`Vat`, `Salg[Jan][CNC]`, `Vat:AndelCNC`).
+One complete structured-ref or Defined name token in Formula text (`Vat`, `[Jan][CNC]`, `Salg[Jan][CNC]`, `Vat:AndelCNC`). On the Edit cell’s Table the token is a Local Formula ref; on another Table it names that Table.
 _Avoid_: A1 token, range address (as Excel `B12`)
+
+**Local Formula ref**:
+A Formula ref that omits the Table name because the Edit cell is on that Table (`[Jan][CNC]`, `[Jan][@]`, `[@][Outsource]`, `[Value]`). A Defined name stays a Defined name (`Vat`).
+_Avoid_: Unqualified ref, relative A1
+
+**This-row**:
+`@` in the row slot of a Formula ref (`[Jan][@]`). The target is the Edit cell’s row — the current line.
+_Avoid_: Current line (say This-row), [@] as a Defined name
+
+**This-column**:
+`@` in the column slot of a Formula ref (`[@][CNC]`, `[@-1][@]`). The target is the Edit cell’s column.
+_Avoid_: Current column (say This-column)
+
+**Relative**:
+A Formula ref that uses This-row and/or This-column so the target moves with the Edit cell.
+_Avoid_: Unlocked, floating ref
+
+**Fixed**:
+A Formula ref that names the column and/or row, with `$` when locked (`[$Jan][$CNC]`). The target stays when the Formula is filled.
+_Avoid_: Absolute (Excel A1 `$A$1`), locked name
+
+**F4**:
+Cycles the Active formula ref: Relative → Fixed both → Fixed row → Fixed column → Relative. Same order as Excel.
+_Avoid_: Toggle lock, absolute shortcut
 
 **Formula range**:
 A Formula ref of two same-Table names joined by `:` (`Vat:AndelCNC`), produced in Point by click-drag or Shift+Arrow.
@@ -205,7 +237,7 @@ Formula edit in which arrows move the Caret, started by F2, double-click, Formul
 _Avoid_: Edit (the verb), F2 mode, in-cell edit (when you mean the mode)
 
 **Point**:
-Formula-edit mode that inserts a Formula ref from a grid click or arrow; click-drag or Shift+Arrow writes a Formula range in the same Table. An operator typed while Pointing returns to Enter; F2, or a click that places the Caret in Formula text (in-cell editor or Formula bar), returns to Edit mode without Cancel.
+Formula-edit mode that inserts a Formula ref from a grid click or arrow; click-drag or Shift+Arrow writes a Formula range in the same Table. Pointing the Edit cell writes no Formula ref. An operator typed while Pointing returns to Enter; F2, or a click that places the Caret in Formula text (in-cell editor or Formula bar), returns to Edit mode without Cancel.
 _Avoid_: Navigate (when you mean inserting a ref)
 
 **Edit cell**:
@@ -215,6 +247,14 @@ _Avoid_: Active cell (when you mean this vs Selection), source cell
 **Formula text**:
 The draft string in Formula edit.
 _Avoid_: Overlay value, input value (when you mean the draft)
+
+**Inline**:
+Formula-edit placement: Formula text is typed in the Edit cell, one line, same size and padding as the cell. Long text scrolls horizontally with the Caret; there is no scrollbar.
+_Avoid_: In-cell edit (that phrase is for Edit mode), embedded editor, wrap
+
+**Popup**:
+Formula-edit placement: Formula text is typed in a floating box on the Edit cell. The box stays in the canvas (not Explorer or the Properties panel) and moves its anchor so it does not cover the Target cell.
+_Avoid_: Overlay (when you mean this box, not a Scenario Overlay), dialog
 
 **Invalid draft**:
 A typed value that cannot Commit: an illegal identifier, a collision, a reserved function name, or an empty name. The field uses a light red fill while the draft is invalid and does not write. Distinct from a Formula Error (that is a stored Formula that failed to evaluate).
@@ -255,7 +295,7 @@ _Avoid_: IntelliSense, formula wizard
 ### Navigation
 
 **Arrow navigation**:
-In Ready, an arrow moves Selection to the next selectable Cell — Growth included, Unused corners skipped. Right/left wrap to the next/previous row, then the next/previous Table. Up/down stay on the same column index, then that index in the adjacent Table.
+In Ready, an arrow moves Selection to the next selectable Cell — Growth and the Table corner included, Unused corner skipped. Right/left wrap to the next/previous row, then the next/previous Table. Up/down stay on the same column index, then that index in the adjacent Table.
 _Avoid_: Caret movement (that is Edit mode), Point (that inserts a ref)
 
 **Ctrl+arrow**:
@@ -277,7 +317,7 @@ _Avoid_: Block, region, current region (Excel’s name)
 ### Shell
 
 **Explorer**:
-The left column: Sheets and the Tables on each Sheet. Clicking a Table name Reveals that Table.
+The left column: Sheets and the Tables on each Sheet. Clicking a Table name Reveals that Table. Creating a Table from New table switches to that Sheet and Reveals the Table.
 _Avoid_: Folder tree, sheet tabs (when you mean this list)
 
 **Reveal**:
@@ -285,7 +325,7 @@ Selecting a Table from Explorer and scrolling the viewport to that Table’s sta
 _Avoid_: Jump, scroll-into-view, follow selection
 
 **Selection**:
-The object the Properties panel edits: Workbook, Sheet, Table, column, row, or Cell (optionally a Cell range). Clicking empty canvas selects the Sheet. Clicking a Key cell selects the row; a Header cell, the column. Selection never sits on an Unused corner. Arrow navigation, Ctrl+arrow, Shift+arrow, and Shift+Ctrl+arrow keep the moving Cell in view without Reveal.
+The object the Properties panel edits: Workbook, Sheet, Table, column, row, Cell (optionally a Cell range), or Growth-cell. Clicking empty canvas selects the Sheet. Clicking a Key cell selects the row; a Header cell, the column. A 1×1 Table corner is not an object. A 1×1 data Growth cell is a Growth-cell. Selection never sits on an Unused corner. Arrow navigation, Ctrl+arrow, Shift+arrow, and Shift+Ctrl+arrow keep the moving Cell in view without Reveal.
 _Avoid_: A1 range (when you mean this), focus (when you mean Selection)
 
 **Cell range**:

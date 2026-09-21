@@ -2,12 +2,12 @@ export { WorkbookProvider, useWorkbook, useSnapshot } from "./WorkbookProvider.j
 export {
   Explorer,
   FormulaBar,
-  GroupCanvas,
+  FormulaEditPlacementSwitch,
   ScenarioBar,
   TimeGrainSwitch,
 } from "./components.js";
+export type { FormulaEditPlacement } from "./WorkbookProvider.js";
 export { CustomSheetCanvas } from "./CustomSheetCanvas.js";
-export { SheetCanvas } from "./SheetCanvas.js";
 export { PropertiesPanel } from "./PropertiesPanel.js";
 export type { HostInspectors } from "./PropertiesPanel.js";
 export { GlossaryButton } from "./GlossaryDialog.js";

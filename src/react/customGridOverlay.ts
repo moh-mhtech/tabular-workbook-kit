@@ -8,9 +8,21 @@ import type { WorkbookLayout } from "../model/layout.js";
 import { canRegisterDefinedName, getCellName } from "../model/names.js";
 import type { WorkbookSession } from "../session/WorkbookSession.js";
 
-export type OverlayNavMode = "cells" | "text";
+export type FormulaEditMode = "enter" | "edit" | "point";
+export type OverlayNavMode = FormulaEditMode;
 
-export type OverlayKeyAction = "toggle-text" | "point-cell" | "caret" | "formula-operator";
+export type OverlayKeyAction =
+  | "toggle-text"
+  | "toggle-mode"
+  | "point-cell"
+  | "extend-range"
+  | "commit-move"
+  | "hide-suggest"
+  | "move-suggest"
+  | "pick-suggest"
+  | "cancel"
+  | "caret"
+  | "formula-operator";
 
 export type PointedRefSpan = { start: number; end: number };
 
@@ -32,7 +44,7 @@ export function isFormulaOperatorKey(key: string): boolean {
 }
 
 export function toggleOverlayNavMode(mode: OverlayNavMode): OverlayNavMode {
-  return mode === "cells" ? "text" : "cells";
+  return mode === "edit" ? "enter" : "edit";
 }
 
 export function commitKeyMovement(event: {
@@ -59,32 +71,61 @@ export function overlayArrowMovement(key: string): readonly [-1 | 0 | 1, -1 | 0 
   }
 }
 
+export function formulaKeyAction(
+  mode: FormulaEditMode,
+  event: { key: string; shiftKey?: boolean; altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean },
+  opts: { suggestVisible: boolean; isFormula: boolean },
+): OverlayKeyAction {
+  if (event.key === "Escape") return opts.suggestVisible ? "hide-suggest" : "cancel";
+  if (opts.suggestVisible && (event.key === "ArrowDown" || event.key === "ArrowUp")) return "move-suggest";
+  if (opts.suggestVisible && event.key === "Tab") return "pick-suggest";
+  if (opts.suggestVisible && event.key === "Enter" && !event.shiftKey) return "pick-suggest";
+  if (opts.suggestVisible && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+    return formulaKeyAction(mode, event, { ...opts, suggestVisible: false });
+  }
+  if (event.key === "F2") return "toggle-mode";
+  const modified = Boolean(event.altKey || event.ctrlKey || event.metaKey);
+  const arrow = overlayArrowMovement(event.key);
+  if (arrow && !modified) {
+    if (opts.isFormula && (mode === "enter" || mode === "point")) {
+      return event.shiftKey ? "extend-range" : "point-cell";
+    }
+    if (!opts.isFormula && mode === "enter" && !event.shiftKey) return "commit-move";
+    return "caret";
+  }
+  if (isFormulaOperatorKey(event.key) && !modified) return "formula-operator";
+  if (commitKeyMovement(event)) return "commit-move";
+  return "caret";
+}
+
 export function overlayKeyAction(
   mode: OverlayNavMode,
-  event: { key: string; altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean },
+  event: { key: string; altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean },
 ): OverlayKeyAction {
-  if (event.key === "F2") return "toggle-text";
-  if (
-    mode === "cells" &&
-    overlayArrowMovement(event.key) &&
-    !event.altKey &&
-    !event.ctrlKey &&
-    !event.metaKey
-  ) {
-    return "point-cell";
-  }
-  if (isFormulaOperatorKey(event.key) && !event.altKey && !event.ctrlKey && !event.metaKey) {
-    return "formula-operator";
-  }
-  return "caret";
+  const action = formulaKeyAction(mode, event, { suggestVisible: false, isFormula: true });
+  return action === "toggle-mode" ? "toggle-text" : action;
 }
 
 export function canPointFromDraft(draft: string): boolean {
   return draft.trimStart().startsWith("=");
 }
 
-const FORMULA_REF =
-  /(?:[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\.)?[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\[[^\]]+\](?:\[[^\]]+\])?|\[[^\]]+\](?:\[[^\]]+\])?|[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*(?!\s*\()/g;
+export function isValidInsertPoint(draft: string, caret: number): boolean {
+  if (!canPointFromDraft(draft)) return false;
+  const before = draft.slice(0, caret);
+  if (before.endsWith("=") || /[+\-*/^&,(]$/.test(before)) return true;
+  return cursorFormulaRef(draft, caret, caret) !== null;
+}
+
+export function canPointClick(mode: FormulaEditMode | undefined, draft: string, caret: number): boolean {
+  if (!canPointFromDraft(draft)) return false;
+  if (!mode || mode === "enter" || mode === "point") return true;
+  return isValidInsertPoint(draft, caret);
+}
+
+const ATOM_REF =
+  "(?:(?:[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\\.)?[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*(?![A-Za-z0-9ÆØÅæøå_]|\\s*\\())";
+const FORMULA_REF = new RegExp(`(?:${ATOM_REF})(?::(?:${ATOM_REF}))?`, "g");
 
 export function formulaRefSpans(draft: string): PointedRefSpan[] {
   FORMULA_REF.lastIndex = 0;
@@ -206,17 +247,35 @@ export function commitLiteralEditAndSelect(
   return true;
 }
 
+export function rangeFormulaRef(start: string, end: string): string {
+  return start === end ? start : `${start}:${end}`;
+}
+
 export function pointAtProjectedCell(
   session: WorkbookSession,
   projection: SheetGridProjection,
   layout: WorkbookLayout,
   col: number,
   row: number,
+  options?: { extend?: boolean },
 ): boolean {
-  if (!session.formulaEdit || !projection.tableId) return false;
+  const edit = session.formulaEdit;
+  if (!edit || !projection.tableId) return false;
   const ref = formulaRefForProjectedCell(projection, layout, col, row);
   if (!ref) return false;
-  session.pointFormulaRef(ref, { tableId: projection.tableId, col, row });
+  const origin = { tableId: projection.tableId, col, row };
+  if (options?.extend && edit.rangeAnchor && edit.rangeAnchor.tableId === projection.tableId) {
+    const startRef = formulaRefForProjectedCell(
+      projection,
+      layout,
+      edit.rangeAnchor.col,
+      edit.rangeAnchor.row,
+    );
+    if (!startRef) return false;
+    session.pointFormulaRef(rangeFormulaRef(startRef, ref), origin, { keepAnchor: true });
+    return true;
+  }
+  session.pointFormulaRef(ref, origin);
   return true;
 }
 
@@ -242,11 +301,29 @@ export function pointFromArrow(
   movement: readonly [-1 | 0 | 1, -1 | 0 | 1],
   projection: SheetGridProjection,
   layout: WorkbookLayout,
+  options?: { extend?: boolean },
 ): { location: readonly [number, number]; ref: string } | undefined {
-  const pointed = nextPointableCell(targetWalkStart(session, from, projection), movement, projection, layout);
+  const origin = options?.extend
+    ? session.formulaEdit?.targetCell &&
+      (!projection.tableId || session.formulaEdit.targetCell.tableId === projection.tableId)
+      ? ([session.formulaEdit.targetCell.col, session.formulaEdit.targetCell.row] as const)
+      : targetWalkStart(session, from, projection)
+    : targetWalkStart(session, from, projection);
+  const pointed = nextPointableCell(origin, movement, projection, layout);
   if (!pointed) return undefined;
-  if (!pointAtProjectedCell(session, projection, layout, pointed.location[0], pointed.location[1])) {
+  if (
+    !pointAtProjectedCell(session, projection, layout, pointed.location[0], pointed.location[1], {
+      extend: options?.extend,
+    })
+  ) {
     return undefined;
   }
   return pointed;
+}
+
+export function shouldPointGridClick(session: WorkbookSession): boolean {
+  const edit = session.formulaEdit;
+  if (!edit) return false;
+  const caret = edit.selectionEnd ?? edit.selectionStart ?? edit.draft.length;
+  return canPointClick(edit.mode, edit.draft, caret);
 }

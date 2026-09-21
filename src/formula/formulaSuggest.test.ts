@@ -15,8 +15,19 @@ describe("formula suggestions", () => {
     );
   });
 
-  it("lists functions after = and inserts at the prefix", () => {
-    expect(formulaPrefix("=", 1)).toEqual({ start: 1, text: "" });
+  it("does not suggest after = or an operator, and names complete as you type", () => {
+    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    expect(formulaPrefix("=", 1)).toBeNull();
+    expect(suggestFormula("=", 1, layout)).toEqual([]);
+    expect(suggestFormula("=Vat+", 5, layout)).toEqual([]);
+    expect(suggestFormula("=V", 2, layout).some((item) => item.label === "Vat")).toBe(true);
+    expect(suggestFormula("=Sa", 3, layout).some((item) => item.label === "Salg")).toBe(true);
+    expect(suggestFormula("=Salg[", 6, layout).some((item) => item.kind === "column")).toBe(true);
+  });
+
+  it("lists functions after a letter prefix and inserts at the prefix", () => {
+    expect(formulaPrefix("=", 1)).toBeNull();
+    expect(formulaPrefix("=Su", 3)).toEqual({ start: 1, text: "Su", bracket: false });
     expect(applySuggestion("=Su", 3, { label: "SUM", insert: "SUM(", kind: "function" })).toEqual({
       draft: "=SUM(",
       caret: 5,

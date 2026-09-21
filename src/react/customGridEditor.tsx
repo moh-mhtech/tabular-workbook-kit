@@ -8,8 +8,8 @@ import {
   applyFormulaOperator,
   canPointFromDraft,
   commitKeyMovement,
+  formulaKeyAction,
   overlayArrowMovement,
-  overlayKeyAction,
   pointFromArrow,
   toggleOverlayNavMode,
   type OverlayNavMode,
@@ -39,7 +39,6 @@ export function SpreadsheetTextEditor({
   layout: WorkbookLayout;
 }) {
   const { session } = useWorkbook();
-  const [mode, setMode] = useState(initialNavMode);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const selectionRef = useRef({ start: 0, end: 0 });
@@ -52,15 +51,16 @@ export function SpreadsheetTextEditor({
   const [activeSuggest, setActiveSuggest] = useState(0);
   const [suggestOpen, setSuggestOpen] = useState(true);
   const sessionDraft = session.formulaEdit?.draft;
-  const suggestions = suggestOpen
-    ? suggestFormula(draft, selectionRef.current.start, layout)
-    : [];
+  const mode = session.formulaEdit?.mode ?? initialNavMode;
+  const suggestCursor = selectionRef.current.start || draft.length;
+  const suggestions = suggestOpen ? suggestFormula(draft, suggestCursor, layout) : [];
 
   useLayoutEffect(() => {
     const target = projectedCell(projection, layout, editingLocation[0], editingLocation[1]);
     if (target.kind !== "table" || target.hit.kind !== "cell") return;
     session.beginFormulaEdit(target.hit.tableId, target.hit.rowId, target.hit.columnId, initial, {
       pointing: initial.trimStart().startsWith("="),
+      mode: initialNavMode,
       editCell: projection.tableId
         ? { tableId: projection.tableId, col: editingLocation[0], row: editingLocation[1] }
         : undefined,
@@ -74,7 +74,7 @@ export function SpreadsheetTextEditor({
     if (!input) return;
     input.focus();
     const end = input.value.length;
-    const start = isHighlighted && initialNavMode === "cells" ? 0 : end;
+    const start = isHighlighted && initialNavMode === "enter" ? 0 : end;
     applySelection(input, start, end);
     session.syncFormulaEditCursor(input.value, start, end);
   }, [initialNavMode, isHighlighted, session]);
@@ -148,45 +148,56 @@ export function SpreadsheetTextEditor({
       onSelect={(event) => syncInputCursor(event.currentTarget)}
       onKeyDown={(event) => {
         const input = event.currentTarget;
-        if (event.key === "Escape" && suggestions.length) {
+        const liveSuggest = suggestOpen
+          ? suggestFormula(draft, input.selectionStart || draft.length, layout)
+          : [];
+        const action = formulaKeyAction(mode, event, {
+          suggestVisible: liveSuggest.length > 0,
+          isFormula: canPointFromDraft(draft),
+        });
+        if (action === "hide-suggest") {
           event.preventDefault();
           event.stopPropagation();
           setSuggestOpen(false);
           return;
         }
-        if (suggestions.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+        if (action === "cancel") return;
+        if (action === "move-suggest") {
           event.preventDefault();
           event.stopPropagation();
           setActiveSuggest((current) =>
             event.key === "ArrowDown"
-              ? (current + 1) % suggestions.length
-              : (current - 1 + suggestions.length) % suggestions.length,
+              ? (current + 1) % liveSuggest.length
+              : (current - 1 + liveSuggest.length) % liveSuggest.length,
           );
           return;
         }
-        if (suggestions.length && event.key === "Tab") {
+        if (action === "pick-suggest") {
           event.preventDefault();
           event.stopPropagation();
-          const picked = suggestions[activeSuggest] ?? suggestions[0]!;
-          const applied = applySuggestion(draft, input.selectionStart ?? draft.length, picked);
+          const picked = liveSuggest[activeSuggest] ?? liveSuggest[0]!;
+          const cursor = Math.max(input.selectionStart ?? 0, selectionRef.current.start, 1);
+          const applied = applySuggestion(draft, cursor, picked);
           writeDraft(applied.draft, applied.caret, applied.caret);
+          setSuggestOpen(false);
           return;
         }
-        const commitMove = commitKeyMovement(event);
-        if (commitMove) {
+        if (action === "commit-move") {
           event.preventDefault();
           event.stopPropagation();
+          const commitMove = overlayArrowMovement(event.key) ?? commitKeyMovement(event);
+          if (!commitMove) return;
           const next = value.kind === GridCellKind.Text ? { ...value, data: draft } : value;
           if (value.kind === GridCellKind.Text) onChange(next);
           onFinishedEditing(next, commitMove);
           return;
         }
-        const action = overlayKeyAction(mode, event);
-        if (action === "toggle-text") {
+        if (action === "toggle-mode" || action === "toggle-text") {
           event.preventDefault();
           event.stopPropagation();
-          setMode(toggleOverlayNavMode(mode));
-          if (mode === "cells") {
+          const nextMode = toggleOverlayNavMode(mode);
+          session.setFormulaEditMode(nextMode);
+          if (mode !== "edit") {
             requestAnimationFrame(() => applySelection(input, input.value.length, input.value.length));
           }
           return;
@@ -203,17 +214,20 @@ export function SpreadsheetTextEditor({
             event.key,
           );
           writeDraft(applied.draft, applied.caret, applied.caret);
+          session.setFormulaEditMode("enter");
           pendingSelectionRef.current = { start: applied.caret, end: applied.caret };
           applySelection(input, applied.caret, applied.caret);
           return;
         }
-        if (action !== "point-cell" || !canPointFromDraft(draft)) return;
+        if (action !== "point-cell" && action !== "extend-range") return;
         event.preventDefault();
         event.stopPropagation();
         syncInputCursor(input);
         const movement = overlayArrowMovement(event.key);
         if (!movement) return;
-        const pointed = pointFromArrow(session, editingLocation, movement, projection, layout);
+        const pointed = pointFromArrow(session, editingLocation, movement, projection, layout, {
+          extend: action === "extend-range",
+        });
         if (!pointed || !session.formulaEdit) return;
         const nextDraft = session.formulaEdit.draft;
         const span = session.formulaEdit.activeFormulaRef;

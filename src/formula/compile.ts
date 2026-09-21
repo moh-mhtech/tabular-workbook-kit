@@ -1,4 +1,5 @@
 import { a1, columnLetters, findColumn, valueColumn, type LaidOutColumn, type TableLayout, type WorkbookLayout } from "../model/layout.js";
+import { canRegisterDefinedName, getCellName, promotedNames } from "../model/names.js";
 import { resolveTimeToken } from "../model/yearColumns.js";
 
 export interface CompileContext {
@@ -16,11 +17,25 @@ const QUALIFIED =
   /(?:([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)\.)?([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)\[([^\]]+)\](?:\[([^\]]+)\])?/g;
 const LOCAL_PAIR = /(?<![A-Za-z0-9_ÆØÅæøå.])\[([^\]]+)\](?:\[([^\]]+)\])?/g;
 const AT = /^@([+-]\d+)?$/;
+const ATOM_REF =
+  "(?:(?:[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\\.)?[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|\\[[^\\]]+\\](?:\\[[^\\]]+\\])?|[A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*(?![A-Za-z0-9ÆØÅæøå_]|\\s*\\())";
+const RANGE_REF = new RegExp(`(${ATOM_REF}):(${ATOM_REF})`, "g");
 
 export function compileFormula(formula: string, ctx: CompileContext): string {
   const source = formula.trim().startsWith("=") ? formula.trim().slice(1) : formula.trim();
 
-  let out = source.replace(QUALIFIED, (full, _sheet: string | undefined, tableName: string, first: string, second?: string) => {
+  RANGE_REF.lastIndex = 0;
+  let out = source.replace(RANGE_REF, (full, left: string, right: string) => {
+    try {
+      const compiled = compileRefRange(left, right, ctx);
+      if (!compiled) throw new Error(`range ${left} ${right}`);
+      return compiled;
+    } catch {
+      return "#REF!";
+    }
+  });
+
+  out = out.replace(QUALIFIED, (full, _sheet: string | undefined, tableName: string, first: string, second?: string) => {
     const table = ctx.layout.tablesByName.get(String(tableName).toLowerCase());
     if (!table) return full;
     try {
@@ -40,6 +55,90 @@ export function compileFormula(formula: string, ctx: CompileContext): string {
   });
 
   return `=${out}`;
+}
+
+function compileRefRange(left: string, right: string, ctx: CompileContext): string {
+  const start = resolveAuthoringCell(left, ctx);
+  const end = resolveAuthoringCell(right, ctx);
+  if (!start || !end || start.table.table.id !== end.table.table.id) throw new Error("range");
+  const table = start.table;
+  const rowIds = table.rows.map((row) => row.id);
+  const colIds = table.columns.filter((col) => col.kind !== "key").map((col) => col.id);
+  const rowA = rowIds.indexOf(start.rowId);
+  const rowB = rowIds.indexOf(end.rowId);
+  const colA = colIds.indexOf(start.columnId);
+  const colB = colIds.indexOf(end.columnId);
+  if (rowA < 0 || rowB < 0 || colA < 0 || colB < 0) throw new Error("range");
+  const parts: string[] = [];
+  for (let row = Math.min(rowA, rowB); row <= Math.max(rowA, rowB); row++) {
+    for (let col = Math.min(colA, colB); col <= Math.max(colA, colB); col++) {
+      const rowId = rowIds[row]!;
+      const columnId = colIds[col]!;
+      const named = getCellName(ctx.layout, table.table.id, rowId, columnId);
+      if (named.defined && canRegisterDefinedName(named.defined)) {
+        parts.push(named.defined);
+        continue;
+      }
+      const laidCol = table.columns.find((candidate) => candidate.id === columnId);
+      const laidRow = table.rows.find((candidate) => candidate.id === rowId);
+      if (!laidCol || !laidRow) continue;
+      parts.push(compileRef(table, laidCol.name, laidRow.key, ctx, false));
+    }
+  }
+  if (!parts.length) throw new Error("range");
+  return parts.length === 1 ? parts[0]! : `SUM(${parts.join(",")})`;
+}
+
+function resolveAuthoringCell(
+  text: string,
+  ctx: CompileContext,
+): { table: TableLayout; rowId: string; columnId: string } | undefined {
+  const qualified = text.match(
+    /^(?:([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)\.)?([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)\[([^\]]+)\](?:\[([^\]]+)\])?$/,
+  );
+  if (qualified) {
+    const table = ctx.layout.tablesByName.get(qualified[2]!.toLowerCase());
+    if (!table) return undefined;
+    return cellFromTokens(table, qualified[3]!.trim(), qualified[4]?.trim(), ctx);
+  }
+  const local = text.match(/^\[([^\]]+)\](?:\[([^\]]+)\])?$/);
+  if (local && ctx.currentTable) {
+    return cellFromTokens(ctx.currentTable, local[1]!.trim(), local[2]?.trim(), ctx);
+  }
+  const promoted = promotedNames(ctx.layout.snapshot).find(
+    (item) => item.name.toLowerCase() === text.toLowerCase(),
+  );
+  if (!promoted) return undefined;
+  const table = ctx.layout.tables.get(promoted.tableId);
+  if (!table) return undefined;
+  return { table, rowId: promoted.rowId, columnId: promoted.columnId };
+}
+
+function cellFromTokens(
+  table: TableLayout,
+  first: string,
+  second: string | undefined,
+  ctx: CompileContext,
+): { table: TableLayout; rowId: string; columnId: string } | undefined {
+  const colToken = resolveAt(first, table, ctx, "column");
+  const asColumn = tryColumn(table, colToken, ctx);
+  if (second !== undefined) {
+    const rowToken = resolveAt(second, table, ctx, "row");
+    const row = isThisRow(rowToken, table, ctx)
+      ? table.rows.find((candidate) => candidate.rowIndex === ctx.currentRowIndex)
+      : table.rows.find((candidate) => candidate.key.toLowerCase() === rowToken.toLowerCase());
+    if (!asColumn || asColumn.kind === "key" || !row) return undefined;
+    return { table, rowId: row.id, columnId: asColumn.id };
+  }
+  if (asColumn && asColumn.kind !== "key") {
+    const row = table.rows.find((candidate) => candidate.rowIndex === ctx.currentRowIndex) ?? table.rows[0];
+    if (!row) return undefined;
+    return { table, rowId: row.id, columnId: asColumn.id };
+  }
+  const asRow = table.keyByLower.get(colToken.toLowerCase());
+  const value = valueColumn(table);
+  if (asRow && value) return { table, rowId: asRow.id, columnId: value.id };
+  return undefined;
 }
 
 function compileRef(

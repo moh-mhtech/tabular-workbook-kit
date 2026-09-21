@@ -87,7 +87,7 @@ function CellEditorHost() {
         );
       }}
       isHighlighted={false}
-      initialNavMode="text"
+      initialNavMode="edit"
       editingLocation={[1, 3]}
       projection={projection}
       layout={layout}

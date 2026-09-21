@@ -25,19 +25,19 @@ const FUNCTIONS = [
   "NOT",
 ];
 
-export function formulaPrefix(draft: string, cursor: number): { start: number; text: string } | null {
+export function formulaPrefix(
+  draft: string,
+  cursor: number,
+): { start: number; text: string; bracket: boolean } | null {
   if (!draft.trimStart().startsWith("=")) return null;
   const before = draft.slice(0, cursor);
   const bracket = before.match(/\[([A-Za-z0-9ÆØÅæøå_-]*)$/);
   if (bracket?.index !== undefined) {
-    return { start: bracket.index + 1, text: bracket[1]! };
+    return { start: bracket.index + 1, text: bracket[1]!, bracket: true };
   }
   const match = before.match(/([A-Za-zÆØÅæøå_][A-Za-z0-9ÆØÅæøå_]*)$/);
-  if (match?.index === undefined) {
-    if (before.endsWith("=") || /[+\-*/^&,(]$/.test(before)) return { start: cursor, text: "" };
-    return null;
-  }
-  return { start: match.index, text: match[1]! };
+  if (match?.index === undefined) return null;
+  return { start: match.index, text: match[1]!, bracket: false };
 }
 
 export function suggestFormula(
@@ -47,20 +47,26 @@ export function suggestFormula(
 ): FormulaSuggestion[] {
   const prefix = formulaPrefix(draft, cursor);
   if (!prefix) return [];
+  if (!prefix.bracket && !prefix.text) return [];
   const needle = prefix.text.toLowerCase();
   const items: FormulaSuggestion[] = [];
-  for (const name of FUNCTIONS) {
-    if (!needle || name.toLowerCase().startsWith(needle)) {
-      items.push({ label: name, insert: `${name}(`, kind: "function" });
+  const wantNames = !prefix.bracket;
+  if (wantNames) {
+    for (const name of FUNCTIONS) {
+      if (name.toLowerCase().startsWith(needle)) {
+        items.push({ label: name, insert: `${name}(`, kind: "function" });
+      }
     }
   }
   for (const table of layout.tables.values()) {
-    if (!needle || table.table.name.toLowerCase().startsWith(needle)) {
+    if (wantNames && table.table.name.toLowerCase().startsWith(needle)) {
       items.push({ label: table.table.name, insert: table.table.name, kind: "table" });
     }
-    for (const row of table.table.rows) {
-      if (!needle || row.key.toLowerCase().startsWith(needle)) {
-        items.push({ label: row.key, insert: row.key, kind: "name" });
+    if (wantNames) {
+      for (const row of table.table.rows) {
+        if (row.key.toLowerCase().startsWith(needle)) {
+          items.push({ label: row.key, insert: row.key, kind: "name" });
+        }
       }
     }
     for (const column of table.columns) {

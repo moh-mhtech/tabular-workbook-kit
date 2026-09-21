@@ -42,10 +42,10 @@ import {
 } from "./customGridInteractions.js";
 import { SpreadsheetTextEditor, type OverlayEditorProps } from "./customGridEditor.js";
 import {
-  canPointFromDraft,
   commitLiteralEditAndSelect,
   isSpreadsheetPointEvent,
   pointAtProjectedCell,
+  shouldPointGridClick,
   type OverlayNavMode,
 } from "./customGridOverlay.js";
 import { clampCanvasScroll, scrollCanvasToKeepCellVisible, scrollCanvasToKeepTableVisible } from "./sheetScroll.js";
@@ -57,6 +57,32 @@ const EMPTY_SELECTION: GridSelection = {
   rows: CompactSelection.empty(),
 };
 
+function gridLocationFromPointer(
+  host: HTMLElement,
+  clientX: number,
+  clientY: number,
+  columnWidths: number[],
+  rowHeights: number[],
+): readonly [number, number] | null {
+  const rect = host.getBoundingClientRect();
+  let x = clientX - rect.left;
+  let y = clientY - rect.top;
+  if (x < 0 || y < 0) return null;
+  let col = 0;
+  for (; col < columnWidths.length; col++) {
+    x -= columnWidths[col]!;
+    if (x < 0) break;
+  }
+  if (col >= columnWidths.length) return null;
+  let row = 0;
+  for (; row < rowHeights.length; row++) {
+    y -= rowHeights[row]!;
+    if (y < 0) break;
+  }
+  if (row >= rowHeights.length) return null;
+  return [col, row];
+}
+
 function cellGridSelection(cell: readonly [number, number]): GridSelection {
   return {
     columns: CompactSelection.empty(),
@@ -66,6 +92,22 @@ function cellGridSelection(cell: readonly [number, number]): GridSelection {
       range: { x: cell[0], y: cell[1], width: 1, height: 1 },
       rangeStack: [],
     },
+  };
+}
+
+function pointedHighlightRange(
+  target: { col: number; row: number } | undefined,
+  anchor: { col: number; row: number } | undefined,
+): { x: number; y: number; width: number; height: number } | undefined {
+  if (!target) return undefined;
+  const start = anchor ?? target;
+  const x = Math.min(start.col, target.col);
+  const y = Math.min(start.row, target.row);
+  return {
+    x,
+    y,
+    width: Math.abs(start.col - target.col) + 1,
+    height: Math.abs(start.row - target.row) + 1,
   };
 }
 
@@ -334,9 +376,7 @@ export function CustomSheetCanvas() {
       onScroll={(event) => clampCanvasScroll(event.currentTarget)}
       onClick={(event) => {
         if ((event.target as HTMLElement | null)?.closest("[data-table-id]")) return;
-        if (session.formulaEdit && !canPointFromDraft(session.formulaEdit.draft)) {
-          session.commitFormulaEdit();
-        }
+        if (session.formulaEdit) session.commitFormulaEdit();
         session.setSelection({ kind: "sheet", sheetId: sheet.sheetId });
       }}
     >
@@ -376,8 +416,10 @@ function TableGrid({ tableId }: { tableId: string }) {
     [layout, projection],
   );
   const [gridSelection, setGridSelection] = useState<GridSelection>(EMPTY_SELECTION);
-  const overlayStartModeRef = useRef<OverlayNavMode>("cells");
+    const overlayStartModeRef = useRef<OverlayNavMode>("enter");
   const overlayOpenRef = useRef(false);
+  const pointingDragRef = useRef(false);
+  const lastClickWasDoubleRef = useRef(false);
   const editingLocationRef = useRef<Item | null>(null);
   const gridRef = useRef<DataEditorRef | null>(null);
   const gridSelectionRef = useRef(gridSelection);
@@ -390,11 +432,12 @@ function TableGrid({ tableId }: { tableId: string }) {
     projection,
     layout,
     editingLocation: [1, 1] as Item,
-    initialNavMode: "cells" as OverlayNavMode,
+    initialNavMode: "enter" as OverlayNavMode,
   });
   editorHostRef.current.projection = projection;
   editorHostRef.current.layout = layout;
   const targetCell = session.formulaEdit?.targetCell;
+  const rangeAnchor = session.formulaEdit?.rangeAnchor;
   const hostRef = useRef<HTMLDivElement>(null);
   const horizontalScroll = snapshot.sheets.find((sheet) => sheet.id === projection?.sheetId)?.horizontalScroll ?? "table";
 
@@ -499,8 +542,10 @@ function TableGrid({ tableId }: { tableId: string }) {
   const onCellClicked = useCallback(
     (location: Item) => {
       if (!projection || !session.formulaEdit) return;
-      if (canPointFromDraft(session.formulaEdit.draft)) {
-        pointAtProjectedCell(session, projection, layout, location[0], location[1]);
+      if (shouldPointGridClick(session)) {
+        pointAtProjectedCell(session, projection, layout, location[0], location[1], {
+          extend: pointingDragRef.current,
+        });
         return;
       }
       overlayOpenRef.current = false;
@@ -583,7 +628,8 @@ function TableGrid({ tableId }: { tableId: string }) {
       cancel?: () => void;
       preventDefault?: () => void;
     }) => {
-      if (event.key === "F2") overlayStartModeRef.current = "text";
+      if (event.key === "F2") overlayStartModeRef.current = "edit";
+      if (event.key === "Enter" || event.key === " ") overlayStartModeRef.current = "enter";
       if (overlayOpenRef.current || session.formulaEdit) return;
       if (event.altKey || event.shiftKey) return;
       const direction = arrowNavDirection(event.key);
@@ -611,12 +657,14 @@ function TableGrid({ tableId }: { tableId: string }) {
     editingLocationRef.current = cell;
     overlayOpenRef.current = true;
     editorHostRef.current.editingLocation = cell;
+    if (lastClickWasDoubleRef.current) overlayStartModeRef.current = "edit";
+    lastClickWasDoubleRef.current = false;
   }, [projection]);
 
   const onFinishedEditing = useCallback(
     (_newValue?: GridCell, movement: readonly [number, number] = [0, 0]) => {
       overlayOpenRef.current = false;
-      overlayStartModeRef.current = "cells";
+      overlayStartModeRef.current = "enter";
       session.cancelFormulaEdit();
       if (!projection?.tableId) return;
       const current = editingLocationRef.current ?? gridSelectionRef.current.current?.cell;
@@ -658,12 +706,44 @@ function TableGrid({ tableId }: { tableId: string }) {
     width: column.width,
   }));
 
+  const columnWidths = fittedColumns.map((column) => column.width);
+  const pointedRange = pointedHighlightRange(
+    targetCell && targetCell.tableId === tableId ? targetCell : undefined,
+    rangeAnchor && rangeAnchor.tableId === tableId ? rangeAnchor : undefined,
+  );
+
   return (
     <div
       ref={hostRef}
       className="wk-table-spreadsheet click-outside-ignore"
       tabIndex={0}
       onKeyDown={(event) => onEditorKeyDown(event)}
+      onPointerDown={(event) => {
+        lastClickWasDoubleRef.current = event.detail >= 2;
+        if (!session.formulaEdit || !projection) return;
+        if ((event.target as HTMLElement | null)?.closest(".wk-overlay-editor, .wk-formula-bar, .wk-formula-suggest")) {
+          return;
+        }
+        const location = gridLocationFromPointer(event.currentTarget, event.clientX, event.clientY, columnWidths, fittedRows);
+        if (!location) return;
+        const editCell = session.formulaEdit.editCell;
+        if (editCell && editCell.tableId === tableId && editCell.col === location[0] && editCell.row === location[1]) {
+          return;
+        }
+        if (shouldPointGridClick(session)) {
+          pointingDragRef.current = true;
+          pointAtProjectedCell(session, projection, layout, location[0], location[1]);
+        }
+      }}
+      onPointerMove={(event) => {
+        if (!pointingDragRef.current || !session.formulaEdit || !projection || event.buttons === 0) return;
+        const location = gridLocationFromPointer(event.currentTarget, event.clientX, event.clientY, columnWidths, fittedRows);
+        if (!location) return;
+        pointAtProjectedCell(session, projection, layout, location[0], location[1], { extend: true });
+      }}
+      onPointerUp={() => {
+        pointingDragRef.current = false;
+      }}
       style={{
         width: fittedColumns.reduce((sum, column) => sum + column.width, 0) + 2,
         height: fittedRows.reduce((sum, height) => sum + height, 0) + SCROLLBAR_GUTTER,
@@ -714,10 +794,13 @@ function TableGrid({ tableId }: { tableId: string }) {
         onKeyDown={onEditorKeyDown}
         onCellActivated={onCellActivated}
         onFinishedEditing={onFinishedEditing}
-        isOutsideClick={(event) => !isSpreadsheetPointEvent(event)}
+        isOutsideClick={(event) => {
+          if (!isSpreadsheetPointEvent(event)) return true;
+          return !shouldPointGridClick(session);
+        }}
         highlightRegions={
-          targetCell && targetCell.tableId === tableId
-            ? [{ color: "rgba(42, 111, 151, 0.28)", range: { x: targetCell.col, y: targetCell.row, width: 1, height: 1 } }]
+          pointedRange
+            ? [{ color: "rgba(42, 111, 151, 0.28)", range: pointedRange }]
             : undefined
         }
         cellActivationBehavior="double-click"

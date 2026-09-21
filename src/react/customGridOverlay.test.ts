@@ -9,9 +9,11 @@ import {
   canPointFromDraft,
   commitLiteralEditAndSelect,
   cursorFormulaRef,
+  formulaKeyAction,
   formulaRefForProjectedCell,
   formulaRefSpans,
   isSpreadsheetPointEvent,
+  isValidInsertPoint,
   nextPointableCell,
   commitKeyMovement,
   overlayArrowMovement,
@@ -26,8 +28,9 @@ const inert = { evaluate: () => ({}) };
 
 describe("custom grid overlay navigation", () => {
   it("toggles between pointing at cells and in-cell caret", () => {
-    expect(toggleOverlayNavMode("cells")).toBe("text");
-    expect(toggleOverlayNavMode("text")).toBe("cells");
+    expect(toggleOverlayNavMode("enter")).toBe("edit");
+    expect(toggleOverlayNavMode("edit")).toBe("enter");
+    expect(toggleOverlayNavMode("point")).toBe("edit");
   });
 
   it("maps Enter and Tab to the next cell after a commit", () => {
@@ -46,23 +49,23 @@ describe("custom grid overlay navigation", () => {
   });
 
   it("uses F2 to enter in-cell focus", () => {
-    expect(overlayKeyAction("cells", { key: "F2" })).toBe("toggle-text");
-    expect(overlayKeyAction("text", { key: "F2" })).toBe("toggle-text");
+    expect(overlayKeyAction("enter", { key: "F2" })).toBe("toggle-text");
+    expect(overlayKeyAction("edit", { key: "F2" })).toBe("toggle-text");
   });
 
   it("points at cells on arrows until F2", () => {
-    expect(overlayKeyAction("cells", { key: "ArrowDown" })).toBe("point-cell");
-    expect(overlayKeyAction("cells", { key: "ArrowLeft" })).toBe("point-cell");
-    expect(overlayKeyAction("text", { key: "ArrowDown" })).toBe("caret");
-    expect(overlayKeyAction("cells", { key: "a" })).toBe("caret");
-    expect(overlayKeyAction("cells", { key: "+" })).toBe("formula-operator");
-    expect(overlayKeyAction("text", { key: "*" })).toBe("formula-operator");
+    expect(overlayKeyAction("enter", { key: "ArrowDown" })).toBe("point-cell");
+    expect(overlayKeyAction("enter", { key: "ArrowLeft" })).toBe("point-cell");
+    expect(overlayKeyAction("edit", { key: "ArrowDown" })).toBe("caret");
+    expect(overlayKeyAction("enter", { key: "a" })).toBe("caret");
+    expect(overlayKeyAction("enter", { key: "+" })).toBe("formula-operator");
+    expect(overlayKeyAction("edit", { key: "*" })).toBe("formula-operator");
   });
 
   it("leaves modified arrows inside the cell", () => {
-    expect(overlayKeyAction("cells", { key: "ArrowRight", ctrlKey: true })).toBe("caret");
-    expect(overlayKeyAction("cells", { key: "ArrowUp", altKey: true })).toBe("caret");
-    expect(overlayKeyAction("cells", { key: "ArrowDown", metaKey: true })).toBe("caret");
+    expect(overlayKeyAction("enter", { key: "ArrowRight", ctrlKey: true })).toBe("caret");
+    expect(overlayKeyAction("enter", { key: "ArrowUp", altKey: true })).toBe("caret");
+    expect(overlayKeyAction("enter", { key: "ArrowDown", metaKey: true })).toBe("caret");
   });
 
   it("only points from a formula draft", () => {
@@ -112,6 +115,8 @@ describe("custom grid overlay navigation", () => {
     expect(cursorFormulaRef("=SUM(", 5, 5)).toBeNull();
     expect(cursorFormulaRef("=Params[Vækst]", 14, 14)).toEqual({ start: 1, end: 14 });
     expect(cursorFormulaRef("=", 1, 1)).toBeNull();
+    expect(formulaRefSpans("=Vat:AndelCNC")).toEqual([{ start: 1, end: 13 }]);
+    expect(cursorFormulaRef("=Vat:AndelCNC", 13, 13)).toEqual({ start: 1, end: 13 });
   });
 
   it("keeps the formula edit open when a click or arrow points at a cell", () => {
@@ -253,5 +258,48 @@ describe("custom grid overlay navigation", () => {
     session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=Vat");
     expect(commitLiteralEditAndSelect(session, projection, layout, 1, 4)).toBe(false);
     expect(session.formulaEdit?.draft).toBe("=Vat");
+  });
+
+  it("points a click in Edit only at a valid insert point", () => {
+    expect(isValidInsertPoint("=", 1)).toBe(true);
+    expect(isValidInsertPoint("=Vat+", 5)).toBe(true);
+    expect(isValidInsertPoint("=SUM(", 5)).toBe(true);
+    expect(isValidInsertPoint("=SUM(Vat)", 3)).toBe(false);
+    expect(isValidInsertPoint("=Vat", 4)).toBe(true);
+  });
+
+  it("lets suggestions steal arrows only when the list is visible", () => {
+    expect(
+      formulaKeyAction("enter", { key: "ArrowDown" }, { suggestVisible: true, isFormula: true }),
+    ).toBe("move-suggest");
+    expect(
+      formulaKeyAction("enter", { key: "ArrowDown" }, { suggestVisible: false, isFormula: true }),
+    ).toBe("point-cell");
+    expect(
+      formulaKeyAction("enter", { key: "Enter" }, { suggestVisible: true, isFormula: true }),
+    ).toBe("pick-suggest");
+    expect(
+      formulaKeyAction("enter", { key: "Enter" }, { suggestVisible: false, isFormula: true }),
+    ).toBe("commit-move");
+  });
+
+  it("extends a pointed ref into a same-table range", () => {
+    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const layout = layoutWorkbook(session.getSnapshot());
+    const projection = projectTable(layout, "tbl-params")!;
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=", {
+      pointing: true,
+      editCell: { tableId: "tbl-params", col: 1, row: 3 },
+    });
+    expect(pointAtProjectedCell(session, projection, layout, 1, 3)).toBe(true);
+    expect(session.formulaEdit?.draft).toBe("=Vat");
+    expect(pointAtProjectedCell(session, projection, layout, 1, 4, { extend: true })).toBe(true);
+    expect(session.formulaEdit?.draft).toBe("=Vat:AndelCNC");
+    expect(session.formulaEdit?.mode).toBe("point");
+    expect(pointFromArrow(session, [1, 4], [0, 1], projection, layout, { extend: true })).toEqual({
+      location: [1, 5],
+      ref: "AndelOutsource",
+    });
+    expect(session.formulaEdit?.draft).toBe("=Vat:AndelOutsource");
   });
 });

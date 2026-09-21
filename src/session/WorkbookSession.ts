@@ -3,6 +3,7 @@ import {
   activeFormulaRefKey,
   cursorFormulaRef,
   pointingReplaceSpan,
+  type FormulaEditMode,
 } from "../react/customGridOverlay.js";
 import { effectiveCell, readComputed } from "../engine/compileWorkbook.js";
 import type { FormulaEngine, SheetGrid } from "../engine/types.js";
@@ -66,16 +67,21 @@ export type SessionListener = () => void;
 
 export type FormulaEditOrigin = { tableId: string; col: number; row: number };
 
+export type { FormulaEditMode };
+
 export interface FormulaEdit {
   tableId: string;
   rowId: string;
   columnId: string;
   draft: string;
   pointing: boolean;
+  mode: FormulaEditMode;
   /** Edit cell: the cell whose formula is open. */
   editCell?: FormulaEditOrigin;
   /** Target cell: grid cell currently chosen for the active formula ref. */
   targetCell?: FormulaEditOrigin;
+  /** First cell of a Point range (click-drag / Shift+Arrow). */
+  rangeAnchor?: FormulaEditOrigin;
   /** Active formula ref in the formula text, or null when inserting a new one. */
   activeFormulaRef?: { start: number; end: number } | null;
   activeFormulaRefKey?: string | null;
@@ -575,7 +581,7 @@ export class WorkbookSession {
     this.pointFormulaRef(text);
   }
 
-  pointFormulaRef(ref: string, targetCell?: FormulaEditOrigin) {
+  pointFormulaRef(ref: string, targetCell?: FormulaEditOrigin, options?: { keepAnchor?: boolean }) {
     if (!this.formulaEdit) return;
     const start = this.formulaEdit.selectionStart ?? this.formulaEdit.draft.length;
     const end = this.formulaEdit.selectionEnd ?? start;
@@ -590,11 +596,15 @@ export class WorkbookSession {
       ...this.formulaEdit,
       draft: applied.draft,
       pointing: true,
+      mode: "point",
       activeFormulaRef: applied.span,
       selectionStart: applied.span.start,
       selectionEnd: applied.span.end,
       activeFormulaRefKey: activeFormulaRefKey(applied.span, applied.draft),
       targetCell: targetCell ?? this.formulaEdit.targetCell,
+      rangeAnchor: options?.keepAnchor
+        ? (this.formulaEdit.rangeAnchor ?? targetCell ?? this.formulaEdit.targetCell)
+        : (targetCell ?? this.formulaEdit.targetCell),
     };
     for (const listener of this.listeners) listener();
   }
@@ -604,9 +614,10 @@ export class WorkbookSession {
     rowId: string,
     columnId: string,
     draft: string,
-    options?: { pointing?: boolean; editCell?: FormulaEditOrigin },
+    options?: { pointing?: boolean; editCell?: FormulaEditOrigin; mode?: FormulaEditMode },
   ) {
     const pointing = options?.pointing ?? draft.trim().startsWith("=");
+    const mode = options?.mode ?? "enter";
     const current = this.formulaEdit;
     if (
       current &&
@@ -616,8 +627,13 @@ export class WorkbookSession {
       current.draft === draft &&
       current.pointing === pointing
     ) {
-      if (options?.editCell && !current.editCell) {
-        this.formulaEdit = { ...current, editCell: options.editCell };
+      const next = {
+        ...current,
+        editCell: options?.editCell ?? current.editCell,
+        mode: options?.mode ?? current.mode,
+      };
+      if (next.editCell !== current.editCell || next.mode !== current.mode) {
+        this.formulaEdit = next;
       }
       return;
     }
@@ -629,8 +645,20 @@ export class WorkbookSession {
       columnId,
       draft,
       pointing,
+      mode: sameCell ? (options?.mode ?? current?.mode ?? mode) : mode,
       activeFormulaRef: null,
       editCell: options?.editCell ?? (sameCell ? current.editCell : undefined),
+      rangeAnchor: sameCell ? current?.rangeAnchor : undefined,
+    };
+    for (const listener of this.listeners) listener();
+  }
+
+  setFormulaEditMode(mode: FormulaEditMode) {
+    if (!this.formulaEdit || this.formulaEdit.mode === mode) return;
+    this.formulaEdit = {
+      ...this.formulaEdit,
+      mode,
+      rangeAnchor: mode === "enter" ? undefined : this.formulaEdit.rangeAnchor,
     };
     for (const listener of this.listeners) listener();
   }

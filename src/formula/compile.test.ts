@@ -62,6 +62,12 @@ describe("column-first compile", () => {
     expect(compileFormula("=Salg[2025][Total]", { layout })).toContain("INDEX(Salg[Dec]");
     expect(compileFormula("=Salg[2025][Total]", { layout })).toContain("SUM(");
   });
+
+  it("compiles a pointed name range to SUM of the rectangle", () => {
+    const snapshot = createPlaygroundWorkbook();
+    const layout = layoutWorkbook(snapshot);
+    expect(compileFormula("=Vat:AndelCNC", { layout })).toBe("=SUM(Vat,AndelCNC)");
+  });
 });
 
 describe("sheet hitTest", () => {

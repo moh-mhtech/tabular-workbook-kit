@@ -3,11 +3,20 @@ import { applySuggestion, suggestFormula } from "../formula/formulaSuggest.js";
 import { layoutWorkbook } from "../model/layout.js";
 import { formatDisplayValue, resolveCellFormat } from "../model/numberFormat.js";
 import { KEY_COLUMN_ID, isCellSelection, selectedCellRefs, sharedOrStar } from "../model/types.js";
+import { projectTable, projectedLocationForRef } from "../grid/sheetProjection.js";
 import { blurOnEnter } from "./blurOnEnter.js";
 import { FormulaSuggestList } from "./FormulaSuggestList.js";
 import { OutlinedField } from "./OutlinedField.js";
 import { moveSelectionAfterCommit } from "./customGridInteractions.js";
-import { commitKeyMovement } from "./customGridOverlay.js";
+import {
+  applyFormulaOperator,
+  canPointFromDraft,
+  commitKeyMovement,
+  formulaKeyAction,
+  overlayArrowMovement,
+  pointFromArrow,
+  toggleOverlayNavMode,
+} from "./customGridOverlay.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 import { WorkbookInspector } from "./inspectors/WorkbookInspector.js";
 import { SheetInspector } from "./inspectors/SheetInspector.js";
@@ -140,14 +149,28 @@ function FormulaField() {
       try {
         const cell = session.getCell(table.name, row.key, cellSel.columnId);
         const draft = cell.kind === "formula" ? (cell.formula ?? "=") : rawInput(cell.input);
-        session.beginFormulaEdit(table.id, row.id, cellSel.columnId, draft);
+        const layout = layoutWorkbook(snapshot);
+        const projection = projectTable(layout, table.id);
+        const location = projection
+          ? projectedLocationForRef(projection, layout, cellSel)
+          : undefined;
+        session.beginFormulaEdit(table.id, row.id, cellSel.columnId, draft, {
+          mode: "edit",
+          editCell:
+            projection && location
+              ? { tableId: table.id, col: location[0], row: location[1] }
+              : undefined,
+        });
+        requestAnimationFrame(() => {
+          document.querySelector<HTMLTextAreaElement>(".wk-formula-bar textarea")?.focus();
+        });
       } catch {
         /* wait for calculation */
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [edit, table, row, cellSel, session]);
+  }, [edit, table, row, cellSel, session, snapshot]);
 
   return (
     <FormulaDraft
@@ -162,7 +185,18 @@ function FormulaField() {
           return;
         }
         if (!table || !row || !cellSel) return;
-        session.beginFormulaEdit(table.id, row.id, cellSel.columnId, next);
+        const layout = layoutWorkbook(snapshot);
+        const projection = projectTable(layout, table.id);
+        const location = projection
+          ? projectedLocationForRef(projection, layout, cellSel)
+          : undefined;
+        session.beginFormulaEdit(table.id, row.id, cellSel.columnId, next, {
+          mode: "edit",
+          editCell:
+            projection && location
+              ? { tableId: table.id, col: location[0], row: location[1] }
+              : undefined,
+        });
       }}
       onCommit={(next, movement) => {
         if (!refs.length) return;
@@ -205,6 +239,7 @@ function FormulaDraft({
   onCommit: (value: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => void;
   onCancel: () => void;
 }) {
+  const { session } = useWorkbook();
   const snapshot = useSnapshot();
   const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
   const [draft, setDraft] = useState(committed);
@@ -213,6 +248,7 @@ function FormulaDraft({
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const caret = areaRef.current?.selectionStart ?? draft.length;
   const suggestions = suggestOpen ? suggestFormula(draft, caret, layout) : [];
+  const mode = session.formulaEdit?.mode ?? "edit";
   useEffect(() => {
     setDraft(committed);
   }, [committed, resetKey]);
@@ -222,6 +258,15 @@ function FormulaDraft({
     area.style.height = "0px";
     area.style.height = `${area.scrollHeight}px`;
   }, [draft]);
+
+  const applyDraft = (next: string, nextCaret: number) => {
+    setDraft(next);
+    onChange(next);
+    requestAnimationFrame(() => {
+      const area = areaRef.current;
+      if (area) area.setSelectionRange(nextCaret, nextCaret);
+    });
+  };
 
   return (
     <div className="wk-formula-bar">
@@ -235,6 +280,7 @@ function FormulaDraft({
           value={draft}
           onFocus={() => {
             if (draft === "*") setDraft(firstValue);
+            if (session.formulaEdit) session.setFormulaEditMode(session.formulaEdit.mode === "point" ? "point" : "edit");
           }}
           onChange={(e) => {
             setDraft(e.target.value);
@@ -242,18 +288,34 @@ function FormulaDraft({
             setActiveSuggest(0);
             onChange(e.target.value);
           }}
-          onBlur={() => onCommit(draft)}
+          onSelect={(e) => {
+            const area = e.currentTarget;
+            if (session.formulaEdit) {
+              session.syncFormulaEditCursor(area.value, area.selectionStart ?? 0, area.selectionEnd ?? 0);
+            }
+          }}
+          onBlur={() => {
+            window.setTimeout(() => {
+              if (!session.formulaEdit) return;
+              if (session.formulaEdit.mode === "point") return;
+              onCommit(session.formulaEdit.draft);
+            }, 0);
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              if (suggestions.length) {
-                e.preventDefault();
-                setSuggestOpen(false);
-                return;
-              }
+            const action = formulaKeyAction(mode, e, {
+              suggestVisible: suggestions.length > 0,
+              isFormula: canPointFromDraft(draft),
+            });
+            if (action === "hide-suggest") {
+              e.preventDefault();
+              setSuggestOpen(false);
+              return;
+            }
+            if (action === "cancel") {
               onCancel();
               return;
             }
-            if (suggestions.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+            if (action === "move-suggest") {
               e.preventDefault();
               setActiveSuggest((current) =>
                 e.key === "ArrowDown"
@@ -262,22 +324,53 @@ function FormulaDraft({
               );
               return;
             }
-            if (suggestions.length && (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey))) {
+            if (action === "pick-suggest") {
               e.preventDefault();
               const picked = suggestions[activeSuggest] ?? suggestions[0]!;
               const applied = applySuggestion(draft, e.currentTarget.selectionStart ?? draft.length, picked);
-              setDraft(applied.draft);
-              onChange(applied.draft);
-              requestAnimationFrame(() => {
-                const area = areaRef.current;
-                if (area) area.setSelectionRange(applied.caret, applied.caret);
-              });
+              applyDraft(applied.draft, applied.caret);
+              setSuggestOpen(false);
               return;
             }
-            const movement = commitKeyMovement(e);
-            if (movement) {
+            if (action === "toggle-mode" || action === "toggle-text") {
               e.preventDefault();
-              onCommit(draft, movement);
+              session.setFormulaEditMode(toggleOverlayNavMode(mode));
+              return;
+            }
+            if (action === "formula-operator") {
+              e.preventDefault();
+              const applied = applyFormulaOperator(
+                e.currentTarget.value,
+                session.formulaEdit?.activeFormulaRef ?? null,
+                e.currentTarget.selectionStart ?? draft.length,
+                e.currentTarget.selectionEnd ?? draft.length,
+                e.key,
+              );
+              applyDraft(applied.draft, applied.caret);
+              session.setFormulaEditMode("enter");
+              return;
+            }
+            if (action === "point-cell" || action === "extend-range") {
+              const edit = session.formulaEdit;
+              const tableId = edit?.tableId ?? (session.selection && "tableId" in session.selection ? session.selection.tableId : undefined);
+              if (!edit || !tableId) return;
+              const projection = projectTable(layout, tableId);
+              const from = edit.editCell ? ([edit.editCell.col, edit.editCell.row] as const) : ([1, 1] as const);
+              const movement = overlayArrowMovement(e.key);
+              if (!projection || !movement) return;
+              e.preventDefault();
+              const pointed = pointFromArrow(session, from, movement, projection, layout, {
+                extend: action === "extend-range",
+              });
+              if (!pointed) return;
+              const next = session.formulaEdit?.draft ?? draft;
+              const span = session.formulaEdit?.activeFormulaRef;
+              applyDraft(next, span?.end ?? next.length);
+              return;
+            }
+            if (action === "commit-move") {
+              e.preventDefault();
+              onCommit(draft, overlayArrowMovement(e.key) ?? commitKeyMovement(e));
               return;
             }
             blurOnEnter(e);
@@ -289,8 +382,7 @@ function FormulaDraft({
         active={activeSuggest}
         onPick={(item) => {
           const applied = applySuggestion(draft, areaRef.current?.selectionStart ?? draft.length, item);
-          setDraft(applied.draft);
-          onChange(applied.draft);
+          applyDraft(applied.draft, applied.caret);
         }}
       />
     </div>

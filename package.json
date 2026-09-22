@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./react": "./src/react/index.ts"
+    "./react": "./src/react/index.ts",
+    "./postgres": "./src/persist/postgres/index.ts",
+    "./pglite": "./src/persist/pglite/index.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -14,6 +16,9 @@
   "dependencies": {
     "@glideapps/glide-data-grid": "^6.0.3",
     "hyperformula": "^3.3.0"
+  },
+  "optionalDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
   },
   "peerDependencies": {
     "react": ">=18"

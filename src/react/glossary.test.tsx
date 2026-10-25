@@ -74,14 +74,6 @@ describe("glossary", () => {
     expect(table?.avoid).toMatch(/table kind/i);
   });
 
-  it("parses the host CONTEXT.md", () => {
-    const markdown = readFileSync(join(here, "../../../../apps/playground/CONTEXT.md"), "utf8");
-    const doc = parseGlossary(markdown);
-    expect(doc.title).toMatch(/Playground/);
-    const terms = doc.sections.flatMap((section) => section.terms.map((term) => term.term));
-    expect(terms).toEqual(["Playground", "Project", "Parameters sheet (Parametre)", "Parameters table (Params)"]);
-  });
-
   it("opens the glossary dialog from the toolbar button", () => {
     const doc = parseGlossary("**Cell**:\nThe value at a Table row.\n_Avoid_: A1\n");
     function App() {

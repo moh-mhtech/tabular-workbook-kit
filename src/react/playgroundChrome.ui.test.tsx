@@ -4,9 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { projectTable } from "../grid/sheetProjection.js";
 import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
-import { PlaygroundBrand } from "../../../../apps/playground/src/PlaygroundBrand.tsx";
 import { formulaBar, installGridDom, renderPlaygroundCanvas, selectProjectedCell, trackFocus, typeEqualsOnProjectedCell } from "./playgroundCanvasTest.js";
-import { render } from "@testing-library/react";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -17,16 +15,6 @@ afterEach(() => {
 });
 
 describe("playground chrome UI", () => {
-  it("shows application logo and title", () => {
-    render(<PlaygroundBrand />);
-    expect(screen.getByText("Workbook Playground")).toBeTruthy();
-    const paths = document.querySelectorAll(".pg-brand-mark path");
-    expect(paths.length).toBe(3);
-    expect(paths[1]?.getAttribute("fill")).not.toBe("none");
-    expect(paths[2]?.getAttribute("fill")).not.toBe("none");
-    expect(paths[0]?.getAttribute("fill")).toBe("none");
-  });
-
   it("groups Scenario selection with a Scenario options menu", async () => {
     await renderPlaygroundCanvas({ chrome: true });
     expect(screen.getByRole("group", { name: "Scenario" })).toBeTruthy();

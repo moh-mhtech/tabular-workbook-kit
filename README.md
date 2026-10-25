@@ -1,6 +1,6 @@
 # Workbook kit
 
-Tables-only calculation kernel. Playground mounts the custom canvas and HyperFormula. Glossary: [CONTEXT.md](./CONTEXT.md). Host policy (Parametre/Params): [apps/playground/CONTEXT.md](../../apps/playground/CONTEXT.md).
+Tables-only calculation kernel. A host mounts the custom canvas and HyperFormula. Glossary: [CONTEXT.md](./CONTEXT.md). Host policy, such as Parametre and Params, lives in the host glossary, not in this library.
 
 ## Mount (copy from Playground)
 

@@ -1,6 +1,6 @@
-# Workbook kit
+# Workbook
 
-The calculation document a host (Playground, later BudgetTool) edits: named tables on sheets, a calendar, and scenarios. It is not an unstructured spreadsheet and not a financial statement. Product rules (a locked parameters sheet, Project chrome) live in the host.
+The language of a tabular Workbook a host embeds: named tables on sheets, a calendar, and scenarios. It is not an unstructured spreadsheet, not a financial statement, and not a product. It does not require a parameters table, a fiscal year, or a particular spoken language.
 
 ## Language
 
@@ -20,7 +20,7 @@ _Avoid_: Sheet, range, post list, dataset, table kind
 
 **Calendar**:
 The Workbook’s ordered monthly Periods, the shared time line year-columns join on.
-_Avoid_: Timeline, date range, fiscal year (fiscal year is a BudgetTool concept)
+_Avoid_: Timeline, date range, fiscal year (a host concept)
 
 **Period**:
 One month on the Calendar. The join key between year-column tables.
@@ -33,6 +33,10 @@ _Avoid_: Case, version, copy, what-if sheet
 **Base**:
 The Workbook Inputs with no Scenario overlay applied.
 _Avoid_: Default scenario, original, master
+
+**Sample workbook**:
+An English Workbook that shows Sheets, Tables, year-columns, Formulas, and a Scenario. Names such as Parameters, Sales, Staff, and Result are examples, not required objects.
+_Avoid_: Budget seed, Parametre, product template, host workbook
 
 ### Tables
 

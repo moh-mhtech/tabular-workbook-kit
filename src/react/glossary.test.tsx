@@ -16,7 +16,7 @@ describe("glossary", () => {
   it("parses the kit CONTEXT.md into grouped terms", () => {
     const markdown = readFileSync(join(here, "../../CONTEXT.md"), "utf8");
     const doc = parseGlossary(markdown);
-    expect(doc.title).toBe("Workbook kit");
+    expect(doc.title).toBe("Workbook");
     expect(doc.sections.map((section) => section.heading)).toEqual([
       "Document",
       "Tables",
@@ -29,6 +29,7 @@ describe("glossary", () => {
     ]);
     const terms = doc.sections.flatMap((section) => section.terms.map((term) => term.term));
     expect(terms).toContain("Workbook");
+    expect(terms).toContain("Sample workbook");
     expect(terms).toContain("Year column");
     expect(terms).toContain("Growth header");
     expect(terms).toContain("Growth-cell");

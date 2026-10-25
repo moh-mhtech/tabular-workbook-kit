@@ -1,18 +1,18 @@
-# Workbook kit
+# tabular-workbook-kit
 
-Tables-only calculation kernel. A host mounts the custom canvas and HyperFormula. Glossary: [CONTEXT.md](./CONTEXT.md). Host policy, such as Parametre and Params, lives in the host glossary, not in this library.
+Sheets-style workbook library that enforces tables. A host application mounts the custom canvas and HyperFormula. This repository is the library, not an application. Glossary: [CONTEXT.md](./CONTEXT.md). Host policy, such as Parametre and Params, lives in the host glossary, not in this library. Licensed under GPL-3.0.
 
-## Mount (copy from Playground)
+## Mount
 
 ```tsx
-import { WorkbookSession } from "@budgettool/workbook";
+import { WorkbookSession } from "tabular-workbook-kit";
 import {
   WorkbookProvider,
   CustomSheetCanvas,
   Explorer,
   PropertiesPanel,
   ScenarioBar,
-} from "@budgettool/workbook/react";
+} from "tabular-workbook-kit/react";
 
 const session = new WorkbookSession(snapshot);
 

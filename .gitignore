@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+.pglite-data/
+*.local
+.DS_Store

@@ -10,12 +10,11 @@ function tryCall(fn: () => void) {
   }
 }
 
-export function WorkbookInspector({ label }: { label: string }) {
+export function WorkbookInspector() {
   const { session } = useWorkbook();
   const snapshot = useSnapshot();
   return (
     <section>
-      <h3>{label}</h3>
       <OutlinedField label="Name">
         <MixedTextInput values={[snapshot.name]} onCommit={(value) => tryCall(() => session.renameWorkbook(value))} />
       </OutlinedField>

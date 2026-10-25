@@ -12,14 +12,33 @@ function tryCall(fn: () => void) {
   }
 }
 
-export function Explorer({ workbookLabel = "Workbook" }: { workbookLabel?: string }) {
+function ExplorerFolderIcon() {
+  return (
+    <svg className="wk-explorer-folder-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M2 4.5 A1 1 0 0 1 3 3.5 H6.2 L7.4 5 H13 A1 1 0 0 1 14 6 V12.5 A1 1 0 0 1 13 13.5 H3 A1 1 0 0 1 2 12.5 Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: boolean }) {
   const { session, activeSheetId, setActiveSheetId } = useWorkbook();
   const snapshot = useSnapshot();
 
   return (
     <nav className="wk-explorer" aria-label="Sheets">
-      <button type="button" className="wk-explorer-group-btn" onClick={() => session.setSelection({ kind: "workbook" })}>
-        {workbookLabel}
+      <button
+        type="button"
+        className="wk-explorer-group-btn wk-explorer-workbook"
+        onClick={() => session.setSelection({ kind: "workbook" })}
+      >
+        {workbookFolderIcon ? <ExplorerFolderIcon /> : null}
+        <span>{snapshot.name}</span>
       </button>
       {snapshot.sheets.map((sheet) => (
         <div key={sheet.id} className="wk-explorer-group">
@@ -77,7 +96,7 @@ export function Explorer({ workbookLabel = "Workbook" }: { workbookLabel?: strin
       <div className="wk-explorer-group">
         <button
           type="button"
-          className="wk-explorer-group-btn wk-explorer-new"
+          className="wk-explorer-group-btn wk-explorer-new-sheet"
           aria-label="New sheet"
           onClick={() => tryCall(() => session.addSheet())}
         >
@@ -91,51 +110,7 @@ export function Explorer({ workbookLabel = "Workbook" }: { workbookLabel?: strin
   );
 }
 
-export function ScenarioBar() {
-  const { session } = useWorkbook();
-  const snapshot = useSnapshot();
-  const activeId = snapshot.activeScenarioId;
-
-  return (
-    <div className="wk-scenario-bar">
-      <span className="wk-label">Scenario</span>
-      <select
-        value={activeId ?? ""}
-        onChange={(e) => session.activateScenario(e.target.value || null)}
-      >
-        <option value="">Base</option>
-        {snapshot.scenarios.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-      <button type="button" onClick={() => tryCall(() => session.addScenario())}>
-        Add
-      </button>
-      <button
-        type="button"
-        disabled={!activeId}
-        onClick={() =>
-          tryCall(() => {
-            if (!activeId) return;
-            const current = snapshot.scenarios.find((s) => s.id === activeId);
-            const next = window.prompt("Rename scenario", current?.name ?? "");
-            if (next != null) session.renameScenario(activeId, next);
-          })
-        }
-      >
-        Rename
-      </button>
-      <button type="button" disabled={!activeId} onClick={() => tryCall(() => activeId && session.duplicateScenario(activeId))}>
-        Duplicate
-      </button>
-      <button type="button" disabled={!activeId} onClick={() => tryCall(() => activeId && session.deleteScenario(activeId))}>
-        Delete
-      </button>
-    </div>
-  );
-}
+export { ScenarioBar } from "./ScenarioBar.js";
 
 export function FormulaBar() {
   return null;

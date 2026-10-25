@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { projectTable } from "../grid/sheetProjection.js";
 import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { PlaygroundBrand } from "../../../../apps/playground/src/PlaygroundBrand.tsx";
 import { formulaBar, installGridDom, renderPlaygroundCanvas, selectProjectedCell, trackFocus, typeEqualsOnProjectedCell } from "./playgroundCanvasTest.js";
+import { render } from "@testing-library/react";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -15,6 +17,43 @@ afterEach(() => {
 });
 
 describe("playground chrome UI", () => {
+  it("shows application logo and title", () => {
+    render(<PlaygroundBrand />);
+    expect(screen.getByText("Workbook Playground")).toBeTruthy();
+    const paths = document.querySelectorAll(".pg-brand-mark path");
+    expect(paths.length).toBe(3);
+    expect(paths[1]?.getAttribute("fill")).not.toBe("none");
+    expect(paths[2]?.getAttribute("fill")).not.toBe("none");
+    expect(paths[0]?.getAttribute("fill")).toBe("none");
+  });
+
+  it("groups Scenario selection with a Scenario options menu", async () => {
+    await renderPlaygroundCanvas({ chrome: true });
+    expect(screen.getByRole("group", { name: "Scenario" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Scenario" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Scenario options" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Add" })).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Scenario options" }));
+    });
+    expect(await screen.findByRole("menuitem", { name: "Add" })).toBeTruthy();
+    expect((screen.getByRole("menuitem", { name: "Duplicate" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("menuitem", { name: "Delete" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows the Workbook name with a folder icon in the explorer", async () => {
+    await renderPlaygroundCanvas({ chrome: true, explorerWorkbookFolderIcon: true });
+    const project = screen.getByRole("button", { name: "Playground 2025" });
+    expect(project.querySelector(".wk-explorer-folder-icon")).toBeTruthy();
+  });
+
+  it("styles New sheet as a prominent action", async () => {
+    await renderPlaygroundCanvas({ chrome: true });
+    const newSheet = screen.getByRole("button", { name: "New sheet" });
+    expect(newSheet.classList.contains("wk-explorer-new-sheet")).toBe(true);
+    expect(newSheet.classList.contains("wk-explorer-new")).toBe(false);
+  });
+
   it("toggles Formula-edit placement between Popup and Inline", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     expect(screen.getByRole("group", { name: "Formula-edit placement" })).toBeTruthy();
@@ -99,7 +138,7 @@ describe("playground chrome UI", () => {
   it("renames the workbook and shrinking the calendar leaves orphan December cells", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Workbook" }));
+      fireEvent.click(screen.getByRole("button", { name: "Playground 2025" }));
     });
     const name = screen.getByDisplayValue("Playground 2025") as HTMLInputElement;
     await act(async () => {

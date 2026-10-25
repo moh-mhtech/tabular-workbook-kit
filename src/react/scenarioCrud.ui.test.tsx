@@ -17,7 +17,10 @@ describe("scenario CRUD", () => {
   it("adds, renames, duplicates, and deletes from the scenario bar", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+      fireEvent.click(screen.getByRole("button", { name: "Scenario options" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Add" }));
     });
     const added = session.getSnapshot().scenarios.find((scenario) => scenario.name === "Scenario")!;
     expect(added.overlays).toEqual({});
@@ -26,14 +29,20 @@ describe("scenario CRUD", () => {
     });
     vi.spyOn(window, "prompt").mockReturnValue("Fast");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+      fireEvent.click(screen.getByRole("button", { name: "Scenario options" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
     });
     expect(session.getSnapshot().scenarios.some((scenario) => scenario.name === "Fast")).toBe(true);
     await act(async () => {
       session.setInput("Params", "Vat", "Value", 0.4);
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Duplicate" }));
+      fireEvent.click(screen.getByRole("button", { name: "Scenario options" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
     });
     const copy = session.getSnapshot().scenarios.find((scenario) => scenario.name === "Fast2")!;
     expect(copy.overlays).toEqual({ [overlayKey("tbl-params", "row-vat", "Value")]: 0.4 });
@@ -45,7 +54,10 @@ describe("scenario CRUD", () => {
       session.activateScenario(copy.id);
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+      fireEvent.click(screen.getByRole("button", { name: "Scenario options" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
     });
     expect(session.getSnapshot().activeScenarioId).toBeNull();
     expect(session.getSnapshot().scenarios.some((scenario) => scenario.id === copy.id)).toBe(false);
@@ -53,7 +65,10 @@ describe("scenario CRUD", () => {
 
   it("rejects a rename collision and does not delete Base", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
-    expect((screen.getByRole("button", { name: "Delete" }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Scenario options" }));
+    });
+    expect((screen.getByRole("menuitem", { name: "Delete" }) as HTMLButtonElement).disabled).toBe(true);
     await act(async () => {
       session.activateScenario("scn-vaekst");
     });

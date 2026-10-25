@@ -52,13 +52,7 @@ function tryCall(fn: () => void) {
   }
 }
 
-export function PropertiesPanel({
-  hostInspectors,
-  workbookLabel = "Workbook",
-}: {
-  hostInspectors?: HostInspectors;
-  workbookLabel?: string;
-}) {
+export function PropertiesPanel({ hostInspectors }: { hostInspectors?: HostInspectors }) {
   const { session } = useWorkbook();
   const snapshot = useSnapshot();
   const selection = session.selection;
@@ -76,7 +70,7 @@ export function PropertiesPanel({
       {selection?.kind === "growth" && !session.formulaEdit ? <GrowthValueField /> : null}
       {!selection || selection.kind === "workbook" ? (
         <>
-          <WorkbookInspector label={workbookLabel} />
+          <WorkbookInspector />
           {hostInspectors?.workbook?.()}
         </>
       ) : null}

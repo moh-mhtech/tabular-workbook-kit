@@ -3,9 +3,9 @@ export {
   Explorer,
   FormulaBar,
   FormulaEditPlacementSwitch,
-  ScenarioBar,
   TimeGrainSwitch,
 } from "./components.js";
+export { ScenarioBar } from "./ScenarioBar.js";
 export type { FormulaEditPlacement } from "./WorkbookProvider.js";
 export { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 export { PropertiesPanel } from "./PropertiesPanel.js";

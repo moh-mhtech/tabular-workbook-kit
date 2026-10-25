@@ -1,21 +1,33 @@
+:root {
+  --wk-bg: #f3f5f8;
+  --wk-surface: #ffffff;
+  --wk-surface-muted: #f7f8fb;
+  --wk-line: #e3e7ee;
+  --wk-text: #1c2430;
+  --wk-text-muted: #667085;
+  --wk-accent: #2a6f97;
+  --wk-accent-soft: #e8f1f7;
+  --wk-radius: 8px;
+  --wk-control-h: 30px;
+}
+
 .wk-explorer {
   font: 13px/1.4 "Segoe UI", sans-serif;
-  color: #1e3a5f;
-  padding: 12px 8px;
-  border-right: 1px solid #d7dee8;
+  color: var(--wk-text);
+  padding: 16px 12px 20px;
+  border-right: 1px solid var(--wk-line);
   min-width: 0;
   overflow: auto;
-  background: #f4f7fa;
+  background: var(--wk-surface-muted);
 }
 
 .wk-explorer-group {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .wk-explorer-group-btn,
 .wk-explorer-table,
-.wk-grain button,
-.wk-scenario-bar select {
+.wk-grain button {
   font: inherit;
   color: inherit;
   background: transparent;
@@ -24,49 +36,87 @@
   text-align: left;
 }
 
+.wk-explorer > .wk-explorer-group-btn.wk-explorer-workbook {
+  margin: 0 4px 14px;
+  padding: 0 8px;
+  font: 650 13px/1.3 "Segoe UI", sans-serif;
+  color: var(--wk-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+}
+
+.wk-explorer-folder-icon {
+  flex: 0 0 auto;
+  color: var(--wk-accent);
+}
+
+.wk-explorer-group-btn.wk-explorer-new-sheet {
+  color: var(--wk-accent);
+  font-weight: 700;
+}
+
+.wk-explorer-group-btn.wk-explorer-new-sheet .wk-explorer-new-glyph {
+  font-weight: 700;
+}
+
+.wk-explorer-group-btn.wk-explorer-new-sheet:hover {
+  color: var(--wk-accent);
+  background: var(--wk-accent-soft);
+}
+
 .wk-explorer-group-btn {
   font-weight: 650;
   width: 100%;
-  padding: 4px 8px;
+  padding: 6px 8px;
+  border-radius: 7px;
 }
 
 .wk-explorer-group-btn.is-active,
 .wk-grain button.is-active {
-  background: #1e3a5f;
-  color: #fff;
+  background: var(--wk-accent-soft);
+  color: var(--wk-accent);
 }
 
 .wk-explorer-table {
   width: 100%;
-  padding: 3px 16px;
-  color: #3d4f66;
+  padding: 5px 10px 5px 16px;
+  color: var(--wk-text-muted);
+  border-radius: 7px;
+}
+
+.wk-explorer-table:hover,
+.wk-explorer-group-btn:hover {
+  background: #eef2f6;
+  color: var(--wk-text);
 }
 
 .wk-explorer-tables {
   list-style: none;
-  margin: 0;
+  margin: 4px 0 0;
   padding: 0;
 }
 
-/* "New table" / "New sheet" are actions, never selectable objects: dashed and muted. */
+/* "New table" / "New sheet" are actions, never selectable objects. */
 .wk-explorer-new {
   box-sizing: border-box;
   font-weight: 400;
-  color: #7a8a99;
-  border: 1px dashed #c5d0dc;
+  color: #8b97a5;
+  border: 0;
 }
 
 .wk-explorer-table.wk-explorer-new {
-  padding: 2px 15px;
+  padding: 5px 10px 5px 16px;
 }
 
 .wk-explorer-group-btn.wk-explorer-new {
-  padding: 3px 7px;
+  padding: 6px 8px;
 }
 
 .wk-explorer-new:hover {
-  color: #1e3a5f;
-  border-color: #1e3a5f;
+  color: var(--wk-accent);
+  background: var(--wk-accent-soft);
 }
 
 .wk-explorer-new-glyph {
@@ -155,9 +205,9 @@
 .wk-grain {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font: 13px/1.4 "Segoe UI", sans-serif;
-  color: #1e3a5f;
+  color: var(--wk-text);
 }
 
 .wk-formula-bar {
@@ -432,18 +482,112 @@
 }
 
 .wk-scenario-bar {
+  padding: 0 4px 0 16px;
+}
+
+.wk-scenario-combo {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.wk-scenario-combo select,
+.wk-scenario-menu-btn {
+  box-sizing: border-box;
+  height: var(--wk-control-h);
+  margin: 0;
+  border: 1px solid var(--wk-line);
+  background: var(--wk-surface);
+  color: var(--wk-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.wk-scenario-combo select {
+  min-width: 7.5rem;
+  padding: 0 28px 0 10px;
+  border-radius: 7px 0 0 7px;
+  border-right: 0;
+}
+
+.wk-scenario-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+  border-radius: 0 7px 7px 0;
+}
+
+.wk-scenario-menu-btn:hover,
+.wk-scenario-combo select:hover {
+  border-color: #c5d0dc;
+  background: var(--wk-surface-muted);
+}
+
+.wk-scenario-menu-dots {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.wk-scenario-menu-dots span {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--wk-text-muted);
+}
+
+.wk-scenario-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 9rem;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  border: 1px solid var(--wk-line);
+  border-radius: 8px;
+  background: var(--wk-surface);
+  box-shadow: 0 8px 24px rgba(28, 36, 48, 0.12);
+}
+
+.wk-scenario-menu button {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--wk-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wk-scenario-menu button:hover:not(:disabled) {
+  background: var(--wk-surface-muted);
+}
+
+.wk-scenario-menu button:disabled {
+  color: #98a2b3;
+  cursor: default;
 }
 
 .wk-label {
   font-weight: 650;
+  color: var(--wk-text-muted);
 }
 
 .wk-canvas {
-  padding: 16px 20px;
+  padding: 20px 24px;
   overflow: auto;
   height: 100%;
   box-sizing: border-box;
+  background: var(--wk-bg);
 }
 
 .wk-canvas-title {
@@ -555,9 +699,24 @@
   padding: 0;
 }
 
+.wk-grain {
+  padding: 3px;
+  border: 1px solid var(--wk-line);
+  border-radius: 9px;
+  background: #eef1f5;
+  gap: 2px;
+}
+
 .wk-grain button {
-  border: 1px solid #c5d0dc;
-  padding: 4px 8px;
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--wk-text-muted);
+}
+
+.wk-grain button:hover {
+  color: var(--wk-text);
 }
 
 .wk-shell {
@@ -617,9 +776,12 @@
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 16px;
-  border-bottom: 1px solid #d7dee8;
-  background: #fff;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 8px 8px 0;
+  border-bottom: 1px solid var(--wk-line);
+  background: var(--wk-surface);
+  box-shadow: 0 1px 0 rgba(28, 36, 48, 0.02);
 }
 
 .wk-kpi {
@@ -629,12 +791,12 @@
 .wk-properties {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 12px 16px;
-  border-left: 1px solid #d7dee8;
-  background: #f8fafc;
+  gap: 16px;
+  padding: 16px 18px;
+  border-left: 1px solid var(--wk-line);
+  background: var(--wk-surface-muted);
   font: 13px/1.45 "Segoe UI", sans-serif;
-  color: #1e3a5f;
+  color: var(--wk-text);
   overflow: auto;
 }
 
@@ -873,12 +1035,12 @@
 
 .wk-table-viewport-title {
   display: block;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   padding: 0;
   border: 0;
   background: transparent;
-  color: #1e3a5f;
-  font: 650 14px/1.3 "Segoe UI", sans-serif;
+  color: var(--wk-text);
+  font: 650 15px/1.3 "Segoe UI", sans-serif;
   cursor: pointer;
 }
 
@@ -946,7 +1108,8 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: 12px;
+  padding: 20px 24px;
+  background: var(--wk-bg);
 }
 
 .wk-custom-grid {
@@ -1089,7 +1252,7 @@
 .wk-shell-top-end {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-left: auto;
   padding: 0 12px 0 8px;
 }

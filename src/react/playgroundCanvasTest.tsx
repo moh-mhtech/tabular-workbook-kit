@@ -61,6 +61,7 @@ export async function renderPlaygroundCanvas(
     extra?: ReactNode;
     chrome?: boolean;
     formulaEditPlacement?: FormulaEditPlacement;
+    explorerWorkbookFolderIcon?: boolean;
   } = {},
 ) {
   const session = new WorkbookSession(
@@ -74,7 +75,7 @@ export async function renderPlaygroundCanvas(
         <div className="wk-shell">
           {options.chrome ? (
             <>
-              <Explorer />
+              <Explorer workbookFolderIcon={options.explorerWorkbookFolderIcon} />
               <ScenarioBar />
               <TimeGrainSwitch />
               <FormulaEditPlacementSwitch />

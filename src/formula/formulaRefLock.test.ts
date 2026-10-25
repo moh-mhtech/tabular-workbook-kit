@@ -17,7 +17,7 @@ describe("F4 Formula-ref lock", () => {
   });
 
   it("keeps a Qualified Formula ref prefix", () => {
-    expect(cycleFormulaRefLock("Salg[@][Outsource]", febOut)).toBe("Salg[$Jan][$Outsource]");
+    expect(cycleFormulaRefLock("Sales[@][Outsource]", febOut)).toBe("Sales[$Jan][$Outsource]");
   });
 
   it("leaves a Defined name unchanged", () => {

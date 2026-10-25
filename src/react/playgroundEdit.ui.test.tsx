@@ -56,7 +56,7 @@ describe("playground edit UI", () => {
     await act(async () => {
       session.setSelection({
         kind: "cell",
-        tableId: "tbl-salg",
+        tableId: "tbl-sales",
         rowId: "row-cnc",
         columnId: "2025-01",
       });
@@ -67,7 +67,7 @@ describe("playground edit UI", () => {
     });
     expect(session.selection).toMatchObject({
       kind: "cell",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       columnId: "2025-02",
     });
     await act(async () => {
@@ -75,7 +75,7 @@ describe("playground edit UI", () => {
     });
     expect(session.selection).toMatchObject({
       kind: "cell",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       columnId: "2025-01",
     });
   });
@@ -103,28 +103,28 @@ describe("playground edit UI", () => {
 
   it("evaluates a Formula of a Blank Defined name as Blank", async () => {
     const { session } = await renderPlaygroundCanvas({
-      extra: <GridCellProbe tableId="tbl-params" rowId="row-andel-cnc" columnId="Value" />,
+      extra: <GridCellProbe tableId="tbl-params" rowId="row-cnc-share" columnId="Value" />,
     });
     await act(async () => {
       const added = session.addRow("Params");
       session.renameRow("Params", added.id, "hello");
-      session.setFormula("Params", "AndelCNC", "Value", "=hello");
+      session.setFormula("Params", "CncShare", "Value", "=hello");
       await session.recalculate();
     });
     expect(session.getCell("Params", "hello", "Value").computed).toBe(null);
-    expect(session.getCell("Params", "AndelCNC", "Value").computed).toBe(null);
-    expect(session.getCell("Params", "AndelCNC", "Value").error).toBeUndefined();
+    expect(session.getCell("Params", "CncShare", "Value").computed).toBe(null);
+    expect(session.getCell("Params", "CncShare", "Value").error).toBeUndefined();
     expect(JSON.parse(screen.getByTestId("grid-cell").textContent ?? "{}").displayData).toBe("");
   });
 
-  it("recalculates Salg when Params Vækst changes", async () => {
+  it("recalculates Sales when Params Growth changes", async () => {
     const { session } = await renderPlaygroundCanvas();
-    const before = session.getCell("Salg", "Total", "2025-12").computed as number;
+    const before = session.getCell("Sales", "Total", "2025-12").computed as number;
     await act(async () => {
       session.setSelection({
         kind: "cell",
         tableId: "tbl-params",
-        rowId: "row-vaekst",
+        rowId: "row-growth",
         columnId: "Value",
       });
     });
@@ -136,7 +136,7 @@ describe("playground edit UI", () => {
     await act(async () => {
       await session.recalculate();
     });
-    expect(session.getCell("Salg", "Total", "2025-12").computed as number).toBeGreaterThan(before);
+    expect(session.getCell("Sales", "Total", "2025-12").computed as number).toBeGreaterThan(before);
   });
 
   it("adds a row when typing on the Params growth row", async () => {
@@ -152,7 +152,7 @@ describe("playground edit UI", () => {
     );
   });
 
-  it("adds a column when typing on a growable table growth column, but not on Salg or Params", async () => {
+  it("adds a column when typing on a growable table growth column, but not on Sales or Params", async () => {
     const { session } = await renderPlaygroundCanvas();
     const notesId = session.addTable("sheet-forud", { name: "Notes" }).id;
     await act(async () => {
@@ -166,12 +166,12 @@ describe("playground edit UI", () => {
     expect(session.getSnapshot().tables.find((table) => table.id === notesId)!.attributeColumns.length).toBeGreaterThan(1);
 
     layout = layoutWorkbook(session.getSnapshot());
-    const salg = projectTable(layout, "tbl-salg")!;
-    const salgCols = session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.attributeColumns.length;
+    const salg = projectTable(layout, "tbl-sales")!;
+    const salgCols = session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.attributeColumns.length;
     await act(async () => {
       applyCustomGridEdits(session, salg, layout, [{ location: [salg.colCount - 1, 1], value: { data: "9" } }]);
     });
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.attributeColumns.length).toBe(salgCols);
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.attributeColumns.length).toBe(salgCols);
 
     const params = projectTable(layout, "tbl-params")!;
     expect(params.growthColumn).toBe(false);
@@ -263,7 +263,7 @@ describe("playground edit UI", () => {
         columnId: "Value",
         range: [
           { tableId: "tbl-params", rowId: "row-vat", columnId: "Value" },
-          { tableId: "tbl-params", rowId: "row-andel-cnc", columnId: "Value" },
+          { tableId: "tbl-params", rowId: "row-cnc-share", columnId: "Value" },
         ],
       });
     });

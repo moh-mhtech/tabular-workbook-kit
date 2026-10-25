@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { projectTable } from "../grid/sheetProjection.js";
 import { evaluatedCells, gridCell } from "./CustomSheetCanvas.js";
 import { COLOR_PALETTE } from "./inspectors/StyleField.js";
@@ -74,11 +74,11 @@ describe("properties inspector UI", () => {
       session.setSelection({
         kind: "cell",
         tableId: "tbl-params",
-        rowId: "row-andel-out",
+        rowId: "row-outsource-share",
         columnId: "Value",
         range: [
-          { tableId: "tbl-params", rowId: "row-andel-out", columnId: "Value" },
-          { tableId: "tbl-params", rowId: "row-andel-plade", columnId: "Value" },
+          { tableId: "tbl-params", rowId: "row-outsource-share", columnId: "Value" },
+          { tableId: "tbl-params", rowId: "row-bend-share", columnId: "Value" },
         ],
       });
     });
@@ -88,7 +88,7 @@ describe("properties inspector UI", () => {
 
   it("keeps format and style in sync when the selected cell changes", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
-    await selectParamsCell(session, "row-andel-out");
+    await selectParamsCell(session, "row-outsource-share");
     await act(async () => {
       fireEvent.change(screen.getByLabelText("Format"), { target: { value: "G3A" } });
       fireEvent.blur(screen.getByLabelText("Format"));
@@ -96,20 +96,20 @@ describe("properties inspector UI", () => {
     });
     expect((screen.getByLabelText("Format") as HTMLInputElement).value).toBe("G3A");
     expect(screen.getByLabelText("Bold").getAttribute("aria-pressed")).toBe("true");
-    await selectParamsCell(session, "row-andel-plade");
+    await selectParamsCell(session, "row-bend-share");
     expect((screen.getByLabelText("Format") as HTMLInputElement).value).toBe("");
     expect(screen.getByLabelText("Bold").getAttribute("aria-pressed")).toBe("false");
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("AndelPladebuk");
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("BendShare");
   });
 
   it("updates name and value after keyboard navigation", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await selectProjectedCell(session, "tbl-params", 1, 5);
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("AndelOutsource");
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("OutsourceShare");
     expect((screen.getByLabelText("Value") as HTMLTextAreaElement).value).toBe("0.12");
     await pressTableKey("tbl-params", "ArrowDown");
-    expect(session.selection).toMatchObject({ rowId: "row-andel-plade", columnId: "Value" });
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("AndelPladebuk");
+    expect(session.selection).toMatchObject({ rowId: "row-bend-share", columnId: "Value" });
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("BendShare");
     expect((screen.getByLabelText("Value") as HTMLTextAreaElement).value).toBe("0.08");
   });
 
@@ -223,10 +223,10 @@ describe("properties inspector UI", () => {
   });
 
   it("shows a red Error token and names the failing Formula ref", async () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     snapshot.tables
       .find((table) => table.id === "tbl-params")!
-      .rows.find((row) => row.id === "row-andel-cnc")!.cells.Value = {
+      .rows.find((row) => row.id === "row-cnc-share")!.cells.Value = {
       kind: "formula",
       formula: "=MissingName",
     };
@@ -235,8 +235,8 @@ describe("properties inspector UI", () => {
       snapshot,
       extra: <GridCellProbe col={1} row={4} />,
     });
-    await selectParamsCell(session, "row-andel-cnc");
-    expect(session.getCell("Params", "AndelCNC", "Value").computed).toBe("#NAME?");
+    await selectParamsCell(session, "row-cnc-share");
+    expect(session.getCell("Params", "CncShare", "Value").computed).toBe("#NAME?");
     const painted = JSON.parse(screen.getByTestId("grid-cell").textContent ?? "{}") as {
       displayData: string;
       data: string;

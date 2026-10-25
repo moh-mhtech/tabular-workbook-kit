@@ -3,14 +3,14 @@ import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import type { FormulaEngine } from "../engine/types.js";
 import { layoutSheets } from "../model/sheetView.js";
 import type { CellSnapshot, TableSnapshot } from "../model/types.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "./WorkbookSession.js";
 
 /** These cases are about grid geometry, so they skip the calculation round trip. */
 const inert: FormulaEngine = { evaluate: () => ({}) };
 
 function playground() {
-  return new WorkbookSession(createPlaygroundWorkbook(), inert);
+  return new WorkbookSession(createSampleWorkbook(), inert);
 }
 
 /** A sheet holding one plain table: header at row 0, one row, key plus Value. */
@@ -105,22 +105,22 @@ describe("table auto-expansion", () => {
 describe("auto-expansion against table invariants", () => {
   it("grows a time-axis table downwards but never rightwards", () => {
     const session = playground();
-    const sheetId = sheetIdOf(session, "Forudsætninger");
+    const sheetId = sheetIdOf(session, "Assumptions");
 
-    // Salg is 4 rows plus a header, and 1 key column plus 12 periods.
+    // Sales is 4 rows plus a header, and 1 key column plus 12 periods.
     session.writeGridCell(sheetId, 1, 13, "x");
-    expect(table(session, "Salg").attributeColumns).toHaveLength(0);
+    expect(table(session, "Sales").attributeColumns).toHaveLength(0);
     expect(looseCells(session, sheetId)["1:13"]).toEqual({ kind: "input", value: "x" });
 
     session.writeGridCell(sheetId, 5, 1, "999");
-    const salg = table(session, "Salg");
+    const salg = table(session, "Sales");
     expect(salg.rows).toHaveLength(5);
     expect(salg.rows[4].cells["2025-01"]).toEqual({ kind: "input", value: 999 });
   });
 
   it("keeps a promoteRowKeys table at one data column and allocates a promotable key", () => {
     const session = playground();
-    const sheetId = sheetIdOf(session, "Parametre");
+    const sheetId = sheetIdOf(session, "Parameters");
 
     // Params is 7 rows plus a header, and 1 key column plus Value.
     session.writeGridCell(sheetId, 1, 2, "7");
@@ -136,7 +136,7 @@ describe("auto-expansion against table invariants", () => {
 
   it("rolls the whole expansion back when the new row key is not a legal name", () => {
     const session = playground();
-    const sheetId = sheetIdOf(session, "Parametre");
+    const sheetId = sheetIdOf(session, "Parameters");
 
     expect(() => session.writeGridCell(sheetId, 8, 0, "SUM")).toThrow(/reserved/);
     expect(table(session, "Params").rows).toHaveLength(7);
@@ -145,10 +145,10 @@ describe("auto-expansion against table invariants", () => {
 
   it("still expands a locked table, since locked only blocks deletion", () => {
     const session = playground();
-    const sheetId = sheetIdOf(session, "Parametre");
-    session.writeGridCell(sheetId, 8, 0, "Moms");
+    const sheetId = sheetIdOf(session, "Parameters");
+    session.writeGridCell(sheetId, 8, 0, "Levy");
 
-    expect(table(session, "Params").rows.map((r) => r.key)).toContain("Moms");
+    expect(table(session, "Params").rows.map((r) => r.key)).toContain("Levy");
   });
 });
 

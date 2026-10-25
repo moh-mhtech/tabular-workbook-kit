@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPlaygroundWorkbook } from "../../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../../session/WorkbookSession.js";
 import { createPglitePersistence } from "./index.js";
 
@@ -8,7 +8,7 @@ describe("PglitePersistence", () => {
     const persist = await createPglitePersistence("playground");
     expect(await persist.load()).toBeNull();
 
-    await persist.save(createPlaygroundWorkbook());
+    await persist.save(createSampleWorkbook());
     const loaded = await persist.load();
     expect(loaded).not.toBeNull();
     const session = new WorkbookSession(loaded!);
@@ -28,9 +28,9 @@ describe("PglitePersistence", () => {
 
   it("keeps the latest Stored Input when two saves overlap", async () => {
     const persist = await createPglitePersistence("playground-overlap");
-    const first = createPlaygroundWorkbook();
-    const session = new WorkbookSession(createPlaygroundWorkbook());
-    session.setInput("Params", "Vækst", "Value", "test");
+    const first = createSampleWorkbook();
+    const session = new WorkbookSession(createSampleWorkbook());
+    session.setInput("Params", "Growth", "Value", "test");
     const second = session.toSnapshot();
 
     await Promise.all([persist.save(first), persist.save(second)]);
@@ -39,24 +39,24 @@ describe("PglitePersistence", () => {
     expect(loaded).not.toBeNull();
     const restored = new WorkbookSession(loaded!);
     await restored.recalculate();
-    expect(restored.getCell("Params", "Vækst", "Value").input).toBe("test");
+    expect(restored.getCell("Params", "Growth", "Value").input).toBe("test");
   });
 
   it("round-trips a snapshot including scenario overlays", async () => {
     const persist = await createPglitePersistence("playground");
-    const session = new WorkbookSession(createPlaygroundWorkbook());
+    const session = new WorkbookSession(createSampleWorkbook());
     await session.recalculate();
-    session.activateScenario("scn-vaekst");
-    session.setInput("Params", "Vækst", "Value", 0.04);
+    session.activateScenario("scn-growth");
+    session.setInput("Params", "Growth", "Value", 0.04);
     await persist.save(session.toSnapshot());
     const loaded = await persist.load();
     expect(loaded).not.toBeNull();
     const restored = new WorkbookSession(loaded!);
     await restored.recalculate();
-    expect(restored.activeScenarioId).toBe("scn-vaekst");
-    expect(restored.getCell("Params", "Årssalg", "Value").computed).toBe(10_000_000);
-    expect(restored.getCell("Params", "Vækst", "Value").computed).toBe(0.04);
-    expect(restored.getCell("Params", "Vækst", "Value").overlay).toBe(true);
+    expect(restored.activeScenarioId).toBe("scn-growth");
+    expect(restored.getCell("Params", "AnnualSales", "Value").computed).toBe(10_000_000);
+    expect(restored.getCell("Params", "Growth", "Value").computed).toBe(0.04);
+    expect(restored.getCell("Params", "Growth", "Value").overlay).toBe(true);
   });
 });
 

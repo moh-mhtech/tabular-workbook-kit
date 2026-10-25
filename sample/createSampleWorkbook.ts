@@ -1,4 +1,4 @@
-import { overlayKey, type WorkbookSnapshot } from "../model/types.js";
+import { overlayKey, type WorkbookSnapshot } from "../src/model/types.js";
 
 function input(value: number | string | boolean | null) {
   return { kind: "input" as const, value };
@@ -9,7 +9,7 @@ function formula(text: string) {
 }
 
 function months(build: (periodId: string, label: string) => ReturnType<typeof formula> | ReturnType<typeof input>) {
-  const labels = ["Jan", "Feb", "Mar", "Apr", "Maj", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
+  const labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const cells: Record<string, ReturnType<typeof formula> | ReturnType<typeof input>> = {};
   labels.forEach((label, i) => {
     const id = `2025-${String(i + 1).padStart(2, "0")}`;
@@ -18,20 +18,20 @@ function months(build: (periodId: string, label: string) => ReturnType<typeof fo
   return cells;
 }
 
-export function createPlaygroundWorkbook(): WorkbookSnapshot {
+export function createSampleWorkbook(): WorkbookSnapshot {
   const paramsId = "tbl-params";
-  const aarsalgRow = "row-aarsalg";
-  const vaekstRow = "row-vaekst";
+  const annualRow = "row-annual";
+  const growthRow = "row-growth";
 
   return {
-    id: "wb-playground",
-    name: "Playground 2025",
+    id: "wb-sample",
+    name: "Sample 2025",
     calendar: { startMonth: "2025-01", monthCount: 12 },
     sheets: [
-      { id: "sheet-params", name: "Parametre", tableIds: ["tbl-params"], locked: true },
-      { id: "sheet-forud", name: "Forudsætninger", tableIds: ["tbl-salg"] },
-      { id: "sheet-kap", name: "Kapacitet", tableIds: ["tbl-staff"] },
-      { id: "sheet-res", name: "Resultat", tableIds: ["tbl-resultat"] },
+      { id: "sheet-params", name: "Parameters", tableIds: ["tbl-params"], locked: true },
+      { id: "sheet-forud", name: "Assumptions", tableIds: ["tbl-sales"] },
+      { id: "sheet-kap", name: "Capacity", tableIds: ["tbl-staff"] },
+      { id: "sheet-res", name: "Result", tableIds: ["tbl-result"] },
     ],
     tables: [
       {
@@ -42,26 +42,26 @@ export function createPlaygroundWorkbook(): WorkbookSnapshot {
         yearColumns: [],
         attributeColumns: [{ id: "Value", name: "Value" }],
         rows: [
-          { id: aarsalgRow, key: "Årssalg", cells: { Value: input(8_000_000) } },
-          { id: vaekstRow, key: "Vækst", cells: { Value: input(0.03) } },
+          { id: annualRow, key: "AnnualSales", cells: { Value: input(8_000_000) } },
+          { id: growthRow, key: "Growth", cells: { Value: input(0.03) } },
           { id: "row-vat", key: "Vat", cells: { Value: input(0.25) } },
-          { id: "row-andel-cnc", key: "AndelCNC", cells: { Value: input(0.8) } },
-          { id: "row-andel-out", key: "AndelOutsource", cells: { Value: input(0.12) } },
-          { id: "row-andel-plade", key: "AndelPladebuk", cells: { Value: input(0.08) } },
+          { id: "row-cnc-share", key: "CncShare", cells: { Value: input(0.8) } },
+          { id: "row-outsource-share", key: "OutsourceShare", cells: { Value: input(0.12) } },
+          { id: "row-bend-share", key: "BendShare", cells: { Value: input(0.08) } },
           {
             id: "row-start",
             key: "Start",
             cells: {
               Value: formula(
-                "=IF(Params[Vækst]=0,Params[Årssalg]/12,Params[Årssalg]*Params[Vækst]/((1+Params[Vækst])^12-1))",
+                "=IF(Params[Growth]=0,Params[AnnualSales]/12,Params[AnnualSales]*Params[Growth]/((1+Params[Growth])^12-1))",
               ),
             },
           },
         ],
       },
       {
-        id: "tbl-salg",
-        name: "Salg",
+        id: "tbl-sales",
+        name: "Sales",
         yearColumns: [{ id: "yc-2025", year: 2025, grain: "month" }],
         attributeColumns: [],
         rows: [
@@ -70,8 +70,8 @@ export function createPlaygroundWorkbook(): WorkbookSnapshot {
             key: "CNC",
             cells: months((_id, label) =>
               label === "Jan"
-                ? formula("=Params[Start]*Params[AndelCNC]")
-                : formula("=[@-1][@]*(1+Params[Vækst])"),
+                ? formula("=Params[Start]*Params[CncShare]")
+                : formula("=[@-1][@]*(1+Params[Growth])"),
             ),
           },
           {
@@ -79,23 +79,23 @@ export function createPlaygroundWorkbook(): WorkbookSnapshot {
             key: "Outsource",
             cells: months((_id, label) =>
               label === "Jan"
-                ? formula("=Params[Start]*Params[AndelOutsource]")
-                : formula("=[@-1][@]*(1+Params[Vækst])"),
+                ? formula("=Params[Start]*Params[OutsourceShare]")
+                : formula("=[@-1][@]*(1+Params[Growth])"),
             ),
           },
           {
-            id: "row-plade",
-            key: "Pladebuk",
+            id: "row-bending",
+            key: "Bending",
             cells: months((_id, label) =>
               label === "Jan"
-                ? formula("=Params[Start]*Params[AndelPladebuk]")
-                : formula("=[@-1][@]*(1+Params[Vækst])"),
+                ? formula("=Params[Start]*Params[BendShare]")
+                : formula("=[@-1][@]*(1+Params[Growth])"),
             ),
           },
           {
             id: "row-salg-total",
             key: "Total",
-            cells: months(() => formula("=Salg[@][CNC]+Salg[@][Outsource]+Salg[@][Pladebuk]")),
+            cells: months(() => formula("=Sales[@][CNC]+Sales[@][Outsource]+Sales[@][Bending]")),
           },
         ],
       },
@@ -124,42 +124,42 @@ export function createPlaygroundWorkbook(): WorkbookSnapshot {
               Role: input("Capacity"),
               BaseSalary: input(null),
               ...months(() =>
-                formula("=IFS(Salg[@][Total]>700000,2,Salg[@][Total]>400000,1,TRUE,1)"),
+                formula("=IFS(Sales[@][Total]>700000,2,Sales[@][Total]>400000,1,TRUE,1)"),
               ),
             },
           },
         ],
       },
       {
-        id: "tbl-resultat",
-        name: "Resultat",
+        id: "tbl-result",
+        name: "Result",
         yearColumns: [{ id: "yc-2025", year: 2025, grain: "month" }],
         attributeColumns: [],
         rows: [
           {
-            id: "row-oms",
-            key: "Omsætning",
-            cells: months(() => formula("=Salg[@][Total]")),
+            id: "row-revenue",
+            key: "Revenue",
+            cells: months(() => formula("=Sales[@][Total]")),
           },
           {
-            id: "row-lon",
-            key: "Løn",
+            id: "row-wages",
+            key: "Wages",
             cells: months(() => formula("=Staff[@][Karol]*Staff[@][RequiredFTE]")),
           },
           {
-            id: "row-res",
-            key: "Resultat",
-            cells: months(() => formula("=Resultat[@][Omsætning]-Resultat[@][Løn]")),
+            id: "row-result",
+            key: "Result",
+            cells: months(() => formula("=Result[@][Revenue]-Result[@][Wages]")),
           },
         ],
       },
     ],
     scenarios: [
       {
-        id: "scn-vaekst",
-        name: "Vækst",
+        id: "scn-growth",
+        name: "Growth",
         overlays: {
-          [overlayKey(paramsId, aarsalgRow, "Value")]: 10_000_000,
+          [overlayKey(paramsId, annualRow, "Value")]: 10_000_000,
         },
       },
     ],

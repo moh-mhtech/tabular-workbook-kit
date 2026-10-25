@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import type { WorkbookSnapshot } from "../model/types.js";
 import { projectTable } from "../grid/sheetProjection.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import {
   adjacentTableArrowTarget,
@@ -255,26 +255,26 @@ describe("table arrow navigation", () => {
     expect(session.gridFocus).toEqual({ tableId: "tbl-narrow", col: 1, row: 0 });
   });
 
-  it("lands on Salg's locked time-axis Growth column as a Growth-cell", () => {
-    const snapshot = createPlaygroundWorkbook();
+  it("lands on Sales's locked time-axis Growth column as a Growth-cell", () => {
+    const snapshot = createSampleWorkbook();
     const session = new WorkbookSession(snapshot, inert);
     const layout = layoutWorkbook(snapshot);
-    const salg = projectTable(layout, "tbl-salg")!;
+    const salg = projectTable(layout, "tbl-sales")!;
     const lastPeriodCol = salg.colCount - 2;
     const growthCol = salg.colCount - 1;
     session.setSelection({
       kind: "cell",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       rowId: "row-cnc",
       columnId: "2025-12",
     });
-    expect(focusAdjacentTable(session, [salg], { tableId: "tbl-salg", col: lastPeriodCol, row: 1 }, "right", layout)).toEqual({
-      tableId: "tbl-salg",
+    expect(focusAdjacentTable(session, [salg], { tableId: "tbl-sales", col: lastPeriodCol, row: 1 }, "right", layout)).toEqual({
+      tableId: "tbl-sales",
       col: growthCol,
       row: 1,
     });
-    expect(session.selection).toEqual({ kind: "growth", tableId: "tbl-salg", col: growthCol, row: 1 });
-    expect(session.gridFocus).toEqual({ tableId: "tbl-salg", col: growthCol, row: 1 });
+    expect(session.selection).toEqual({ kind: "growth", tableId: "tbl-sales", col: growthCol, row: 1 });
+    expect(session.gridFocus).toEqual({ tableId: "tbl-sales", col: growthCol, row: 1 });
   });
 });
 

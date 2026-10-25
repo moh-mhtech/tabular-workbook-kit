@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { projectSheet, projectTable } from "../grid/sheetProjection.js";
 import {
@@ -18,7 +18,7 @@ const inert = { evaluate: () => ({}) };
 
 describe("custom grid interactions", () => {
   it("selects the next row or column after a cell commit", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     session.setSelection({
       kind: "cell",
       tableId: "tbl-params",
@@ -29,27 +29,27 @@ describe("custom grid interactions", () => {
     expect(session.selection).toEqual({
       kind: "cell",
       tableId: "tbl-params",
-      rowId: "row-andel-cnc",
+      rowId: "row-cnc-share",
       columnId: "Value",
     });
 
     session.setSelection({
       kind: "cell",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       rowId: "row-cnc",
       columnId: "2025-01",
     });
     expect(moveSelectionAfterCommit(session, session.getSnapshot(), [1, 0])).toBe(true);
     expect(session.selection).toEqual({
       kind: "cell",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       rowId: "row-cnc",
       columnId: "2025-02",
     });
   });
 
   it("moves from the last row onto the unused growth cell", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     session.setSelection({
       kind: "cell",
       tableId: "tbl-params",
@@ -62,7 +62,7 @@ describe("custom grid interactions", () => {
   });
 
   it("moves from the last column onto the unused growth cell when the table can grow", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     const notes = session.addTable("sheet-forud", { name: "Notes" });
     const columnId = notes.attributeColumns[0]!.id;
     const rowId = notes.rows[0]!.id;
@@ -73,7 +73,7 @@ describe("custom grid interactions", () => {
   });
 
   it("moves from a just-filled growth cell onto the new unused cell", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
     expect(applyCustomGridEdits(session, projection, layout, [{ location: [1, 8], value: { data: "9" } }])).toBe(1);
@@ -101,7 +101,7 @@ describe("custom grid interactions", () => {
   });
 
   it("propagates a single typed value across the selected range", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
     const edits = expandEditAcrossRange(
@@ -119,7 +119,7 @@ describe("custom grid interactions", () => {
   });
 
   it("does not expand a pasted multi-cell edit across the selection", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const projection = projectTable(layout, "tbl-params")!;
     const edits = expandEditAcrossRange(
       projection,
@@ -137,7 +137,7 @@ describe("custom grid interactions", () => {
   });
 
   it("commits a pasted range as one undo step", () => {
-    const before = createPlaygroundWorkbook();
+    const before = createSampleWorkbook();
     const session = new WorkbookSession(before, inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectSheet(layout, "sheet-params")!;
@@ -155,7 +155,7 @@ describe("custom grid interactions", () => {
   });
 
   it("ignores edits outside a table growth margin", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectSheet(layout, "sheet-params")!;
 
@@ -167,7 +167,7 @@ describe("custom grid interactions", () => {
   });
 
   it("clears a range as one undo step", () => {
-    const before = createPlaygroundWorkbook();
+    const before = createSampleWorkbook();
     const session = new WorkbookSession(before, inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectSheet(layout, "sheet-params")!;
@@ -182,7 +182,7 @@ describe("custom grid interactions", () => {
   });
 
   it("renames a table identifier through the table viewport", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-staff")!;
 
@@ -197,7 +197,7 @@ describe("custom grid interactions", () => {
   });
 
   it("fills downward by repeating the source cell", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectSheet(layout, "sheet-params")!;
     applyCustomGridEdits(session, projection, layout, [{ location: [1, 1], value: { data: "42" } }]);
@@ -218,7 +218,7 @@ describe("custom grid interactions", () => {
   });
 
   it("grows a table so a pasted block fits", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     const notes = session.addTable("sheet-forud", { name: "Notes" });
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, notes.id)!;
@@ -243,7 +243,7 @@ describe("custom grid interactions", () => {
   });
 
   it("grows rows but not columns when pasting into a promoteRowKeys table", () => {
-    const before = createPlaygroundWorkbook();
+    const before = createSampleWorkbook();
     const session = new WorkbookSession(before, inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
@@ -271,9 +271,9 @@ describe("custom grid interactions", () => {
   });
 
   it("does not add columns when pasting past a time-axis table", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
-    const projection = projectTable(layout, "tbl-salg")!;
+    const projection = projectTable(layout, "tbl-sales")!;
 
     expect(
       applyCustomGridPaste(session, projection, [12, 5], [
@@ -282,7 +282,7 @@ describe("custom grid interactions", () => {
       ]),
     ).toBe(2);
 
-    const salg = session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!;
+    const salg = session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!;
     expect(salg.rows).toHaveLength(6);
     expect(salg.attributeColumns).toHaveLength(0);
     expect(salg.rows[4]!.cells["2025-12"]).toEqual({ kind: "input", value: 1 });

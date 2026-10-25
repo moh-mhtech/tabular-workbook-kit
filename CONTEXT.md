@@ -1,6 +1,6 @@
 # Workbook kit
 
-The calculation document a host (Playground, later BudgetTool) edits: named tables on sheets, a calendar, and scenarios. It is not an unstructured spreadsheet and not a financial statement. Product rules (locked Parametre, Project chrome) live in the host.
+The calculation document a host (Playground, later BudgetTool) edits: named tables on sheets, a calendar, and scenarios. It is not an unstructured spreadsheet and not a financial statement. Product rules (a locked parameters sheet, Project chrome) live in the host.
 
 ## Language
 
@@ -147,7 +147,7 @@ Removes Cell style from the Cell. Does not change Number format or Stored value.
 _Avoid_: Clear (that clears Stored value), reset style
 
 **Number format**:
-How a numeric Display value is shown. The Cell’s pattern wins, then the column’s (**Column format**), then the default: three significant digits with grouping. Patterns include `G3`, `#,##G3`, `G3A` (auto K/M/B/T from 1,000), `G3K` / `G3M` / `G3B` / `G3T`, `0.00`, `0%`, and a prefix or quoted suffix (`DKK G3A`, `G3A" kr"`). It does not change Stored value or Computed value. Text and `TRUE`/`FALSE` are shown as-is.
+How a numeric Display value is shown. The Cell’s pattern wins, then the column’s (**Column format**), then the default: three significant digits with grouping. Patterns include `G3`, `#,##G3`, `G3A` (auto K/M/B/T from 1,000), `G3K` / `G3M` / `G3B` / `G3T`, `0.00`, `0%`, and a prefix or quoted suffix (`USD G3A`, `G3A" kr"`). It does not change Stored value or Computed value. Text and `TRUE`/`FALSE` are shown as-is.
 _Avoid_: Cell style, rounding the stored value
 
 **Column format**:
@@ -183,11 +183,11 @@ _Avoid_: Rollup, pivot, aggregate, bucket
 ### Formulas
 
 **Defined name**:
-A Workbook-wide name for one Cell. A key-value Table registers each row key as the name of that row’s Value cell (`Vat`, `Årssalg`, `Café`). Letters in any script, digits, and underscore; unique against other promoted keys, Table names, Sheet names, and reserved functions. New rows on a key-value Table get `Param`, `Param2`, … — not `1`, `2`, `3` (those are default Row keys on other Tables, and cannot be Defined names).
+A Workbook-wide name for one Cell. A key-value Table registers each row key as the name of that row’s Value cell (`Vat`, `AnnualSales`, `Café`). Letters in any script, digits, and underscore; unique against other promoted keys, Table names, Sheet names, and reserved functions. New rows on a key-value Table get `Param`, `Param2`, … — not `1`, `2`, `3` (those are default Row keys on other Tables, and cannot be Defined names).
 _Avoid_: Name-as-formula (`=@-1`), P table, ASCII-only names
 
 **Formula ref**:
-One complete structured-ref or Defined name token in Formula text (`Vat`, `[Jan][CNC]`, `Salg[Jan][CNC]`, `Vat:AndelCNC`). On the Edit cell’s Table the token is a Local Formula ref; on another Table it names that Table.
+One complete structured-ref or Defined name token in Formula text (`Vat`, `[Jan][CNC]`, `Sales[Jan][CNC]`, `Vat:CncShare`). On the Edit cell’s Table the token is a Local Formula ref; on another Table it names that Table.
 _Avoid_: A1 token, range address (as Excel `B12`)
 
 **Local Formula ref**:
@@ -215,7 +215,7 @@ Cycles the Active formula ref: Relative → Fixed both → Fixed row → Fixed c
 _Avoid_: Toggle lock, absolute shortcut
 
 **Formula range**:
-A Formula ref of two same-Table names joined by `:` (`Vat:AndelCNC`), produced in Point by click-drag or Shift+Arrow.
+A Formula ref of two same-Table names joined by `:` (`Vat:CncShare`), produced in Point by click-drag or Shift+Arrow.
 _Avoid_: Cell range (that is Selection), A1 range
 
 ### Editing

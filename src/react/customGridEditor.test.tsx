@@ -5,7 +5,7 @@ import { clickFormulaText, pressCaretKey } from "./playgroundCanvasTest.js";
 import { GridCellKind, type GridCell } from "@glideapps/glide-data-grid";
 import { afterEach, describe, expect, it } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { projectTable } from "../grid/sheetProjection.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { overlayProvideOptions, ProjectedOverlayEditor, type OverlayEditorProps } from "./customGridEditor.js";
@@ -164,7 +164,7 @@ function GrowthColumnHeaderEditorHost() {
 }
 
 function renderEditor(host: "loop" | "stable" | "double-click" | "key" | "growth-key" | "growth-column" = "loop") {
-  const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+  const session = new WorkbookSession(createSampleWorkbook(), inert);
   if (host === "growth-column") {
     act(() => {
       session.addTable("sheet-forud", { name: "Notes" });
@@ -256,11 +256,11 @@ describe("custom grid editor UI", () => {
     const { session } = renderEditor("stable");
     fireEvent.change(cellEditor(), { target: { value: "=" } });
     fireEvent.keyDown(cellEditor(), { key: "ArrowDown" });
-    expect(session.formulaEdit?.draft).toBe("=AndelCNC");
+    expect(session.formulaEdit?.draft).toBe("=CncShare");
     expect(document.activeElement).toBe(cellEditor());
 
     fireEvent.keyDown(cellEditor(), { key: "ArrowDown" });
-    expect(cellEditor().value).toBe("=AndelOutsource");
+    expect(cellEditor().value).toBe("=OutsourceShare");
 
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
@@ -285,7 +285,7 @@ describe("custom grid editor UI", () => {
       pointAtProjectedCell(session, projection, layout, 1, 3);
       pointAtProjectedCell(session, projection, layout, 1, 4, { extend: true });
     });
-    expect(editor.value).toBe("=Vat:AndelCNC");
+    expect(editor.value).toBe("=Vat:CncShare");
     expect(session.formulaEdit?.mode).toBe("point");
     expect(document.querySelector(".wk-overlay-editor")).toBe(editor);
 
@@ -301,7 +301,7 @@ describe("custom grid editor UI", () => {
     expect(document.activeElement).toBe(editor);
     expect(editor.selectionStart).toBe(3);
     expect(editor.selectionEnd).toBe(3);
-    expect(editor.value).toBe("=Vat:AndelCNC");
+    expect(editor.value).toBe("=Vat:CncShare");
     expect(session.formulaEdit?.mode).toBe("edit");
   });
 
@@ -310,19 +310,19 @@ describe("custom grid editor UI", () => {
     const editor = cellEditor();
     fireEvent.change(editor, { target: { value: "=", selectionStart: 1, selectionEnd: 1 } });
     fireEvent.keyDown(editor, { key: "ArrowDown" });
-    expect(editor.value).toBe("=AndelCNC");
+    expect(editor.value).toBe("=CncShare");
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 4 });
 
     fireEvent.keyDown(editor, { key: "+" });
-    expect(editor.value).toBe("=AndelCNC+");
+    expect(editor.value).toBe("=CncShare+");
     expect(session.formulaEdit?.activeFormulaRef).toBeNull();
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 3 });
 
     fireEvent.keyDown(editor, { key: "ArrowDown" });
-    expect(editor.value).toBe("=AndelCNC+AndelCNC");
+    expect(editor.value).toBe("=CncShare+CncShare");
 
     fireEvent.keyDown(editor, { key: "ArrowDown" });
-    expect(editor.value).toBe("=AndelCNC+AndelOutsource");
+    expect(editor.value).toBe("=CncShare+OutsourceShare");
   });
 
   it("does not point a cell when the draft is a literal", () => {
@@ -375,14 +375,14 @@ describe("custom grid editor UI", () => {
     const editor = cellEditor();
     fireEvent.change(editor, { target: { value: "=" } });
     fireEvent.keyDown(editor, { key: "ArrowDown" });
-    expect(editor.value).toBe("=AndelCNC");
+    expect(editor.value).toBe("=CncShare");
     fireEvent.pointerDown(editor);
     expect(session.formulaEdit?.mode).toBe("edit");
     editor.setSelectionRange(editor.value.length, editor.value.length);
     fireEvent.select(editor);
     expect(editor.selectionStart).toBe(editor.value.length);
     expect(fireEvent.keyDown(editor, { key: ")", cancelable: true }), ") must stay in Edit mode").toBe(true);
-    fireEvent.change(editor, { target: { value: "=AndelCNC)" } });
+    fireEvent.change(editor, { target: { value: "=CncShare)" } });
     editor.setSelectionRange(editor.value.length, editor.value.length);
     fireEvent.select(editor);
     expect(session.formulaEdit?.mode).toBe("edit");
@@ -396,8 +396,8 @@ describe("custom grid editor UI", () => {
       session.setFormulaEditMode("edit");
     });
     expect(editor.selectionStart).toBe(caret);
-    expect(editor.value).toBe("=AndelCNC)");
-    expect(session.formulaEdit?.draft).toBe("=AndelCNC)");
+    expect(editor.value).toBe("=CncShare)");
+    expect(session.formulaEdit?.draft).toBe("=CncShare)");
     expect(session.formulaEdit?.mode).toBe("edit");
   });
 

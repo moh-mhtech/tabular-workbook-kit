@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { formatDisplayValue, rawEditValue, resolveCellFormat } from "./numberFormat.js";
 import type { TableSnapshot } from "./types.js";
@@ -75,7 +75,7 @@ describe("formatDisplayValue", () => {
     expect(formatDisplayValue(1234.5, '#,##G3" kr"')).toBe(`${present("1234", true)} kr`);
     expect(formatDisplayValue(1234.5, "G3 dkk")).toBe(`${present("1234", false)} dkk`);
     expect(formatDisplayValue(8_000_000, "G3 dkk")).toBe(`${present("8000000", false)} dkk`);
-    expect(formatDisplayValue(1234.5, "DKK #,##G3")).toBe(`DKK ${present("1234", true)}`);
+    expect(formatDisplayValue(1234.5, "USD #,##G3")).toBe(`USD ${present("1234", true)}`);
     expect(formatDisplayValue(0.1234, "G3")).toBe(present("0.123", false));
     expect(formatDisplayValue(0.2534, "G3%")).toBe(`${present("25.3", false)}%`);
     expect(formatDisplayValue(1.23456, "G4")).toBe(present("1.235", false));
@@ -93,7 +93,7 @@ describe("formatDisplayValue", () => {
     expect(formatDisplayValue(2.3e12, "G3A")).toBe(`${present("2.3", false)}T`);
     expect(formatDisplayValue(-8_000_000, "G3A")).toBe(`-${present("8", false)}M`);
     expect(formatDisplayValue(999_500, "G3A")).toBe(`${present("1", false)}M`);
-    expect(formatDisplayValue(8_000_000, "DKK G3A")).toBe(`DKK ${present("8", false)}M`);
+    expect(formatDisplayValue(8_000_000, "USD G3A")).toBe(`USD ${present("8", false)}M`);
     expect(formatDisplayValue(8_000_000, 'G3A" kr"')).toBe(`${present("8", false)}M kr`);
   });
 
@@ -105,22 +105,22 @@ describe("formatDisplayValue", () => {
     expect(formatDisplayValue(25, "G3K")).toBe(`${present("0.025", false)}K`);
     expect(formatDisplayValue(1_500_000_000, "G3B")).toBe(`${present("1.5", false)}B`);
     expect(formatDisplayValue(2.3e12, "G3T")).toBe(`${present("2.3", false)}T`);
-    expect(formatDisplayValue(8_000_000, "DKK G3M")).toBe(`DKK ${present("8", false)}M`);
+    expect(formatDisplayValue(8_000_000, "USD G3M")).toBe(`USD ${present("8", false)}M`);
     expect(formatDisplayValue(0, "G3K")).toBe(`${present("0", false)}K`);
     expect(formatDisplayValue(8_000_000, "K")).toBe(`${present("8000", false)}K`);
   });
 
   it("keeps compact format display-only so edits and formulas see the original number", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), { evaluate: () => ({}) });
-    session.setCellFormat("tbl-params", "row-aarsalg", "Value", "DKK G3A");
+    const session = new WorkbookSession(createSampleWorkbook(), { evaluate: () => ({}) });
+    session.setCellFormat("tbl-params", "row-annual", "Value", "USD G3A");
     const table = session.getSnapshot().tables.find((candidate) => candidate.id === "tbl-params")!;
-    const row = table.rows.find((candidate) => candidate.id === "row-aarsalg")!;
+    const row = table.rows.find((candidate) => candidate.id === "row-annual")!;
     const source = row.cells.Value;
     const pattern = resolveCellFormat(table, "Value", source);
-    expect(pattern).toBe("DKK G3A");
+    expect(pattern).toBe("USD G3A");
     expect(source.value).toBe(8_000_000);
     expect(rawEditValue(source.value ?? null)).toBe("8000000");
-    expect(formatDisplayValue(source.value ?? null, pattern)).toBe(`DKK ${present("8", false)}M`);
+    expect(formatDisplayValue(source.value ?? null, pattern)).toBe(`USD ${present("8", false)}M`);
   });
 
   it("applies Excel number patterns used in the properties panel", () => {
@@ -143,7 +143,7 @@ describe("formatDisplayValue", () => {
   });
 
   it("formats a custom-grid cell after setCellFormat", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), { evaluate: () => ({}) });
+    const session = new WorkbookSession(createSampleWorkbook(), { evaluate: () => ({}) });
     session.setCellFormat("tbl-params", "row-vat", "Value", "0%");
     const table = session.getSnapshot().tables.find((candidate) => candidate.id === "tbl-params")!;
     const row = table.rows.find((candidate) => candidate.id === "row-vat")!;

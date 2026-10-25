@@ -65,7 +65,7 @@ describe("grid formatting UI", () => {
     });
     const before = renders.at(-1)!;
     await act(async () => {
-      session.setCellStyle("tbl-params", "row-aarsalg", "Value", { bold: true });
+      session.setCellStyle("tbl-params", "row-annual", "Value", { bold: true });
     });
     const after = renders.at(-1)!;
     expect(after.snapshot).not.toBe(before.snapshot);
@@ -81,7 +81,7 @@ describe("grid formatting UI", () => {
       session.setSelection({
         kind: "cell",
         tableId: "tbl-params",
-        rowId: "row-aarsalg",
+        rowId: "row-annual",
         columnId: "Value",
       });
     });
@@ -206,10 +206,10 @@ describe("grid formatting UI", () => {
       session.setSelection({
         kind: "cell",
         tableId: "tbl-params",
-        rowId: "row-aarsalg",
+        rowId: "row-annual",
         columnId: "Value",
       });
-      session.setCellStyle("tbl-params", "row-aarsalg", "Value", {
+      session.setCellStyle("tbl-params", "row-annual", "Value", {
         bold: true,
         italic: true,
         fillColor: "#fff6d6",

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { createPlaygroundWorkbook } from "../../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../../session/WorkbookSession.js";
 import { WorkbookProvider } from "../WorkbookProvider.js";
 import { exampleNumberFromSelection, NumberFormatField } from "./NumberFormatField.js";
@@ -13,11 +13,11 @@ afterEach(cleanup);
 const inert = { evaluate: () => ({}) };
 
 function sessionWithSelection(kind: "aarsalg" | "vat") {
-  const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+  const session = new WorkbookSession(createSampleWorkbook(), inert);
   session.setSelection({
     kind: "cell",
     tableId: "tbl-params",
-    rowId: kind === "aarsalg" ? "row-aarsalg" : "row-vat",
+    rowId: kind === "aarsalg" ? "row-annual" : "row-vat",
     columnId: "Value",
   });
   return session;

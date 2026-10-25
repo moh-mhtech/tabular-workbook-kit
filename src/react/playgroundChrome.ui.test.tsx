@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { projectTable } from "../grid/sheetProjection.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { formulaBar, installGridDom, renderPlaygroundCanvas, selectProjectedCell, trackFocus, typeEqualsOnProjectedCell } from "./playgroundCanvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -31,7 +31,7 @@ describe("playground chrome UI", () => {
 
   it("shows the Workbook name with a folder icon in the explorer", async () => {
     await renderPlaygroundCanvas({ chrome: true, explorerWorkbookFolderIcon: true });
-    const project = screen.getByRole("button", { name: "Playground 2025" });
+    const project = screen.getByRole("button", { name: "Sample 2025" });
     expect(project.querySelector(".wk-explorer-folder-icon")).toBeTruthy();
   });
 
@@ -55,30 +55,30 @@ describe("playground chrome UI", () => {
   it("selects a sheet from the explorer and paints that sheet's tables", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Forudsætninger" }));
+      fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
     });
     expect(session.selection).toEqual({ kind: "sheet", sheetId: "sheet-forud" });
-    expect(document.querySelector('[data-table-id="tbl-salg"]')).toBeTruthy();
+    expect(document.querySelector('[data-table-id="tbl-sales"]')).toBeTruthy();
     expect(document.querySelector('[data-table-id="tbl-params"]')).toBeFalsy();
   });
 
   it("reveals a table on another sheet from the explorer", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
     });
-    expect(session.selection).toEqual({ kind: "table", tableId: "tbl-salg" });
-    expect(document.querySelector('[data-table-id="tbl-salg"] .wk-table-viewport-title')?.textContent).toBe("Salg");
+    expect(session.selection).toEqual({ kind: "table", tableId: "tbl-sales" });
+    expect(document.querySelector('[data-table-id="tbl-sales"] .wk-table-viewport-title')?.textContent).toBe("Sales");
   });
 
-  it("keeps the locked Parametre sheet selectable and blocks deleting Params", async () => {
+  it("keeps the locked Parameters sheet selectable and blocks deleting Params", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     const alerts: string[] = [];
     vi.spyOn(window, "alert").mockImplementation((message) => {
       alerts.push(String(message));
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Parametre" }));
+      fireEvent.click(screen.getByRole("button", { name: "Parameters" }));
     });
     expect(session.selection).toEqual({ kind: "sheet", sheetId: "sheet-params" });
     expect(screen.queryByRole("button", { name: "Delete sheet" })).toBeNull();
@@ -91,7 +91,7 @@ describe("playground chrome UI", () => {
   });
 
   it("selects the sheet when an empty-bands canvas is clicked", async () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     snapshot.sheets.push({ id: "sheet-empty", name: "Tom", tableIds: [] });
     const { session } = await renderPlaygroundCanvas({ snapshot, chrome: true });
     await act(async () => {
@@ -108,9 +108,9 @@ describe("playground chrome UI", () => {
   it("renames a sheet and sets horizontal scroll from the inspector", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Forudsætninger" }));
+      fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
     });
-    const name = screen.getByDisplayValue("Forudsætninger") as HTMLInputElement;
+    const name = screen.getByDisplayValue("Assumptions") as HTMLInputElement;
     await act(async () => {
       fireEvent.change(name, { target: { value: "Forecast" } });
       fireEvent.blur(name);
@@ -126,9 +126,9 @@ describe("playground chrome UI", () => {
   it("renames the workbook and shrinking the calendar leaves orphan December cells", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Playground 2025" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sample 2025" }));
     });
-    const name = screen.getByDisplayValue("Playground 2025") as HTMLInputElement;
+    const name = screen.getByDisplayValue("Sample 2025") as HTMLInputElement;
     await act(async () => {
       fireEvent.change(name, { target: { value: "Budget 2025" } });
       fireEvent.blur(name);
@@ -142,7 +142,7 @@ describe("playground chrome UI", () => {
     expect(session.getSnapshot().calendar.monthCount).toBe(6);
     expect(layoutWorkbook(session.getSnapshot()).periods).toHaveLength(6);
     expect(
-      session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-12"]?.formula,
+      session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-12"]?.formula,
     ).toBeTruthy();
   });
 
@@ -180,19 +180,19 @@ describe("playground chrome UI", () => {
   it("renames a table from the inspector and updates the canvas title", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
     });
-    const name = screen.getByDisplayValue("Salg") as HTMLInputElement;
+    const name = screen.getByDisplayValue("Sales") as HTMLInputElement;
     await act(async () => {
       fireEvent.change(name, { target: { value: "Sales" } });
       fireEvent.blur(name);
     });
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-salg")?.name).toBe("Sales");
-    expect(document.querySelector('[data-table-id="tbl-salg"] .wk-table-viewport-title')?.textContent).toBe("Sales");
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")?.name).toBe("Sales");
+    expect(document.querySelector('[data-table-id="tbl-sales"] .wk-table-viewport-title')?.textContent).toBe("Sales");
   });
 
   it("toggles year columns from the table inspector", async () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     snapshot.tables.push({
       id: "tbl-notes",
       name: "Notes",
@@ -221,7 +221,7 @@ describe("playground chrome UI", () => {
       session.setSelection({
         kind: "cell",
         tableId: "tbl-params",
-        rowId: "row-aarsalg",
+        rowId: "row-annual",
         columnId: "Value",
       });
     });
@@ -255,10 +255,10 @@ describe("playground chrome UI", () => {
     });
     expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2]!.key).toBe("Vat");
     await act(async () => {
-      fireEvent.change(name, { target: { value: "Moms" } });
+      fireEvent.change(name, { target: { value: "Levy" } });
       fireEvent.blur(name);
     });
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2]!.key).toBe("Moms");
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2]!.key).toBe("Levy");
   });
 
   it("marks an Invalid draft when a Defined name starts with a digit", async () => {
@@ -295,39 +295,39 @@ describe("playground chrome UI", () => {
       session.setSelection({
         kind: "cell",
         tableId: "tbl-params",
-        rowId: "row-andel-out",
+        rowId: "row-outsource-share",
         columnId: "Value",
       });
     });
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("AndelOutsource");
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("OutsourceShare");
     expect((screen.getByLabelText("Value") as HTMLTextAreaElement).value).toBe("0.12");
     await act(async () => {
       session.setSelection({
         kind: "cell",
         tableId: "tbl-params",
-        rowId: "row-andel-plade",
+        rowId: "row-bend-share",
         columnId: "Value",
       });
     });
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("AndelPladebuk");
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("BendShare");
     expect((screen.getByLabelText("Value") as HTMLTextAreaElement).value).toBe("0.08");
   });
 
   it("switches scenarios from the bar and restores Base without rewriting formulas", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
-    const formula = session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-01"]!.formula;
-    const base = session.getCell("Salg", "Total", "2025-01").computed as number;
+    const formula = session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]!.formula;
+    const base = session.getCell("Sales", "Total", "2025-01").computed as number;
     const select = screen.getByDisplayValue("Base") as HTMLSelectElement;
     await act(async () => {
-      fireEvent.change(select, { target: { value: "scn-vaekst" } });
+      fireEvent.change(select, { target: { value: "scn-growth" } });
     });
     await act(async () => {
       await session.recalculate();
     });
-    expect(session.getCell("Params", "Årssalg", "Value").computed).toBe(10_000_000);
-    expect(session.getCell("Params", "Årssalg", "Value").overlay).toBe(true);
-    expect(session.getCell("Salg", "Total", "2025-01").computed as number).toBeGreaterThan(base);
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-01"]!.formula).toBe(
+    expect(session.getCell("Params", "AnnualSales", "Value").computed).toBe(10_000_000);
+    expect(session.getCell("Params", "AnnualSales", "Value").overlay).toBe(true);
+    expect(session.getCell("Sales", "Total", "2025-01").computed as number).toBeGreaterThan(base);
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]!.formula).toBe(
       formula,
     );
     await act(async () => {
@@ -336,14 +336,14 @@ describe("playground chrome UI", () => {
     await act(async () => {
       await session.recalculate();
     });
-    expect(session.getCell("Params", "Årssalg", "Value").computed).toBe(8_000_000);
-    expect(session.getCell("Params", "Årssalg", "Value").overlay).toBe(false);
+    expect(session.getCell("Params", "AnnualSales", "Value").computed).toBe(8_000_000);
+    expect(session.getCell("Params", "AnnualSales", "Value").overlay).toBe(false);
   });
 
   it("writes an overlay for inputs but keeps formula edits on Base while a scenario is active", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      session.activateScenario("scn-vaekst");
+      session.activateScenario("scn-growth");
     });
     await act(async () => {
       session.setSelection({
@@ -364,49 +364,49 @@ describe("playground chrome UI", () => {
     });
     expect(session.getCell("Params", "Vat", "Value").computed).toBe(0.4);
     await act(async () => {
-      session.writeCell("Salg", "CNC", "2025-01", "=1");
+      session.writeCell("Sales", "CNC", "2025-01", "=1");
     });
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-01"]).toEqual({
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]).toEqual({
       kind: "formula",
       formula: "=1",
     });
-    expect(() => session.writeCell("Salg", "CNC", "2025-01", "9")).toThrow(/Base/);
+    expect(() => session.writeCell("Sales", "CNC", "2025-01", "9")).toThrow(/Base/);
   });
 
   it("changes only the selected year-column grain from the time grain switch", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
     });
-    expect(projectTable(layoutWorkbook(session.getSnapshot()), "tbl-salg")!.colCount).toBe(14);
+    expect(projectTable(layoutWorkbook(session.getSnapshot()), "tbl-sales")!.colCount).toBe(14);
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Kvartal" }));
+      fireEvent.click(screen.getByRole("button", { name: "Quarter" }));
     });
-    const salg = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-salg")!;
+    const salg = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-sales")!;
     expect(salg.colCount).toBe(6);
     expect(salg.columns.map((column) => column.title)).toEqual(["", "2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4", ""]);
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-01"]).toBeTruthy();
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]).toBeTruthy();
   });
 
-  it("keeps Salg selected when arrowing onto its locked growth column", async () => {
+  it("keeps Sales selected when arrowing onto its locked growth column", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
     });
-    const salg = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-salg")!;
+    const salg = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-sales")!;
     const focus = trackFocus(session);
-    await selectProjectedCell(session, "tbl-salg", salg.colCount - 2, 1);
-    const host = document.querySelector('[data-table-id="tbl-salg"] .wk-table-spreadsheet');
+    await selectProjectedCell(session, "tbl-sales", salg.colCount - 2, 1);
+    const host = document.querySelector('[data-table-id="tbl-sales"] .wk-table-spreadsheet');
     await act(async () => {
       fireEvent.keyDown(host!, { key: "ArrowRight" });
     });
     expect(session.selection).toEqual({
       kind: "growth",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       col: salg.colCount - 1,
       row: 1,
     });
-    focus.expectAt("tbl-salg", salg.colCount - 1, 1);
+    focus.expectAt("tbl-sales", salg.colCount - 1, 1);
   });
 
   it("deletes a row from the inspector", async () => {

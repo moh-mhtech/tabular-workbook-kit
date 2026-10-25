@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HyperFormulaEngine } from "../engine/hyperformula.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 import { PropertiesPanel } from "./PropertiesPanel.js";
@@ -12,7 +12,7 @@ import { installGridDom } from "./playgroundCanvasTest.js";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 async function renderPlayground() {
-  const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());
+  const session = new WorkbookSession(createSampleWorkbook(), new HyperFormulaEngine());
   await session.recalculate();
   session.setSelection({
     kind: "cell",
@@ -47,7 +47,7 @@ describe("canvas sheet selection", () => {
     });
     expect(session.selection).toEqual({ kind: "sheet", sheetId: "sheet-params" });
     expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Sheet");
-    expect(screen.getByDisplayValue("Parametre")).toBeTruthy();
+    expect(screen.getByDisplayValue("Parameters")).toBeTruthy();
   });
 
   it("keeps the table selected when clicking a table title", async () => {

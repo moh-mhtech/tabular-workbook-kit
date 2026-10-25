@@ -1,6 +1,6 @@
 import type { CalendarSnapshot } from "./types.js";
 
-const DA_LABELS = ["Jan", "Feb", "Mar", "Apr", "Maj", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const EN_ALIASES: Record<string, number> = {
   jan: 0,
   january: 0,
@@ -10,7 +10,6 @@ const EN_ALIASES: Record<string, number> = {
   march: 2,
   apr: 3,
   april: 3,
-  maj: 4,
   may: 4,
   jun: 5,
   june: 5,
@@ -21,7 +20,6 @@ const EN_ALIASES: Record<string, number> = {
   sep: 8,
   sept: 8,
   september: 8,
-  okt: 9,
   oct: 9,
   october: 9,
   nov: 10,
@@ -71,7 +69,7 @@ export function buildPeriods(calendar: CalendarSnapshot): Period[] {
       id,
       year,
       month,
-      label: DA_LABELS[month - 1],
+      label: MONTH_LABELS[month - 1],
       index,
     };
   });

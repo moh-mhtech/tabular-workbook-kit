@@ -2,24 +2,24 @@ import { describe, expect, it } from "vitest";
 import { compileFormula } from "./compile.js";
 import { layoutWorkbook } from "../model/layout.js";
 import { hitTest, layoutSheets } from "../model/sheetView.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 
 describe("column-first compile", () => {
   it("compiles named rows to INDEX/MATCH and this-row to [@Col]", () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     const layout = layoutWorkbook(snapshot);
     const staff = layout.tablesByName.get("staff")!;
     const karol = staff.keyByLower.get("karol")!;
     const jan = staff.columns.find((c) => c.name === "Jan")!;
 
     expect(
-      compileFormula("=Salg[Jan][Total]", {
+      compileFormula("=Sales[Jan][Total]", {
         layout,
         currentTable: staff,
         currentRowIndex: karol.rowIndex,
         currentPeriodId: jan.periodId,
       }),
-    ).toBe('=INDEX(Salg[Jan],MATCH("Total",Salg[key],0))');
+    ).toBe('=INDEX(Sales[Jan],MATCH("Total",Sales[key],0))');
 
     expect(
       compileFormula("=[BaseSalary]", {
@@ -31,15 +31,15 @@ describe("column-first compile", () => {
       }),
     ).toBe("=[@BaseSalary]");
 
-    expect(compileFormula("=Params[Årssalg]", { layout })).toBe(
-      '=INDEX(Params[Value],MATCH("Årssalg",Params[key],0))',
+    expect(compileFormula("=Params[AnnualSales]", { layout })).toBe(
+      '=INDEX(Params[Value],MATCH("AnnualSales",Params[key],0))',
     );
   });
 
   it("strips Fixed $ before compiling", () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     const layout = layoutWorkbook(snapshot);
-    const salg = layout.tablesByName.get("salg")!;
+    const salg = layout.tablesByName.get("sales")!;
     const outsource = salg.keyByLower.get("outsource")!;
     const jan = salg.columns.find((c) => c.name === "Jan")!;
     expect(
@@ -50,13 +50,13 @@ describe("column-first compile", () => {
         currentPeriodId: jan.periodId,
         currentColumnId: jan.id,
       }),
-    ).toBe('=INDEX(Salg[Jan],MATCH("CNC",Salg[key],0))');
+    ).toBe('=INDEX(Sales[Jan],MATCH("CNC",Sales[key],0))');
   });
 
   it("resolves @-1 on the period axis", () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     const layout = layoutWorkbook(snapshot);
-    const salg = layout.tablesByName.get("salg")!;
+    const salg = layout.tablesByName.get("sales")!;
     const cnc = salg.keyByLower.get("cnc")!;
     const feb = salg.columns.find((c) => c.name === "Feb")!;
     expect(
@@ -71,28 +71,28 @@ describe("column-first compile", () => {
   });
 
   it("compiles quarter and year tokens as the sum of stored months", () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     const layout = layoutWorkbook(snapshot);
-    expect(compileFormula("=Salg[2025-Q1][Total]", { layout })).toBe(
-      '=SUM(INDEX(Salg[Jan],MATCH("Total",Salg[key],0)),INDEX(Salg[Feb],MATCH("Total",Salg[key],0)),INDEX(Salg[Mar],MATCH("Total",Salg[key],0)))',
+    expect(compileFormula("=Sales[2025-Q1][Total]", { layout })).toBe(
+      '=SUM(INDEX(Sales[Jan],MATCH("Total",Sales[key],0)),INDEX(Sales[Feb],MATCH("Total",Sales[key],0)),INDEX(Sales[Mar],MATCH("Total",Sales[key],0)))',
     );
-    expect(compileFormula("=Salg[2025][Total]", { layout })).toContain("INDEX(Salg[Dec]");
-    expect(compileFormula("=Salg[2025][Total]", { layout })).toContain("SUM(");
+    expect(compileFormula("=Sales[2025][Total]", { layout })).toContain("INDEX(Sales[Dec]");
+    expect(compileFormula("=Sales[2025][Total]", { layout })).toContain("SUM(");
   });
 
   it("compiles a pointed name range to SUM of the rectangle", () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     const layout = layoutWorkbook(snapshot);
-    expect(compileFormula("=Vat:AndelCNC", { layout })).toBe("=SUM(Vat,AndelCNC)");
+    expect(compileFormula("=Vat:CncShare", { layout })).toBe("=SUM(Vat,CncShare)");
   });
 });
 
 describe("sheet hitTest", () => {
   it("maps stacked bands to table cells", () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     const periods = layoutWorkbook(snapshot).periods;
     const views = layoutSheets(snapshot, periods);
-    const kap = views.find((v) => v.sheetName === "Kapacitet")!;
+    const kap = views.find((v) => v.sheetName === "Capacity")!;
     const header = hitTest(kap, snapshot, kap.bands[0].headerRow, 2, periods);
     expect(header.kind).toBe("header");
     const cell = hitTest(kap, snapshot, kap.bands[0].headerRow + 1, 1, periods);
@@ -101,7 +101,7 @@ describe("sheet hitTest", () => {
   });
 
   it("stops the grid one row and column past the last band", () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     const periods = layoutWorkbook(snapshot).periods;
     const views = layoutSheets(snapshot, periods);
     for (const view of views) {
@@ -110,7 +110,7 @@ describe("sheet hitTest", () => {
       expect(view.rowCount).toBe(lastRow + 2);
       expect(view.colCount).toBe(lastCol + 2);
     }
-    const kap = views.find((v) => v.sheetName === "Kapacitet")!;
+    const kap = views.find((v) => v.sheetName === "Capacity")!;
     expect([kap.rowCount, kap.colCount]).toEqual([4, 16]);
   });
 });

@@ -6,7 +6,7 @@ import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import { fitProjectedColumnWidths, fitProjectedRowHeights } from "../grid/columnFit.js";
 import { projectTable, selectionForProjectedCell } from "../grid/sheetProjection.js";
 import { layoutWorkbook } from "../model/layout.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import type { WorkbookSnapshot } from "../model/types.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { Explorer, FormulaEditPlacementSwitch, ScenarioBar, TimeGrainSwitch } from "./components.js";
@@ -65,7 +65,7 @@ export async function renderPlaygroundCanvas(
   } = {},
 ) {
   const session = new WorkbookSession(
-    options.snapshot ?? createPlaygroundWorkbook(),
+    options.snapshot ?? createSampleWorkbook(),
     new HyperFormulaEngine(),
   );
   await session.recalculate();

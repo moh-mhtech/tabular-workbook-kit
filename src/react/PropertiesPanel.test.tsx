@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { PropertiesPanel } from "./PropertiesPanel.js";
 import { WorkbookProvider } from "./WorkbookProvider.js";
@@ -11,7 +11,7 @@ import { WorkbookProvider } from "./WorkbookProvider.js";
 const inert = { evaluate: () => ({}) };
 
 function renderValueField() {
-  const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+  const session = new WorkbookSession(createSampleWorkbook(), inert);
   session.setSelection({
     kind: "cell",
     tableId: "tbl-params",
@@ -38,7 +38,7 @@ describe("properties value field commit navigation", () => {
     expect(session.selection).toEqual({
       kind: "cell",
       tableId: "tbl-params",
-      rowId: "row-andel-cnc",
+      rowId: "row-cnc-share",
       columnId: "Value",
     });
     expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2].cells.Value).toEqual({
@@ -48,10 +48,10 @@ describe("properties value field commit navigation", () => {
   });
 
   it("moves to the next column on Tab after committing", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     session.setSelection({
       kind: "cell",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       rowId: "row-cnc",
       columnId: "2025-01",
     });
@@ -66,7 +66,7 @@ describe("properties value field commit navigation", () => {
     fireEvent.keyDown(input, { key: "Tab" });
     expect(session.selection).toEqual({
       kind: "cell",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       rowId: "row-cnc",
       columnId: "2025-02",
     });

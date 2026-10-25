@@ -53,7 +53,7 @@ describe("Excel-like cell edit UI", () => {
     await act(async () => {
       fireEvent.change(bar, { target: { value: "=Sa" } });
     });
-    expect(screen.getByRole("option", { name: /Salg/ }).textContent).toContain("Salg");
+    expect(screen.getByRole("option", { name: /Sales/ }).textContent).toContain("Sales");
   });
 
   it("inserts a name without parentheses and a function with them", async () => {
@@ -90,7 +90,7 @@ describe("Excel-like cell edit UI", () => {
       kind: "input",
       value: 12,
     });
-    expect(session.selection).toMatchObject({ tableId: "tbl-params", rowId: "row-andel-cnc" });
+    expect(session.selection).toMatchObject({ tableId: "tbl-params", rowId: "row-cnc-share" });
   });
 
   it("inserts a pointed ref from a grid click without leaving Value", async () => {
@@ -103,9 +103,9 @@ describe("Excel-like cell edit UI", () => {
     });
     await clickProjectedCell(session, "tbl-params", 1, 4);
     await blurFormulaBar();
-    expect(session.formulaEdit?.draft).toBe("=AndelCNC");
+    expect(session.formulaEdit?.draft).toBe("=CncShare");
     expect(session.formulaEdit?.mode).toBe("point");
-    expect(formulaBar()!.value).toBe("=AndelCNC");
+    expect(formulaBar()!.value).toBe("=CncShare");
   });
 
   it("points a Defined name with non-Latin letters like Vat", async () => {
@@ -118,9 +118,9 @@ describe("Excel-like cell edit UI", () => {
     });
     await clickProjectedCell(session, "tbl-params", 1, 1);
     await blurFormulaBar();
-    expect(session.formulaEdit?.draft).toBe("=Årssalg");
+    expect(session.formulaEdit?.draft).toBe("=AnnualSales");
     expect(session.formulaEdit?.mode).toBe("point");
-    expect(formulaBar()!.value).toBe("=Årssalg");
+    expect(formulaBar()!.value).toBe("=AnnualSales");
   });
 
   it("starts Edit in Value on F2", async () => {
@@ -142,8 +142,8 @@ describe("Excel-like cell edit UI", () => {
     await clickProjectedCell(session, "tbl-params", 1, 3);
     await dragProjectedCell(session, "tbl-params", 1, 4);
     await blurFormulaBar();
-    expect(session.formulaEdit?.draft).toBe("=Vat:AndelCNC");
-    expect(formulaBar()!.value).toBe("=Vat:AndelCNC");
+    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare");
+    expect(formulaBar()!.value).toBe("=Vat:CncShare");
   });
 
   it("anchors the Formula-edit popup on the edited cell at one line, not 120px", async () => {
@@ -226,9 +226,9 @@ describe("Excel-like cell edit UI", () => {
     await act(async () => {
       fireEvent.keyDown(editor, { key: "ArrowDown" });
     });
-    expect(session.formulaEdit?.draft).toBe("=AndelCNC");
+    expect(session.formulaEdit?.draft).toBe("=CncShare");
     expect(editor.selectionStart).toBe(editor.selectionEnd);
-    expect(editor.selectionStart).toBe("=AndelCNC".length);
+    expect(editor.selectionStart).toBe("=CncShare".length);
   });
 
   it("moves the Caret after typing =, dragging a Formula range, then clicking Formula text", async () => {
@@ -241,7 +241,7 @@ describe("Excel-like cell edit UI", () => {
     await dragProjectedCell(session, "tbl-params", 1, 4);
     expect(session.formulaEdit, "mouse Formula range must not Cancel").not.toBeNull();
     expect(session.formulaEdit?.mode).toBe("point");
-    expect(session.formulaEdit?.draft).toBe("=Vat:AndelCNC");
+    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare");
     expect(document.querySelector(".wk-overlay-editor"), "in-cell editor must stay open while Pointing").toBe(overlay);
 
     const field = await clickFormulaText(4);
@@ -250,7 +250,7 @@ describe("Excel-like cell edit UI", () => {
     expect(document.activeElement).toBe(field);
     expect(session.formulaEdit, "clicking Formula text must not Cancel").not.toBeNull();
     expect(session.formulaEdit?.mode).toBe("edit");
-    expect(field.value).toBe("=Vat:AndelCNC");
+    expect(field.value).toBe("=Vat:CncShare");
     expect(field.selectionStart).toBe(4);
     expect(field.selectionEnd).toBe(4);
 
@@ -258,9 +258,9 @@ describe("Excel-like cell edit UI", () => {
     expect(document.activeElement).toBe(field);
     expect(field.selectionStart).toBe(3);
     expect(field.selectionEnd).toBe(3);
-    expect(field.value).toBe("=Vat:AndelCNC");
+    expect(field.value).toBe("=Vat:CncShare");
     expect(session.formulaEdit?.mode).toBe("edit");
-    expect(session.formulaEdit?.draft).toBe("=Vat:AndelCNC");
+    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare");
   });
 
   it("moves the Caret after a Formula-text click then )", async () => {
@@ -272,7 +272,7 @@ describe("Excel-like cell edit UI", () => {
     });
     await clickProjectedCell(session, "tbl-params", 1, 3);
     await dragProjectedCell(session, "tbl-params", 1, 4);
-    expect(formulaBar()!.value).toBe("=Vat:AndelCNC");
+    expect(formulaBar()!.value).toBe("=Vat:CncShare");
     expect(document.activeElement).toBe(formulaBar());
     const bar = formulaBar()!;
     await act(async () => {
@@ -283,10 +283,10 @@ describe("Excel-like cell edit UI", () => {
     expect(session.formulaEdit?.mode).toBe("edit");
     await act(async () => {
       expect(fireEvent.keyDown(formulaBar()!, { key: ")", cancelable: true }), ") must stay in Edit mode").toBe(true);
-      fireEvent.change(formulaBar()!, { target: { value: "=Vat:AndelCNC)" } });
+      fireEvent.change(formulaBar()!, { target: { value: "=Vat:CncShare)" } });
     });
     expect(session.formulaEdit?.mode).toBe("edit");
-    expect(formulaBar()!.value).toBe("=Vat:AndelCNC)");
+    expect(formulaBar()!.value).toBe("=Vat:CncShare)");
     expect(document.activeElement).toBe(formulaBar());
     const next = formulaBar()!;
     next.focus();
@@ -298,28 +298,28 @@ describe("Excel-like cell edit UI", () => {
       session.setFormulaEditMode("point");
       session.setFormulaEditMode("edit");
     });
-    expect(formulaBar()!.selectionStart).toBe("=Vat:AndelCNC)".length - 2);
+    expect(formulaBar()!.selectionStart).toBe("=Vat:CncShare)".length - 2);
     expect(document.activeElement).toBe(formulaBar());
-    expect(session.formulaEdit?.draft).toBe("=Vat:AndelCNC)");
+    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare)");
     expect(session.formulaEdit?.mode).toBe("edit");
   });
 
-  it("keeps the Formula range on Vat:AndelCNC after typing )", async () => {
+  it("keeps the Formula range on Vat:CncShare after typing )", async () => {
     const { session } = await renderPlaygroundCanvas();
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
     await clickProjectedCell(session, "tbl-params", 1, 3);
     await dragProjectedCell(session, "tbl-params", 1, 4);
-    expect(session.formulaEdit?.draft).toBe("=Vat:AndelCNC");
+    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare");
     expect(session.formulaEdit?.rangeAnchor).toEqual({ tableId: "tbl-params", col: 1, row: 3 });
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 4 });
 
-    const field = await clickFormulaText("=Vat:AndelCNC".length);
+    const field = await clickFormulaText("=Vat:CncShare".length);
     await act(async () => {
       fireEvent.keyDown(field, { key: ")", cancelable: true });
-      fireEvent.change(field, { target: { value: "=Vat:AndelCNC)" } });
+      fireEvent.change(field, { target: { value: "=Vat:CncShare)" } });
     });
-    expect(field.value).toBe("=Vat:AndelCNC)");
-    expect(session.formulaEdit?.draft).toBe("=Vat:AndelCNC)");
+    expect(field.value).toBe("=Vat:CncShare)");
+    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare)");
     expect(session.formulaEdit?.rangeAnchor).toEqual({ tableId: "tbl-params", col: 1, row: 3 });
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 4 });
   });
@@ -329,14 +329,14 @@ describe("Excel-like cell edit UI", () => {
     await selectVat(session);
     const bar = formulaBar()!;
     await act(async () => {
-      fireEvent.change(bar, { target: { value: "=Vat+AndelCNC" } });
+      fireEvent.change(bar, { target: { value: "=Vat+CncShare" } });
     });
     const vat = document.querySelectorAll('[data-formula-ref="Vat"]');
-    const andel = document.querySelectorAll('[data-formula-ref="AndelCNC"]');
+    const shares = document.querySelectorAll('[data-formula-ref="CncShare"]');
     expect(vat.length).toBeGreaterThan(0);
-    expect(andel.length).toBeGreaterThan(0);
+    expect(shares.length).toBeGreaterThan(0);
     expect((vat[0] as HTMLElement).style.color).toBe("rgb(0, 0, 255)");
-    expect((andel[0] as HTMLElement).style.color).toBe("rgb(255, 0, 0)");
+    expect((shares[0] as HTMLElement).style.color).toBe("rgb(255, 0, 0)");
     const marks = document.querySelector("[data-formula-ref-marks]")?.getAttribute("data-formula-ref-marks");
     expect(marks).toContain("#0000FF");
     expect(marks).toContain("Vat");
@@ -350,12 +350,12 @@ describe("Excel-like cell edit UI", () => {
       fireEvent.change(bar, { target: { value: "=" } });
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
     });
     expect(session.formulaEdit).not.toBeNull();
     expect(formulaBar()).toBeTruthy();
-    await clickProjectedCell(session, "tbl-salg", 1, 1);
-    expect(formulaBar()?.value).toMatch(/Salg\[/);
+    await clickProjectedCell(session, "tbl-sales", 1, 1);
+    expect(formulaBar()?.value).toMatch(/Sales\[/);
     expect(session.formulaEdit).not.toBeNull();
     await act(async () => {
       fireEvent.keyDown(formulaBar()!, { key: "Enter" });
@@ -371,7 +371,7 @@ describe("Excel-like cell edit UI", () => {
     await act(async () => {
       fireEvent.keyDown(editor, { key: "ArrowDown" });
     });
-    expect(session.formulaEdit?.draft).toBe("=AndelCNC");
+    expect(session.formulaEdit?.draft).toBe("=CncShare");
     await act(async () => {
       fireEvent.keyDown(editor, { key: "ArrowUp" });
     });
@@ -379,16 +379,16 @@ describe("Excel-like cell edit UI", () => {
     await act(async () => {
       fireEvent.keyDown(editor, { key: "ArrowDown" });
     });
-    expect(session.formulaEdit?.draft).toBe("=AndelCNC");
+    expect(session.formulaEdit?.draft).toBe("=CncShare");
   });
 
   it("points a Local Formula ref on the same Table", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
     });
-    await typeEqualsOnProjectedCell(session, "tbl-salg", 1, 1);
-    await clickProjectedCell(session, "tbl-salg", 1, 2);
+    await typeEqualsOnProjectedCell(session, "tbl-sales", 1, 1);
+    await clickProjectedCell(session, "tbl-sales", 1, 2);
     expect(session.formulaEdit?.draft).toBe("=[@][Outsource]");
     const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
     await act(async () => {

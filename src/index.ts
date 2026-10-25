@@ -49,5 +49,4 @@ export type { HyperFormulaEngineOptions } from "./engine/hyperformula.js";
 export type { FormulaEngine } from "./engine/types.js";
 export { IndexedDbPersistence, MemoryPersistence } from "./persist/index.js";
 export type { PersistencePort } from "./persist/index.js";
-export { createPlaygroundWorkbook } from "./sample/playgroundWorkbook.js";
 export { layoutWorkbook } from "./model/layout.js";

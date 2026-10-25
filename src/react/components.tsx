@@ -152,7 +152,7 @@ export function TimeGrainSwitch() {
           className={selected.yearColumn.grain === g ? "is-active" : ""}
           onClick={() => tryCall(() => session.setYearColumnGrain(selected.tableId, selected.yearColumn.id, g))}
         >
-          {g === "month" ? "Måned" : g === "quarter" ? "Kvartal" : "År"}
+          {g === "month" ? "Month" : g === "quarter" ? "Quarter" : "Year"}
         </button>
       ))}
     </div>

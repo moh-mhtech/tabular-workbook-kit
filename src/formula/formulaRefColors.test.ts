@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { projectTable } from "../grid/sheetProjection.js";
 import {
   FORMULA_REF_COLORS,
@@ -58,9 +58,9 @@ describe("Formula-ref colors", () => {
       "#00B0F0",
       "#C00000",
     ]);
-    expect(colorFormulaRefs("=Vat+AndelCNC")).toEqual([
+    expect(colorFormulaRefs("=Vat+CncShare")).toEqual([
       { text: "Vat", color: "#0000FF", start: 1, end: 4 },
-      { text: "AndelCNC", color: "#FF0000", start: 5, end: 13 },
+      { text: "CncShare", color: "#FF0000", start: 5, end: 13 },
     ]);
     expect(colorFormulaRefs("=Vat+Vat")).toEqual([
       { text: "Vat", color: "#0000FF", start: 1, end: 4 },
@@ -69,17 +69,17 @@ describe("Formula-ref colors", () => {
   });
 
   it("marks the matching cells on the same Table", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const params = projectTable(layout, "tbl-params")!;
-    expect(formulaRefGridMarks("=Vat+AndelCNC", layout, params)).toEqual([
+    expect(formulaRefGridMarks("=Vat+CncShare", layout, params)).toEqual([
       { text: "Vat", color: "#0000FF", range: { x: 1, y: 3, width: 1, height: 1 } },
-      { text: "AndelCNC", color: "#FF0000", range: { x: 1, y: 4, width: 1, height: 1 } },
+      { text: "CncShare", color: "#FF0000", range: { x: 1, y: 4, width: 1, height: 1 } },
     ]);
   });
 
   it("marks a Local Formula ref on the same Table", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
-    const salg = projectTable(layout, "tbl-salg")!;
+    const layout = layoutWorkbook(createSampleWorkbook());
+    const salg = projectTable(layout, "tbl-sales")!;
     expect(formulaRefGridMarks("=[Jan][CNC]", layout, salg)).toEqual([
       { text: "[Jan][CNC]", color: "#0000FF", range: { x: 1, y: 1, width: 1, height: 1 } },
     ]);
@@ -87,7 +87,7 @@ describe("Formula-ref colors", () => {
       { text: "[$Jan][$CNC]", color: "#0000FF", range: { x: 1, y: 1, width: 1, height: 1 } },
     ]);
     expect(
-      formulaRefGridMarks("=[@][Outsource]", layout, salg, { tableId: "tbl-salg", col: 1, row: 1 }),
+      formulaRefGridMarks("=[@][Outsource]", layout, salg, { tableId: "tbl-sales", col: 1, row: 1 }),
     ).toEqual([{ text: "[@][Outsource]", color: "#0000FF", range: { x: 1, y: 2, width: 1, height: 1 } }]);
   });
 });

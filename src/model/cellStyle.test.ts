@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { applyStrikethrough, CLEARED_CELL_STYLE, resolveCellStyle, styleFont, toggleStyleFlag } from "./cellStyle.js";
 
@@ -7,7 +7,7 @@ const inert = { evaluate: () => ({}) };
 
 describe("cell style", () => {
   it("prefers a cell style over the column default", () => {
-    const table = createPlaygroundWorkbook().tables[0]!;
+    const table = createSampleWorkbook().tables[0]!;
     table.attributeColumns[0]!.style = { bold: true, textColor: "#111" };
     table.rows[2]!.cells.Value!.style = { italic: true };
     expect(resolveCellStyle(table, "Value", table.rows[2]!.cells.Value)).toEqual({
@@ -27,7 +27,7 @@ describe("cell style", () => {
   });
 
   it("clears every style key so a cell falls back to the column default", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     session.setCellStyle("tbl-params", "row-vat", "Value", {
       bold: true,
       italic: true,
@@ -40,7 +40,7 @@ describe("cell style", () => {
   });
 
   it("stores cell and column styles on the session", () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), inert);
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
     session.setColumnStyle("tbl-params", "Value", { bold: true });
     session.setCellStyle("tbl-params", "row-vat", "Value", { italic: true, bold: false });
     const table = session.getSnapshot().tables[0]!;

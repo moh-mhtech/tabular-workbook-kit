@@ -10,7 +10,7 @@ import {
   selectionForProjectedCell,
 } from "../grid/sheetProjection.js";
 import { layoutWorkbook } from "../model/layout.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 import { ProjectedOverlayEditor, SpreadsheetTextEditor } from "./customGridEditor.js";
@@ -107,7 +107,7 @@ function CommitEditorHost({
 }
 
 async function renderPlayground(withCellEditor = false) {
-  const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());
+  const session = new WorkbookSession(createSampleWorkbook(), new HyperFormulaEngine());
   await session.recalculate();
   session.setSelection({
     kind: "cell",
@@ -154,7 +154,7 @@ function expectVatCommitted(session: WorkbookSession) {
   expect(session.selection).toEqual({
     kind: "cell",
     tableId: "tbl-params",
-    rowId: "row-andel-cnc",
+    rowId: "row-cnc-share",
     columnId: "Value",
   });
   expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2].cells.Value).toEqual({
@@ -193,7 +193,7 @@ describe("cell commit UI", () => {
   });
 
   it("commits a Key cell on Enter and selects the next Key cell", async () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());
+    const session = new WorkbookSession(createSampleWorkbook(), new HyperFormulaEngine());
     await session.recalculate();
     await act(async () => {
       render(
@@ -205,12 +205,12 @@ describe("cell commit UI", () => {
     await act(async () => {
       fireEvent.keyDown(screen.getByLabelText("Cell editor"), { key: "Enter" });
     });
-    expect(session.selection).toEqual({ kind: "row", tableId: "tbl-params", rowId: "row-andel-cnc" });
+    expect(session.selection).toEqual({ kind: "row", tableId: "tbl-params", rowId: "row-cnc-share" });
     expect(session.gridFocus).toEqual({ tableId: "tbl-params", col: 0, row: 4 });
   });
 
   it("commits a Header cell on Tab and selects the next Header cell", async () => {
-    const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());
+    const session = new WorkbookSession(createSampleWorkbook(), new HyperFormulaEngine());
     await session.recalculate();
     await act(async () => {
       render(

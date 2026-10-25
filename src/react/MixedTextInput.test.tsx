@@ -26,10 +26,10 @@ describe("MixedTextInput", () => {
   });
 
   it("replaces the displayed value when the source changes", () => {
-    const { rerender } = render(<MixedTextInput values={["AndelOutsource"]} onCommit={() => undefined} />);
-    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("AndelOutsource");
-    rerender(<MixedTextInput values={["AndelPladebuk"]} onCommit={() => undefined} />);
-    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("AndelPladebuk");
+    const { rerender } = render(<MixedTextInput values={["OutsourceShare"]} onCommit={() => undefined} />);
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("OutsourceShare");
+    rerender(<MixedTextInput values={["BendShare"]} onCommit={() => undefined} />);
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("BendShare");
   });
 
   it("does not commit when the value is unchanged", () => {

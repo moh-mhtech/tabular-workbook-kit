@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { formatValue } from "../model/calendar.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 
 async function open() {
-  const session = new WorkbookSession(createPlaygroundWorkbook(), new HyperFormulaEngine());
+  const session = new WorkbookSession(createSampleWorkbook(), new HyperFormulaEngine());
   await session.recalculate();
   return session;
 }
@@ -21,10 +21,10 @@ describe("headless engine", () => {
   it("evaluates IFS, growth, and cross-table refs", async () => {
     const session = await open();
     const params = session.getTable("Params");
-    const aarsalg = params.rows.find((r) => r.key === "Årssalg")!.cells.Value.computed;
+    const aarsalg = params.rows.find((r) => r.key === "AnnualSales")!.cells.Value.computed;
     expect(aarsalg).toBe(8_000_000);
 
-    const salg = session.getTable("Salg");
+    const salg = session.getTable("Sales");
     const janTotal = num(salg.rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
     const decTotal = num(salg.rows.find((r) => r.key === "Total")!.cells["2025-12"].computed);
     expect(formatValue(janTotal)).toMatch(/563/);
@@ -36,32 +36,32 @@ describe("headless engine", () => {
     const fte = staff.rows.find((r) => r.key === "RequiredFTE")!.cells["2025-01"].computed;
     expect(fte === 1 || fte === 2).toBe(true);
 
-    const resultat = session.getTable("Resultat");
-    const oms = num(resultat.rows.find((r) => r.key === "Omsætning")!.cells["2025-01"].computed);
+    const resultat = session.getTable("Result");
+    const oms = num(resultat.rows.find((r) => r.key === "Revenue")!.cells["2025-01"].computed);
     expect(oms).toBeCloseTo(janTotal, 4);
   }, 60_000);
 });
 
 describe("scenarios", () => {
   it("overlays inputs only and does not rewrite formulas", async () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     const baseFormula = snapshot.tables
-      .find((t) => t.name === "Salg")!
+      .find((t) => t.name === "Sales")!
       .rows.find((r) => r.key === "CNC")!.cells["2025-01"].formula;
     const session = new WorkbookSession(snapshot, new HyperFormulaEngine());
     await session.recalculate();
 
-    const baseJan = num(session.getTable("Salg").rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
-    session.activateScenario("scn-vaekst");
+    const baseJan = num(session.getTable("Sales").rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
+    session.activateScenario("scn-growth");
     await session.recalculate();
-    expect(session.getCell("Params", "Årssalg", "Value").overlay).toBe(true);
-    expect(session.getCell("Params", "Årssalg", "Value").computed).toBe(10_000_000);
+    expect(session.getCell("Params", "AnnualSales", "Value").overlay).toBe(true);
+    expect(session.getCell("Params", "AnnualSales", "Value").computed).toBe(10_000_000);
 
     const after = session.toSnapshot();
-    const still = after.tables.find((t) => t.name === "Salg")!.rows.find((r) => r.key === "CNC")!.cells["2025-01"].formula;
+    const still = after.tables.find((t) => t.name === "Sales")!.rows.find((r) => r.key === "CNC")!.cells["2025-01"].formula;
     expect(still).toBe(baseFormula);
 
-    const vaekstJan = num(session.getTable("Salg").rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
+    const vaekstJan = num(session.getTable("Sales").rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
     expect(vaekstJan).toBeGreaterThan(baseJan);
     expect(vaekstJan / baseJan).toBeCloseTo(10 / 8, 5);
   }, 60_000);
@@ -70,9 +70,9 @@ describe("scenarios", () => {
 describe("time grain views", () => {
   it("aggregates months into quarters and year without changing storage", async () => {
     const session = await open();
-    const month = session.getTable("Salg", { timeGrain: "month" });
-    const quarter = session.getTable("Salg", { timeGrain: "quarter" });
-    const year = session.getTable("Salg", { timeGrain: "year" });
+    const month = session.getTable("Sales", { timeGrain: "month" });
+    const quarter = session.getTable("Sales", { timeGrain: "quarter" });
+    const year = session.getTable("Sales", { timeGrain: "year" });
 
     const jan = num(month.rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
     const feb = num(month.rows.find((r) => r.key === "Total")!.cells["2025-02"].computed);

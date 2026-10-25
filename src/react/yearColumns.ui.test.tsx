@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { projectTable } from "../grid/sheetProjection.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { installGridDom, renderPlaygroundCanvas, selectProjectedCell } from "./playgroundCanvasTest.js";
 import { applyCustomGridEdits } from "./customGridInteractions.js";
 
@@ -32,37 +32,37 @@ describe("year-column canvas", () => {
     expect(() => session.deleteColumn("Params", "Value")).toThrow(/cannot be deleted/);
   });
 
-  it("shows 12 Salg month headers and 4 after the selected year-column grain becomes quarter", async () => {
+  it("shows 12 Sales month headers and 4 after the selected year-column grain becomes quarter", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
     });
-    const month = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-salg")!;
+    const month = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-sales")!;
     expect(month.columns.filter((column) => column.title).map((column) => column.title)).toHaveLength(12);
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Kvartal" }));
+      fireEvent.click(screen.getByRole("button", { name: "Quarter" }));
     });
     await act(async () => {
       await session.recalculate();
     });
-    const quarter = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-salg")!;
+    const quarter = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-sales")!;
     expect(quarter.columns.filter((column) => column.title).map((column) => column.title)).toEqual([
       "2025-Q1",
       "2025-Q2",
       "2025-Q3",
       "2025-Q4",
     ]);
-    const jan = session.getCell("Salg", "Total", "2025-01").computed as number;
-    const feb = session.getCell("Salg", "Total", "2025-02").computed as number;
-    const mar = session.getCell("Salg", "Total", "2025-03").computed as number;
-    expect(session.getTable("Salg", { timeGrain: "quarter" }).rows.find((row) => row.key === "Total")!.cells["2025-Q1"].computed).toBeCloseTo(
+    const jan = session.getCell("Sales", "Total", "2025-01").computed as number;
+    const feb = session.getCell("Sales", "Total", "2025-02").computed as number;
+    const mar = session.getCell("Sales", "Total", "2025-03").computed as number;
+    expect(session.getTable("Sales", { timeGrain: "quarter" }).rows.find((row) => row.key === "Total")!.cells["2025-Q1"].computed).toBeCloseTo(
       jan + feb + mar,
       4,
     );
   });
 
   it("even-splits a year or quarter number onto stored months and last month absorbs 1000/12", async () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     snapshot.tables.push({
       id: "tbl-rev",
       name: "Rev",
@@ -104,7 +104,7 @@ describe("year-column canvas", () => {
   });
 
   it("overwrites mixed formula and input months when even-splitting a quarter number", async () => {
-    const snapshot = createPlaygroundWorkbook();
+    const snapshot = createSampleWorkbook();
     snapshot.tables.push({
       id: "tbl-mix",
       name: "Mix",
@@ -133,32 +133,32 @@ describe("year-column canvas", () => {
     expect(row.cells["2025-03"]).toEqual({ kind: "input", value: 100 });
   });
 
-  it("keeps Salg[Jan] on the first year when a yearly 2026 column is added", async () => {
+  it("keeps Sales[Jan] on the first year when a yearly 2026 column is added", async () => {
     const { session } = await renderPlaygroundCanvas();
     await act(async () => {
-      session.addYearColumn("Salg", 2026, "year");
+      session.addYearColumn("Sales", 2026, "year");
     });
-    const salg = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-salg")!;
+    const salg = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-sales")!;
     expect(salg.columns.some((column) => column.id === "2025-01")).toBe(true);
     expect(salg.columns.some((column) => column.id === "2026")).toBe(true);
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-01"]?.formula).toContain(
-      "AndelCNC",
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]?.formula).toContain(
+      "CncShare",
     );
   });
 
-  it("selects the Salg data Growth cell as Growth after a grain change", async () => {
+  it("selects the Sales data Growth cell as Growth after a grain change", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Salg" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "År" }));
+      fireEvent.click(screen.getByRole("button", { name: "Year" }));
     });
-    const salg = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-salg")!;
-    await selectProjectedCell(session, "tbl-salg", salg.colCount - 1, 1);
+    const salg = projectTable(layoutWorkbook(session.getSnapshot()), "tbl-sales")!;
+    await selectProjectedCell(session, "tbl-sales", salg.colCount - 1, 1);
     expect(session.selection).toEqual({
       kind: "growth",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       col: salg.colCount - 1,
       row: 1,
     });

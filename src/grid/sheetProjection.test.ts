@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
-import { createPlaygroundWorkbook } from "../sample/playgroundWorkbook.js";
+import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import {
   TABLE_DATA_COLUMN_WIDTH,
   TABLE_GROWTH_COLUMN_WIDTH,
@@ -22,7 +22,7 @@ import {
 
 describe("sheet grid projection", () => {
   it("uses sheet coordinates and exposes one outer row and column", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const projection = projectSheet(layout, "sheet-params")!;
 
     expect(projection.rowCount).toBe(9);
@@ -31,12 +31,12 @@ describe("sheet grid projection", () => {
   });
 
   it("classifies table cells and only direct growth margins as editable", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const projection = projectSheet(layout, "sheet-params")!;
 
     expect(projectedCell(projection, layout, 1, 1)).toMatchObject({
       kind: "table",
-      hit: { kind: "cell", tableId: "tbl-params", rowId: "row-aarsalg", columnId: "Value" },
+      hit: { kind: "cell", tableId: "tbl-params", rowId: "row-annual", columnId: "Value" },
     });
     expect(projectedCell(projection, layout, 0, 8)).toMatchObject({
       kind: "extension",
@@ -56,19 +56,19 @@ describe("sheet grid projection", () => {
   });
 
   it("maps cells, keys, headers, and margins to session selections", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const projection = projectSheet(layout, "sheet-params")!;
 
     expect(selectionForProjectedCell(projection, layout, 1, 1)).toEqual({
       kind: "cell",
       tableId: "tbl-params",
-      rowId: "row-aarsalg",
+      rowId: "row-annual",
       columnId: "Value",
     });
     expect(selectionForProjectedCell(projection, layout, 0, 1)).toEqual({
       kind: "row",
       tableId: "tbl-params",
-      rowId: "row-aarsalg",
+      rowId: "row-annual",
     });
     expect(selectionForProjectedCell(projection, layout, 1, 0)).toEqual({
       kind: "column",
@@ -82,19 +82,19 @@ describe("sheet grid projection", () => {
   });
 
   it("collects data cells in a projected range in row-major order", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const projection = projectTable(layout, "tbl-params")!;
     expect(cellsInProjectedRange(projection, layout, { x: 1, y: 1, width: 1, height: 3 })).toEqual([
-      { tableId: "tbl-params", rowId: "row-aarsalg", columnId: "Value" },
-      { tableId: "tbl-params", rowId: "row-vaekst", columnId: "Value" },
+      { tableId: "tbl-params", rowId: "row-annual", columnId: "Value" },
+      { tableId: "tbl-params", rowId: "row-growth", columnId: "Value" },
       { tableId: "tbl-params", rowId: "row-vat", columnId: "Value" },
     ]);
   });
 
   it("maps a committed cell to the next row or column", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const params = projectTable(layout, "tbl-params")!;
-    const salg = projectTable(layout, "tbl-salg")!;
+    const salg = projectTable(layout, "tbl-sales")!;
 
     expect(projectedLocationForRef(params, layout, {
       tableId: "tbl-params",
@@ -103,7 +103,7 @@ describe("sheet grid projection", () => {
     })).toEqual([1, 3]);
     expect(cellAfterCommitMove(params, layout, [1, 3], [0, 1])).toEqual({
       location: [1, 4],
-      selection: { kind: "cell", tableId: "tbl-params", rowId: "row-andel-cnc", columnId: "Value" },
+      selection: { kind: "cell", tableId: "tbl-params", rowId: "row-cnc-share", columnId: "Value" },
     });
     expect(cellAfterCommitMove(params, layout, [1, 3], [1, 0])).toBeUndefined();
     expect(cellAfterCommitMove(params, layout, [1, 7], [0, 1])).toEqual({
@@ -113,29 +113,29 @@ describe("sheet grid projection", () => {
 
     expect(cellAfterCommitMove(salg, layout, [1, 1], [1, 0])).toEqual({
       location: [2, 1],
-      selection: { kind: "cell", tableId: "tbl-salg", rowId: "row-cnc", columnId: "2025-02" },
+      selection: { kind: "cell", tableId: "tbl-sales", rowId: "row-cnc", columnId: "2025-02" },
     });
     expect(cellAfterCommitMove(salg, layout, [1, 1], [0, 1])).toEqual({
       location: [1, 2],
-      selection: { kind: "cell", tableId: "tbl-salg", rowId: "row-out", columnId: "2025-01" },
+      selection: { kind: "cell", tableId: "tbl-sales", rowId: "row-out", columnId: "2025-01" },
     });
     expect(cellAfterCommitMove(salg, layout, [1, 4], [0, 1])).toEqual({
       location: [1, 5],
-      selection: { kind: "growth", tableId: "tbl-salg", col: 1, row: 5 },
+      selection: { kind: "growth", tableId: "tbl-sales", col: 1, row: 5 },
     });
   });
 
   it("moves Enter from a Key cell onto the next Key cell, not Growth", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const params = projectTable(layout, "tbl-params")!;
     expect(cellAfterCommitMove(params, layout, [0, 3], [0, 1])).toEqual({
       location: [0, 4],
-      selection: { kind: "row", tableId: "tbl-params", rowId: "row-andel-cnc" },
+      selection: { kind: "row", tableId: "tbl-params", rowId: "row-cnc-share" },
     });
   });
 
   it("moves Tab from a Header cell onto the next Header cell", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const staff = projectTable(layout, "tbl-staff")!;
     expect(cellAfterCommitMove(staff, layout, [1, 0], [1, 0])).toEqual({
       location: [2, 0],
@@ -144,7 +144,7 @@ describe("sheet grid projection", () => {
   });
 
   it("uses table column names as identifiers instead of ABC defaults", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const projection = projectTable(layout, "tbl-params")!;
 
     expect(projection.columns.map((column) => column.title)).toEqual(["", "Value"]);
@@ -158,7 +158,7 @@ describe("sheet grid projection", () => {
     expect(acceptTableGridSelection(projection, [1, 1])).toBe(true);
     expect(projectedCell(projection, layout, 0, 1)).toMatchObject({
       kind: "table",
-      hit: { kind: "key", tableId: "tbl-params", rowId: "row-aarsalg" },
+      hit: { kind: "key", tableId: "tbl-params", rowId: "row-annual" },
     });
     expect(isGrowthHeaderCell(projection, 0, 8)).toBe(true);
     expect(isGrowthCell(projection, 0, 8)).toBe(true);
@@ -170,9 +170,9 @@ describe("sheet grid projection", () => {
   });
 
   it("uses a narrower default width for the key and growth columns", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
+    const layout = layoutWorkbook(createSampleWorkbook());
     const params = projectTable(layout, "tbl-params")!;
-    const salg = projectTable(layout, "tbl-salg")!;
+    const salg = projectTable(layout, "tbl-sales")!;
 
     expect(params.columns.map((column) => column.width)).toEqual([
       TABLE_KEY_COLUMN_WIDTH,
@@ -186,8 +186,8 @@ describe("sheet grid projection", () => {
   });
 
   it("keeps inter-table gaps visible but read-only", () => {
-    const snapshot = createPlaygroundWorkbook();
-    snapshot.sheets[0].tableIds.push("tbl-salg");
+    const snapshot = createSampleWorkbook();
+    snapshot.sheets[0].tableIds.push("tbl-sales");
     const layout = layoutWorkbook(snapshot);
     const projection = projectSheet(layout, "sheet-params")!;
 
@@ -199,23 +199,23 @@ describe("sheet grid projection", () => {
     });
     expect(projectedCell(projection, layout, 1, 10)).toMatchObject({
       kind: "table",
-      hit: { kind: "header", tableId: "tbl-salg" },
+      hit: { kind: "header", tableId: "tbl-sales" },
     });
   });
 
   it("selects time-axis Growth cells as Growth, not the Sheet", () => {
-    const layout = layoutWorkbook(createPlaygroundWorkbook());
-    const salg = projectTable(layout, "tbl-salg")!;
+    const layout = layoutWorkbook(createSampleWorkbook());
+    const salg = projectTable(layout, "tbl-sales")!;
     const growthCol = salg.colCount - 1;
     expect(selectionForProjectedCell(salg, layout, growthCol, 0)).toEqual({
       kind: "growth",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       col: growthCol,
       row: 0,
     });
     expect(selectionForProjectedCell(salg, layout, growthCol, 1)).toEqual({
       kind: "growth",
-      tableId: "tbl-salg",
+      tableId: "tbl-sales",
       col: growthCol,
       row: 1,
     });

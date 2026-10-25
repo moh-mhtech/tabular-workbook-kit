@@ -70,24 +70,24 @@ describe("scenario CRUD", () => {
     });
     expect((screen.getByRole("menuitem", { name: "Delete" }) as HTMLButtonElement).disabled).toBe(true);
     await act(async () => {
-      session.activateScenario("scn-vaekst");
+      session.activateScenario("scn-growth");
     });
-    expect(() => session.renameScenario("scn-vaekst", "Vækst")).not.toThrow();
+    expect(() => session.renameScenario("scn-growth", "Growth")).not.toThrow();
     let extraId = "";
     await act(async () => {
       extraId = session.addScenario("Copy").id;
     });
     expect(() => session.renameScenario(extraId, "Copy")).not.toThrow();
-    expect(() => session.renameScenario(extraId, "Vækst")).toThrow(/already used/);
+    expect(() => session.renameScenario(extraId, "Growth")).toThrow(/already used/);
   });
 
   it("keeps formula edits on Base and overlays only inputs, including undo", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
-    const formula = session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-01"]!.formula;
+    const formula = session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]!.formula;
     const selection = { kind: "sheet" as const, sheetId: "sheet-forud" };
     await act(async () => {
       session.setSelection(selection);
-      session.activateScenario("scn-vaekst");
+      session.activateScenario("scn-growth");
     });
     expect(session.selection).toEqual(selection);
     await act(async () => {
@@ -95,16 +95,16 @@ describe("scenario CRUD", () => {
     });
     expect(session.getCell("Params", "Vat", "Value").overlay).toBe(true);
     await act(async () => {
-      session.writeCell("Salg", "CNC", "2025-01", "=2");
+      session.writeCell("Sales", "CNC", "2025-01", "=2");
     });
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-01"]).toEqual({
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]).toEqual({
       kind: "formula",
       formula: "=2",
     });
     await act(async () => {
       session.undo();
     });
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-salg")!.rows[0]!.cells["2025-01"]!.formula).toBe(
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]!.formula).toBe(
       formula,
     );
     expect(session.getSnapshot().scenarios[0]!.overlays[overlayKey("tbl-params", "row-vat", "Value")]).toBe(0.5);

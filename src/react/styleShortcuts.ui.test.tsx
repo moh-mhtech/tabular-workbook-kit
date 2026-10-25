@@ -55,11 +55,11 @@ describe("cell style UI", () => {
   it("toggles bold from the inspector and keeps a scenario overlay", async () => {
     const { session } = await renderPlaygroundCanvas({ chrome: true });
     await act(async () => {
-      session.activateScenario("scn-vaekst");
+      session.activateScenario("scn-growth");
       session.setSelection({
         kind: "cell",
         tableId: "tbl-params",
-        rowId: "row-aarsalg",
+        rowId: "row-annual",
         columnId: "Value",
       });
     });
@@ -77,6 +77,6 @@ describe("cell style UI", () => {
     expect(screen.getByLabelText("Increase font size").tagName).toBe("BUTTON");
     expect(screen.getByLabelText("Decrease font size").tagName).toBe("BUTTON");
     expect(session.getSnapshot().tables[0]!.rows[0]!.cells.Value!.style).toEqual({ bold: true });
-    expect(session.getCell("Params", "Årssalg", "Value").overlay).toBe(true);
+    expect(session.getCell("Params", "AnnualSales", "Value").overlay).toBe(true);
   });
 });

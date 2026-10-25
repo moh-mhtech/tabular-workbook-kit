@@ -16,7 +16,7 @@ export class PglitePersistence implements PersistencePort {
   private constructor(private readonly store: PostgresWorkbookStore) {}
 
   static async create(
-    workbookId = "playground",
+    workbookId = "workbook",
     options: PglitePersistenceOptions = {},
   ): Promise<PglitePersistence> {
     const db =
@@ -50,7 +50,7 @@ export class PglitePersistence implements PersistencePort {
 }
 
 export async function createPglitePersistence(
-  workbookId = "playground",
+  workbookId = "workbook",
   options: PglitePersistenceOptions = {},
 ): Promise<PglitePersistence> {
   return PglitePersistence.create(workbookId, options);

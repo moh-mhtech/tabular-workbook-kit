@@ -1,6 +1,6 @@
 # tabular-workbook-kit
 
-A sheets-style workbook **library** that hosts embed. Values live in named tables on sheet canvases. It is not an application and not a free cell grid.
+A sheets-style workbook **library** that hosts embed. Values live in named tables on sheet canvases. It is not an application and not a free cell grid. It is not a budget or accounting product. Scenarios, year-columns, defined names, and number prefixes are general features a host can use for a budget or for any other model.
 
 Glossary: [CONTEXT.md](./CONTEXT.md). Licensed under GPL-3.0.
 
@@ -8,7 +8,7 @@ Glossary: [CONTEXT.md](./CONTEXT.md). Licensed under GPL-3.0.
 
 - Named tables stacked on sheets. A sheet is a canvas, not a second place to store values.
 - Column-first structured formulas (`Table[Col][Row]`, `[Col]`, `@` / `@±n`). Names compile to engine ranges. Formulas are rewritten when a table, column, or row is renamed.
-- Promoted row keys become workbook names (`Vat`) on a key-value table.
+- Promoted row keys become workbook names (`Mix`) on a key-value table.
 - Year columns with month, quarter, or year grain. Storage stays monthly.
 - Scenarios overlay inputs on a base workbook.
 - Locked tables and sheets cannot be deleted.
@@ -49,8 +49,8 @@ import { createSampleWorkbook } from "tabular-workbook-kit/sample";
 
 const session = new WorkbookSession(createSampleWorkbook());
 await session.recalculate();
-session.getTable("Sales");
-session.getCell("Params", "AnnualSales", "Value");
+session.getTable("Lines");
+session.getCell("Params", "AnnualUnits", "Value");
 session.activateScenario("scn-growth");
 ```
 
@@ -77,15 +77,15 @@ const session = new WorkbookSession(createSampleWorkbook());
 </WorkbookProvider>
 ```
 
-The sample (`sample/createSampleWorkbook.ts`, outside `src`) is a 2025 workbook that shows the library, not a product:
+The sample (`sample/createSampleWorkbook.ts`, outside `src`) is a 2025 workbook that exercises those features:
 
-- **Parameters** is a locked key-value table. Row keys `AnnualSales`, `Growth`, and `Vat` are workbook names.
-- **Assumptions / Sales** is a monthly year-column table. January is a formula from `Start` and the share names. Later months grow by `Growth`.
-- **Capacity / Staff** adds attribute columns (`Role`, `BaseSalary`) and a formula that reads `Sales`.
-- **Result** subtracts wages from revenue.
-- The **Growth** scenario overlays `AnnualSales` with 10,000,000 and leaves the base at 8,000,000.
+- **Parameters** is a locked key-value table. Row keys `AnnualUnits`, `Growth`, and `Mix` are workbook names.
+- **Assumptions / Lines** is a monthly year-column table. January is a formula from `Start` and the share names. Later months grow by `Growth`.
+- **Capacity / Teams** adds attribute columns (`Role`, `BaseNumber`) and a formula that reads `Lines`.
+- **Result** combines `Lines` and `Teams` with a formula.
+- The **Growth** scenario overlays `AnnualUnits` with 10,000,000 and leaves the base at 8,000,000.
 
-Host policy, such as a Danish budget seed, lives in the host. This library does not create it.
+A host supplies its own workbook. This library does not create one.
 
 ## Session API
 

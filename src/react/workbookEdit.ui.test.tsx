@@ -6,7 +6,7 @@ import { applyCustomGridClear, applyCustomGridEdits, applyCustomGridFill, applyC
 import { layoutWorkbook } from "../model/layout.js";
 import { projectTable, projectedLocationForRef } from "../grid/sheetProjection.js";
 import { evaluatedCells, gridCell } from "./CustomSheetCanvas.js";
-import { formulaBar, installGridDom, renderPlaygroundCanvas, selectProjectedCell } from "./playgroundCanvasTest.js";
+import { formulaBar, installGridDom, renderWorkbookCanvas, selectProjectedCell } from "./canvasTest.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -28,9 +28,9 @@ function GridCellProbe({ tableId, rowId, columnId }: { tableId: string; rowId: s
   return <pre data-testid="grid-cell">{JSON.stringify({ displayData: cell.displayData })}</pre>;
 }
 
-describe("playground edit UI", () => {
+describe("workbook edit", () => {
   it("cancels the formula bar on Escape without writing", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await act(async () => {
       session.setSelection({
         kind: "cell",
@@ -52,12 +52,12 @@ describe("playground edit UI", () => {
   });
 
   it("commits Tab and Shift+Tab from the formula bar", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await act(async () => {
       session.setSelection({
         kind: "cell",
-        tableId: "tbl-sales",
-        rowId: "row-cnc",
+        tableId: "tbl-lines",
+        rowId: "row-red",
         columnId: "2025-01",
       });
     });
@@ -67,7 +67,7 @@ describe("playground edit UI", () => {
     });
     expect(session.selection).toMatchObject({
       kind: "cell",
-      tableId: "tbl-sales",
+      tableId: "tbl-lines",
       columnId: "2025-02",
     });
     await act(async () => {
@@ -75,13 +75,13 @@ describe("playground edit UI", () => {
     });
     expect(session.selection).toMatchObject({
       kind: "cell",
-      tableId: "tbl-sales",
+      tableId: "tbl-lines",
       columnId: "2025-01",
     });
   });
 
   it("evaluates =1+1 through HyperFormula after a formula-bar commit", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await act(async () => {
       session.setSelection({
         kind: "cell",
@@ -98,28 +98,28 @@ describe("playground edit UI", () => {
     await act(async () => {
       await session.recalculate();
     });
-    expect(session.getCell("Params", "Vat", "Value").computed).toBe(2);
+    expect(session.getCell("Params", "Mix", "Value").computed).toBe(2);
   });
 
   it("evaluates a Formula of a Blank Defined name as Blank", async () => {
-    const { session } = await renderPlaygroundCanvas({
-      extra: <GridCellProbe tableId="tbl-params" rowId="row-cnc-share" columnId="Value" />,
+    const { session } = await renderWorkbookCanvas({
+      extra: <GridCellProbe tableId="tbl-params" rowId="row-top-share" columnId="Value" />,
     });
     await act(async () => {
       const added = session.addRow("Params");
       session.renameRow("Params", added.id, "hello");
-      session.setFormula("Params", "CncShare", "Value", "=hello");
+      session.setFormula("Params", "TopShare", "Value", "=hello");
       await session.recalculate();
     });
     expect(session.getCell("Params", "hello", "Value").computed).toBe(null);
-    expect(session.getCell("Params", "CncShare", "Value").computed).toBe(null);
-    expect(session.getCell("Params", "CncShare", "Value").error).toBeUndefined();
+    expect(session.getCell("Params", "TopShare", "Value").computed).toBe(null);
+    expect(session.getCell("Params", "TopShare", "Value").error).toBeUndefined();
     expect(JSON.parse(screen.getByTestId("grid-cell").textContent ?? "{}").displayData).toBe("");
   });
 
-  it("recalculates Sales when Params Growth changes", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    const before = session.getCell("Sales", "Total", "2025-12").computed as number;
+  it("recalculates Lines when Params Growth changes", async () => {
+    const { session } = await renderWorkbookCanvas();
+    const before = session.getCell("Lines", "Total", "2025-12").computed as number;
     await act(async () => {
       session.setSelection({
         kind: "cell",
@@ -136,11 +136,11 @@ describe("playground edit UI", () => {
     await act(async () => {
       await session.recalculate();
     });
-    expect(session.getCell("Sales", "Total", "2025-12").computed as number).toBeGreaterThan(before);
+    expect(session.getCell("Lines", "Total", "2025-12").computed as number).toBeGreaterThan(before);
   });
 
   it("adds a row when typing on the Params growth row", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
     const growthRow = projection.rowCount - 1;
@@ -152,9 +152,9 @@ describe("playground edit UI", () => {
     );
   });
 
-  it("adds a column when typing on a growable table growth column, but not on Sales or Params", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    const notesId = session.addTable("sheet-forud", { name: "Notes" }).id;
+  it("adds a column when typing on a growable table growth column, but not on Lines or Params", async () => {
+    const { session } = await renderWorkbookCanvas();
+    const notesId = session.addTable("sheet-assumptions", { name: "Notes" }).id;
     await act(async () => {
       session.addRow(notesId);
     });
@@ -166,12 +166,12 @@ describe("playground edit UI", () => {
     expect(session.getSnapshot().tables.find((table) => table.id === notesId)!.attributeColumns.length).toBeGreaterThan(1);
 
     layout = layoutWorkbook(session.getSnapshot());
-    const salg = projectTable(layout, "tbl-sales")!;
-    const salgCols = session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.attributeColumns.length;
+    const lines = projectTable(layout, "tbl-lines")!;
+    const linesCols = session.getSnapshot().tables.find((table) => table.id === "tbl-lines")!.attributeColumns.length;
     await act(async () => {
-      applyCustomGridEdits(session, salg, layout, [{ location: [salg.colCount - 1, 1], value: { data: "9" } }]);
+      applyCustomGridEdits(session, lines, layout, [{ location: [lines.colCount - 1, 1], value: { data: "9" } }]);
     });
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.attributeColumns.length).toBe(salgCols);
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-lines")!.attributeColumns.length).toBe(linesCols);
 
     const params = projectTable(layout, "tbl-params")!;
     expect(params.growthColumn).toBe(false);
@@ -183,7 +183,7 @@ describe("playground edit UI", () => {
   });
 
   it("clears, fills, and pastes through the grid helpers after the canvas is mounted", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
     await act(async () => {
@@ -205,7 +205,7 @@ describe("playground edit UI", () => {
   });
 
   it("undoes a canvas edit with Ctrl+Z, including growth as one step", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     const beforeRows = session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows.length;
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
@@ -228,7 +228,7 @@ describe("playground edit UI", () => {
   });
 
   it("commits a literal formula-bar edit when the empty canvas is clicked", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await act(async () => {
       session.setSelection({
         kind: "cell",
@@ -253,7 +253,7 @@ describe("playground edit UI", () => {
   });
 
   it("shows * in the formula bar when a mixed-format range is selected", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await act(async () => {
       session.setCellFormat("tbl-params", "row-vat", "Value", "0.00");
       session.setSelection({
@@ -263,7 +263,7 @@ describe("playground edit UI", () => {
         columnId: "Value",
         range: [
           { tableId: "tbl-params", rowId: "row-vat", columnId: "Value" },
-          { tableId: "tbl-params", rowId: "row-cnc-share", columnId: "Value" },
+          { tableId: "tbl-params", rowId: "row-top-share", columnId: "Value" },
         ],
       });
     });

@@ -7,11 +7,11 @@ import { WorkbookSession } from "../session/WorkbookSession.js";
 import { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 import { PropertiesPanel } from "./PropertiesPanel.js";
 import { WorkbookProvider } from "./WorkbookProvider.js";
-import { installGridDom } from "./playgroundCanvasTest.js";
+import { installGridDom } from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-async function renderPlayground() {
+async function renderWorkbook() {
   const session = new WorkbookSession(createSampleWorkbook(), new HyperFormulaEngine());
   await session.recalculate();
   session.setSelection({
@@ -39,7 +39,7 @@ afterEach(() => {
 
 describe("canvas sheet selection", () => {
   it("selects the sheet when clicking the canvas outside any table", async () => {
-    const { session } = await renderPlayground();
+    const { session } = await renderWorkbook();
     const canvas = document.querySelector(".wk-canvas");
     expect(canvas).toBeTruthy();
     await act(async () => {
@@ -51,7 +51,7 @@ describe("canvas sheet selection", () => {
   });
 
   it("keeps the table selected when clicking a table title", async () => {
-    const { session } = await renderPlayground();
+    const { session } = await renderWorkbook();
     const title = document.querySelector('[data-table-id="tbl-params"] .wk-table-viewport-title');
     expect(title).toBeTruthy();
     await act(async () => {

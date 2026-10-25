@@ -13,7 +13,7 @@ describe("blurOnEnter", () => {
     render(
       <input
         aria-label="Name"
-        defaultValue="Vat"
+        defaultValue="Mix"
         onBlur={(event) => commits.push(event.target.value)}
         onKeyDown={blurOnEnter}
       />,

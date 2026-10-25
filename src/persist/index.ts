@@ -1,6 +1,6 @@
 import type { WorkbookSnapshot } from "../model/types.js";
 
-const IDB_NAME = "budgettool-workbook";
+const IDB_NAME = "tabular-workbook";
 const IDB_VERSION = 2;
 const IDB_STORE = "snapshots";
 
@@ -27,7 +27,7 @@ export class MemoryPersistence implements PersistencePort {
 }
 
 export class IndexedDbPersistence implements PersistencePort {
-  constructor(private readonly key = "playground") {}
+  constructor(private readonly key = "workbook") {}
 
   async load(): Promise<WorkbookSnapshot | null> {
     const db = await openDb();

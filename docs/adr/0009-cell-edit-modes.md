@@ -1,6 +1,6 @@
 # Excel-like cell edit modes (Ready, Enter, Edit, Point)
 
-In-cell overlay and the Value formula bar share one `formulaEdit` machine. Modes match Excel; addresses stay BudgetTool names (`Vat`, `Sales[Jan][CNC]`), never A1.
+In-cell overlay and the Value formula bar share one `formulaEdit` machine. Modes match Excel; addresses stay structured names (`Mix`, `Lines[Jan][Red]`), never A1.
 
 **Ready** — no `formulaEdit`. Arrows move selection. Typing starts Enter (replaces). F2, double-click, or formula-bar focus starts Edit.
 

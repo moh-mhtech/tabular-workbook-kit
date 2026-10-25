@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { overlayKey } from "../model/types.js";
-import { installGridDom, renderPlaygroundCanvas } from "./playgroundCanvasTest.js";
+import { installGridDom, renderWorkbookCanvas } from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -15,7 +15,7 @@ afterEach(() => {
 
 describe("scenario CRUD", () => {
   it("adds, renames, duplicates, and deletes from the scenario bar", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Scenario options" }));
     });
@@ -36,7 +36,7 @@ describe("scenario CRUD", () => {
     });
     expect(session.getSnapshot().scenarios.some((scenario) => scenario.name === "Fast")).toBe(true);
     await act(async () => {
-      session.setInput("Params", "Vat", "Value", 0.4);
+      session.setInput("Params", "Mix", "Value", 0.4);
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Scenario options" }));
@@ -64,7 +64,7 @@ describe("scenario CRUD", () => {
   });
 
   it("rejects a rename collision and does not delete Base", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Scenario options" }));
     });
@@ -82,29 +82,29 @@ describe("scenario CRUD", () => {
   });
 
   it("keeps formula edits on Base and overlays only inputs, including undo", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
-    const formula = session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]!.formula;
-    const selection = { kind: "sheet" as const, sheetId: "sheet-forud" };
+    const { session } = await renderWorkbookCanvas({ chrome: true });
+    const formula = session.getSnapshot().tables.find((table) => table.id === "tbl-lines")!.rows[0]!.cells["2025-01"]!.formula;
+    const selection = { kind: "sheet" as const, sheetId: "sheet-assumptions" };
     await act(async () => {
       session.setSelection(selection);
       session.activateScenario("scn-growth");
     });
     expect(session.selection).toEqual(selection);
     await act(async () => {
-      session.setInput("Params", "Vat", "Value", 0.5);
+      session.setInput("Params", "Mix", "Value", 0.5);
     });
-    expect(session.getCell("Params", "Vat", "Value").overlay).toBe(true);
+    expect(session.getCell("Params", "Mix", "Value").overlay).toBe(true);
     await act(async () => {
-      session.writeCell("Sales", "CNC", "2025-01", "=2");
+      session.writeCell("Lines", "Red", "2025-01", "=2");
     });
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]).toEqual({
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-lines")!.rows[0]!.cells["2025-01"]).toEqual({
       kind: "formula",
       formula: "=2",
     });
     await act(async () => {
       session.undo();
     });
-    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!.rows[0]!.cells["2025-01"]!.formula).toBe(
+    expect(session.getSnapshot().tables.find((table) => table.id === "tbl-lines")!.rows[0]!.cells["2025-01"]!.formula).toBe(
       formula,
     );
     expect(session.getSnapshot().scenarios[0]!.overlays[overlayKey("tbl-params", "row-vat", "Value")]).toBe(0.5);

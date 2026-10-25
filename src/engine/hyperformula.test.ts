@@ -10,12 +10,12 @@ describe("HyperFormulaEngine", () => {
     const values = new HyperFormulaEngine().evaluate(snapshot);
 
     expect(cell(values, snapshot, "Params", "Start", "Value")).toBeCloseTo(563_696.68, 1);
-    expect(cell(values, snapshot, "Params", "NamedVat", "Value")).toBe(0.5);
-    expect(cell(values, snapshot, "Sales", "Total", "2025-01")).toBeCloseTo(
+    expect(cell(values, snapshot, "Params", "NamedMix", "Value")).toBe(0.5);
+    expect(cell(values, snapshot, "Lines", "Total", "2025-01")).toBeCloseTo(
       cell(values, snapshot, "Params", "Start", "Value") as number,
       6,
     );
-    expect(cell(values, snapshot, "Staff", "RequiredFTE", "2025-01")).toBe(1);
+    expect(cell(values, snapshot, "Teams", "RequiredNum", "2025-01")).toBe(1);
     expect(cell(values, snapshot, "Result", "Result", "2025-01")).toBeCloseTo(518_696.68, 1);
     expect(cell(values, snapshot, "Result", "Lookup", "2025-01")).toBe(0.25);
     expect(cell(values, snapshot, "Result", "Naïve", "2025-01")).toBe(8);
@@ -29,7 +29,7 @@ describe("HyperFormulaEngine", () => {
 
     const values = new HyperFormulaEngine({ licenseKey: "gpl-v3" }).evaluate(snapshot);
 
-    expect(cell(values, snapshot, "Params", "AnnualSales", "Value")).toBe(10_000_000);
+    expect(cell(values, snapshot, "Params", "AnnualUnits", "Value")).toBe(10_000_000);
     expect(cell(values, snapshot, "Params", "Start", "Value")).toBeCloseTo(704_620.85, 1);
     expect(snapshot.tables[0].rows[0].cells.Value.value).toBe(8_000_000);
     expect(snapshot.scenarios[0].overlays[overlayKey("tbl-params", "row-annual", "Value")]).toBe(10_000_000);
@@ -81,8 +81,8 @@ function createContractSnapshot(): WorkbookSnapshot {
   snapshot.sheets.find((sheet) => sheet.id === "sheet-res")!.name = "Café";
   snapshot.tables.find((table) => table.name === "Params")!.rows.push({
     id: "row-named-vat",
-    key: "NamedVat",
-    cells: { Value: { kind: "formula", formula: "=Vat*2" } },
+    key: "NamedMix",
+    cells: { Value: { kind: "formula", formula: "=Mix*2" } },
   });
   snapshot.tables.find((table) => table.name === "Result")!.rows.push({
     id: "row-lookup",
@@ -94,7 +94,7 @@ function createContractSnapshot(): WorkbookSnapshot {
           period,
           {
             kind: "formula",
-            formula: '=INDEX(Params[Value],MATCH("Vat",Params[key],0))',
+            formula: '=INDEX(Params[Value],MATCH("Mix",Params[key],0))',
           },
         ];
       }),
@@ -106,7 +106,7 @@ function createContractSnapshot(): WorkbookSnapshot {
     cells: Object.fromEntries(
       Array.from({ length: 12 }, (_, index) => {
         const period = `2025-${String(index + 1).padStart(2, "0")}`;
-        return [period, { kind: "formula", formula: "=AnnualSales/1000000" }];
+        return [period, { kind: "formula", formula: "=AnnualUnits/1000000" }];
       }),
     ),
   });

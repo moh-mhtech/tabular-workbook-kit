@@ -8,7 +8,7 @@ import { projectTable } from "../grid/sheetProjection.js";
 import { evaluatedCells, gridCell } from "./CustomSheetCanvas.js";
 import { COLOR_PALETTE } from "./inspectors/StyleField.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
-import { installGridDom, pressTableKey, renderPlaygroundCanvas, selectProjectedCell } from "./playgroundCanvasTest.js";
+import { installGridDom, pressTableKey, renderWorkbookCanvas, selectProjectedCell } from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 async function selectParamsCell(
-  session: Awaited<ReturnType<typeof renderPlaygroundCanvas>>["session"],
+  session: Awaited<ReturnType<typeof renderWorkbookCanvas>>["session"],
   rowId: string,
 ) {
   await act(async () => {
@@ -55,7 +55,7 @@ function GridCellProbe({ col, row }: { col: number; row: number }) {
 
 describe("properties inspector UI", () => {
   it("labels format Format, omits a Style legend, and shows the evaluated result on the value field", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await selectParamsCell(session, "row-start");
     expect(screen.getByLabelText("Format")).toBeTruthy();
     expect(screen.queryByText("Number format")).toBeNull();
@@ -69,16 +69,16 @@ describe("properties inspector UI", () => {
   });
 
   it("hides the name field for a multi-cell selection", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await act(async () => {
       session.setSelection({
         kind: "cell",
         tableId: "tbl-params",
-        rowId: "row-outsource-share",
+        rowId: "row-alt-share",
         columnId: "Value",
         range: [
-          { tableId: "tbl-params", rowId: "row-outsource-share", columnId: "Value" },
-          { tableId: "tbl-params", rowId: "row-bend-share", columnId: "Value" },
+          { tableId: "tbl-params", rowId: "row-alt-share", columnId: "Value" },
+          { tableId: "tbl-params", rowId: "row-last-share", columnId: "Value" },
         ],
       });
     });
@@ -87,8 +87,8 @@ describe("properties inspector UI", () => {
   });
 
   it("keeps format and style in sync when the selected cell changes", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
-    await selectParamsCell(session, "row-outsource-share");
+    const { session } = await renderWorkbookCanvas({ chrome: true });
+    await selectParamsCell(session, "row-alt-share");
     await act(async () => {
       fireEvent.change(screen.getByLabelText("Format"), { target: { value: "G3A" } });
       fireEvent.blur(screen.getByLabelText("Format"));
@@ -96,25 +96,25 @@ describe("properties inspector UI", () => {
     });
     expect((screen.getByLabelText("Format") as HTMLInputElement).value).toBe("G3A");
     expect(screen.getByLabelText("Bold").getAttribute("aria-pressed")).toBe("true");
-    await selectParamsCell(session, "row-bend-share");
+    await selectParamsCell(session, "row-last-share");
     expect((screen.getByLabelText("Format") as HTMLInputElement).value).toBe("");
     expect(screen.getByLabelText("Bold").getAttribute("aria-pressed")).toBe("false");
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("BendShare");
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("LastShare");
   });
 
   it("updates name and value after keyboard navigation", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await selectProjectedCell(session, "tbl-params", 1, 5);
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("OutsourceShare");
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("AlternateShare");
     expect((screen.getByLabelText("Value") as HTMLTextAreaElement).value).toBe("0.12");
     await pressTableKey("tbl-params", "ArrowDown");
-    expect(session.selection).toMatchObject({ rowId: "row-bend-share", columnId: "Value" });
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("BendShare");
+    expect(session.selection).toMatchObject({ rowId: "row-last-share", columnId: "Value" });
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("LastShare");
     expect((screen.getByLabelText("Value") as HTMLTextAreaElement).value).toBe("0.08");
   });
 
   it("uses None for fill and Default for text, and leaves the fill hex blank without a color", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await selectParamsCell(session, "row-vat");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Fill color" }));
@@ -152,7 +152,7 @@ describe("properties inspector UI", () => {
   });
 
   it("ignores invalid fill hex, clears fill when the hex field is emptied, and clamps font size", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await selectParamsCell(session, "row-vat");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Fill color" }));
@@ -194,7 +194,7 @@ describe("properties inspector UI", () => {
   });
 
   it("opens a hue-by-shade palette whose two lightest steps are distinct", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await selectParamsCell(session, "row-vat");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Fill color" }));
@@ -213,7 +213,7 @@ describe("properties inspector UI", () => {
   });
 
   it("closes the format help tooltip on mouse leave", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await selectParamsCell(session, "row-vat");
     const help = screen.getByLabelText("Number format examples");
     fireEvent.mouseEnter(help);
@@ -226,17 +226,17 @@ describe("properties inspector UI", () => {
     const snapshot = createSampleWorkbook();
     snapshot.tables
       .find((table) => table.id === "tbl-params")!
-      .rows.find((row) => row.id === "row-cnc-share")!.cells.Value = {
+      .rows.find((row) => row.id === "row-top-share")!.cells.Value = {
       kind: "formula",
       formula: "=MissingName",
     };
-    const { session } = await renderPlaygroundCanvas({
+    const { session } = await renderWorkbookCanvas({
       chrome: true,
       snapshot,
       extra: <GridCellProbe col={1} row={4} />,
     });
-    await selectParamsCell(session, "row-cnc-share");
-    expect(session.getCell("Params", "CncShare", "Value").computed).toBe("#NAME?");
+    await selectParamsCell(session, "row-top-share");
+    expect(session.getCell("Params", "TopShare", "Value").computed).toBe("#NAME?");
     const painted = JSON.parse(screen.getByTestId("grid-cell").textContent ?? "{}") as {
       displayData: string;
       data: string;

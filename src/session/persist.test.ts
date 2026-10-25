@@ -16,7 +16,7 @@ describe("persistence", () => {
     const restored = new WorkbookSession(loaded!);
     await restored.recalculate();
     expect(restored.activeScenarioId).toBe("scn-growth");
-    expect(restored.getCell("Params", "AnnualSales", "Value").computed).toBe(10_000_000);
+    expect(restored.getCell("Params", "AnnualUnits", "Value").computed).toBe(10_000_000);
     expect(restored.getCell("Params", "Growth", "Value").computed).toBe(0.04);
     expect(restored.getCell("Params", "Growth", "Value").overlay).toBe(true);
   }, 60_000);

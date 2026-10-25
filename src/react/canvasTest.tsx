@@ -55,7 +55,7 @@ export function installGridDom() {
   }) as never;
 }
 
-export async function renderPlaygroundCanvas(
+export async function renderWorkbookCanvas(
   options: {
     snapshot?: WorkbookSnapshot;
     extra?: ReactNode;

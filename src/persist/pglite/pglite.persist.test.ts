@@ -5,7 +5,7 @@ import { createPglitePersistence } from "./index.js";
 
 describe("PglitePersistence", () => {
   it("load is empty until save restores Stored values", async () => {
-    const persist = await createPglitePersistence("playground");
+    const persist = await createPglitePersistence("workbook");
     expect(await persist.load()).toBeNull();
 
     await persist.save(createSampleWorkbook());
@@ -13,7 +13,7 @@ describe("PglitePersistence", () => {
     expect(loaded).not.toBeNull();
     const session = new WorkbookSession(loaded!);
     await session.recalculate();
-    expect(session.getCell("Params", "Vat", "Value").input).toBe(0.25);
+    expect(session.getCell("Params", "Mix", "Value").input).toBe(0.25);
 
     await persist.clear();
     expect(await persist.load()).toBeNull();
@@ -21,13 +21,13 @@ describe("PglitePersistence", () => {
 
   it("uses a host-served FS bundle instead of resolving pglite.data from the module URL", async () => {
     const fsBundle = new Blob([new Uint8Array(573)]);
-    await expect(createPglitePersistence("playground", { fsBundle })).rejects.toThrow(
+    await expect(createPglitePersistence("workbook", { fsBundle })).rejects.toThrow(
       /Invalid FS bundle size: 573/,
     );
   });
 
   it("keeps the latest Stored Input when two saves overlap", async () => {
-    const persist = await createPglitePersistence("playground-overlap");
+    const persist = await createPglitePersistence("workbook-overlap");
     const first = createSampleWorkbook();
     const session = new WorkbookSession(createSampleWorkbook());
     session.setInput("Params", "Growth", "Value", "test");
@@ -43,7 +43,7 @@ describe("PglitePersistence", () => {
   });
 
   it("round-trips a snapshot including scenario overlays", async () => {
-    const persist = await createPglitePersistence("playground");
+    const persist = await createPglitePersistence("workbook");
     const session = new WorkbookSession(createSampleWorkbook());
     await session.recalculate();
     session.activateScenario("scn-growth");
@@ -54,7 +54,7 @@ describe("PglitePersistence", () => {
     const restored = new WorkbookSession(loaded!);
     await restored.recalculate();
     expect(restored.activeScenarioId).toBe("scn-growth");
-    expect(restored.getCell("Params", "AnnualSales", "Value").computed).toBe(10_000_000);
+    expect(restored.getCell("Params", "AnnualUnits", "Value").computed).toBe(10_000_000);
     expect(restored.getCell("Params", "Growth", "Value").computed).toBe(0.04);
     expect(restored.getCell("Params", "Growth", "Value").overlay).toBe(true);
   });

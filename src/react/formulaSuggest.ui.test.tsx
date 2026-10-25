@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formulaBar, installGridDom, renderPlaygroundCanvas } from "./playgroundCanvasTest.js";
+import { formulaBar, installGridDom, renderWorkbookCanvas } from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -13,7 +13,7 @@ afterEach(() => {
 
 describe("formula suggestion UI", () => {
   it("suggests SUM and inserts it with Tab without committing the cell", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await act(async () => {
       session.setSelection({
         kind: "cell",
@@ -35,7 +35,7 @@ describe("formula suggestion UI", () => {
   });
 
   it("closes the list on Escape and cancels the edit on a second Escape", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await act(async () => {
       session.setSelection({
         kind: "cell",

@@ -29,21 +29,21 @@ describe("custom grid interactions", () => {
     expect(session.selection).toEqual({
       kind: "cell",
       tableId: "tbl-params",
-      rowId: "row-cnc-share",
+      rowId: "row-top-share",
       columnId: "Value",
     });
 
     session.setSelection({
       kind: "cell",
-      tableId: "tbl-sales",
-      rowId: "row-cnc",
+      tableId: "tbl-lines",
+      rowId: "row-red",
       columnId: "2025-01",
     });
     expect(moveSelectionAfterCommit(session, session.getSnapshot(), [1, 0])).toBe(true);
     expect(session.selection).toEqual({
       kind: "cell",
-      tableId: "tbl-sales",
-      rowId: "row-cnc",
+      tableId: "tbl-lines",
+      rowId: "row-red",
       columnId: "2025-02",
     });
   });
@@ -63,7 +63,7 @@ describe("custom grid interactions", () => {
 
   it("moves from the last column onto the unused growth cell when the table can grow", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
-    const notes = session.addTable("sheet-forud", { name: "Notes" });
+    const notes = session.addTable("sheet-assumptions", { name: "Notes" });
     const columnId = notes.attributeColumns[0]!.id;
     const rowId = notes.rows[0]!.id;
     session.setSelection({ kind: "cell", tableId: notes.id, rowId, columnId });
@@ -84,7 +84,7 @@ describe("custom grid interactions", () => {
     });
     expect(session.gridFocus).toEqual({ tableId: "tbl-params", col: 1, row: 9 });
 
-    const notes = session.addTable("sheet-forud", { name: "Notes" });
+    const notes = session.addTable("sheet-assumptions", { name: "Notes" });
     const notesLayout = layoutWorkbook(session.getSnapshot());
     const notesProjection = projectTable(notesLayout, notes.id)!;
     expect(applyCustomGridEdits(session, notesProjection, notesLayout, [{ location: [2, 1], value: { data: "7" } }])).toBe(1);
@@ -184,14 +184,14 @@ describe("custom grid interactions", () => {
   it("renames a table identifier through the table viewport", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
-    const projection = projectTable(layout, "tbl-staff")!;
+    const projection = projectTable(layout, "tbl-teams")!;
 
     expect(applyCustomGridEdits(session, projection, layout, [
       { location: [0, 1], value: { data: "CamLead" } },
       { location: [1, 0], value: { data: "Position" } },
     ])).toBe(2);
 
-    const staff = session.getSnapshot().tables.find((table) => table.id === "tbl-staff")!;
+    const staff = session.getSnapshot().tables.find((table) => table.id === "tbl-teams")!;
     expect(staff.rows[0].key).toBe("CamLead");
     expect(staff.attributeColumns[0].name).toBe("Position");
   });
@@ -219,7 +219,7 @@ describe("custom grid interactions", () => {
 
   it("grows a table so a pasted block fits", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
-    const notes = session.addTable("sheet-forud", { name: "Notes" });
+    const notes = session.addTable("sheet-assumptions", { name: "Notes" });
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, notes.id)!;
 
@@ -273,7 +273,7 @@ describe("custom grid interactions", () => {
   it("does not add columns when pasting past a time-axis table", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
-    const projection = projectTable(layout, "tbl-sales")!;
+    const projection = projectTable(layout, "tbl-lines")!;
 
     expect(
       applyCustomGridPaste(session, projection, [12, 5], [
@@ -282,12 +282,12 @@ describe("custom grid interactions", () => {
       ]),
     ).toBe(2);
 
-    const salg = session.getSnapshot().tables.find((table) => table.id === "tbl-sales")!;
-    expect(salg.rows).toHaveLength(6);
-    expect(salg.attributeColumns).toHaveLength(0);
-    expect(salg.rows[4]!.cells["2025-12"]).toEqual({ kind: "input", value: 1 });
-    expect(salg.rows[5]!.cells["2025-12"]).toEqual({ kind: "input", value: 3 });
-    expect(session.getSnapshot().sheets.find((sheet) => sheet.id === "sheet-forud")?.looseCells).toBeUndefined();
+    const lines = session.getSnapshot().tables.find((table) => table.id === "tbl-lines")!;
+    expect(lines.rows).toHaveLength(6);
+    expect(lines.attributeColumns).toHaveLength(0);
+    expect(lines.rows[4]!.cells["2025-12"]).toEqual({ kind: "input", value: 1 });
+    expect(lines.rows[5]!.cells["2025-12"]).toEqual({ kind: "input", value: 3 });
+    expect(session.getSnapshot().sheets.find((sheet) => sheet.id === "sheet-assumptions")?.looseCells).toBeUndefined();
   });
 });
 

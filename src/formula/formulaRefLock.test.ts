@@ -3,24 +3,24 @@ import { cycleFormulaRefLock } from "./formulaRefLock.js";
 
 const febOut = {
   columnName: "Jan",
-  rowKey: "Outsource",
+  rowKey: "Secondary",
   sameColumn: true,
   sameRow: false,
 };
 
 describe("F4 Formula-ref lock", () => {
   it("cycles Relative, Fixed both, Fixed row, Fixed column", () => {
-    expect(cycleFormulaRefLock("[@][Outsource]", febOut)).toBe("[$Jan][$Outsource]");
-    expect(cycleFormulaRefLock("[$Jan][$Outsource]", febOut)).toBe("[@][$Outsource]");
-    expect(cycleFormulaRefLock("[@][$Outsource]", febOut)).toBe("[$Jan][Outsource]");
-    expect(cycleFormulaRefLock("[$Jan][Outsource]", febOut)).toBe("[@][Outsource]");
+    expect(cycleFormulaRefLock("[@][Secondary]", febOut)).toBe("[$Jan][$Secondary]");
+    expect(cycleFormulaRefLock("[$Jan][$Secondary]", febOut)).toBe("[@][$Secondary]");
+    expect(cycleFormulaRefLock("[@][$Secondary]", febOut)).toBe("[$Jan][Secondary]");
+    expect(cycleFormulaRefLock("[$Jan][Secondary]", febOut)).toBe("[@][Secondary]");
   });
 
   it("keeps a Qualified Formula ref prefix", () => {
-    expect(cycleFormulaRefLock("Sales[@][Outsource]", febOut)).toBe("Sales[$Jan][$Outsource]");
+    expect(cycleFormulaRefLock("Lines[@][Secondary]", febOut)).toBe("Lines[$Jan][$Secondary]");
   });
 
   it("leaves a Defined name unchanged", () => {
-    expect(cycleFormulaRefLock("Vat", febOut)).toBe("Vat");
+    expect(cycleFormulaRefLock("Mix", febOut)).toBe("Mix");
   });
 });

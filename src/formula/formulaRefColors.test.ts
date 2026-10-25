@@ -58,36 +58,36 @@ describe("Formula-ref colors", () => {
       "#00B0F0",
       "#C00000",
     ]);
-    expect(colorFormulaRefs("=Vat+CncShare")).toEqual([
-      { text: "Vat", color: "#0000FF", start: 1, end: 4 },
-      { text: "CncShare", color: "#FF0000", start: 5, end: 13 },
+    expect(colorFormulaRefs("=Mix+TopShare")).toEqual([
+      { text: "Mix", color: "#0000FF", start: 1, end: 4 },
+      { text: "TopShare", color: "#FF0000", start: 5, end: 13 },
     ]);
-    expect(colorFormulaRefs("=Vat+Vat")).toEqual([
-      { text: "Vat", color: "#0000FF", start: 1, end: 4 },
-      { text: "Vat", color: "#0000FF", start: 5, end: 8 },
+    expect(colorFormulaRefs("=Mix+Mix")).toEqual([
+      { text: "Mix", color: "#0000FF", start: 1, end: 4 },
+      { text: "Mix", color: "#0000FF", start: 5, end: 8 },
     ]);
   });
 
   it("marks the matching cells on the same Table", () => {
     const layout = layoutWorkbook(createSampleWorkbook());
     const params = projectTable(layout, "tbl-params")!;
-    expect(formulaRefGridMarks("=Vat+CncShare", layout, params)).toEqual([
-      { text: "Vat", color: "#0000FF", range: { x: 1, y: 3, width: 1, height: 1 } },
-      { text: "CncShare", color: "#FF0000", range: { x: 1, y: 4, width: 1, height: 1 } },
+    expect(formulaRefGridMarks("=Mix+TopShare", layout, params)).toEqual([
+      { text: "Mix", color: "#0000FF", range: { x: 1, y: 3, width: 1, height: 1 } },
+      { text: "TopShare", color: "#FF0000", range: { x: 1, y: 4, width: 1, height: 1 } },
     ]);
   });
 
   it("marks a Local Formula ref on the same Table", () => {
     const layout = layoutWorkbook(createSampleWorkbook());
-    const salg = projectTable(layout, "tbl-sales")!;
-    expect(formulaRefGridMarks("=[Jan][CNC]", layout, salg)).toEqual([
-      { text: "[Jan][CNC]", color: "#0000FF", range: { x: 1, y: 1, width: 1, height: 1 } },
+    const lines = projectTable(layout, "tbl-lines")!;
+    expect(formulaRefGridMarks("=[Jan][Red]", layout, lines)).toEqual([
+      { text: "[Jan][Red]", color: "#0000FF", range: { x: 1, y: 1, width: 1, height: 1 } },
     ]);
-    expect(formulaRefGridMarks("=[$Jan][$CNC]", layout, salg)).toEqual([
-      { text: "[$Jan][$CNC]", color: "#0000FF", range: { x: 1, y: 1, width: 1, height: 1 } },
+    expect(formulaRefGridMarks("=[$Jan][$Red]", layout, lines)).toEqual([
+      { text: "[$Jan][$Red]", color: "#0000FF", range: { x: 1, y: 1, width: 1, height: 1 } },
     ]);
     expect(
-      formulaRefGridMarks("=[@][Outsource]", layout, salg, { tableId: "tbl-sales", col: 1, row: 1 }),
-    ).toEqual([{ text: "[@][Outsource]", color: "#0000FF", range: { x: 1, y: 2, width: 1, height: 1 } }]);
+      formulaRefGridMarks("=[@][Secondary]", layout, lines, { tableId: "tbl-lines", col: 1, row: 1 }),
+    ).toEqual([{ text: "[@][Secondary]", color: "#0000FF", range: { x: 1, y: 2, width: 1, height: 1 } }]);
   });
 });

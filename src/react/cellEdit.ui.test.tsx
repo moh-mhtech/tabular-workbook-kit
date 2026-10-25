@@ -13,10 +13,10 @@ import {
   formulaBar,
   installGridDom,
   pressCaretKey,
-  renderPlaygroundCanvas,
+  renderWorkbookCanvas,
   selectProjectedCell,
   typeEqualsOnProjectedCell,
-} from "./playgroundCanvasTest.js";
+} from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -26,7 +26,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function selectVat(session: Awaited<ReturnType<typeof renderPlaygroundCanvas>>["session"]) {
+function selectMix(session: Awaited<ReturnType<typeof renderWorkbookCanvas>>["session"]) {
   return act(async () => {
     session.setSelection({
       kind: "cell",
@@ -39,35 +39,35 @@ function selectVat(session: Awaited<ReturnType<typeof renderPlaygroundCanvas>>["
 
 describe("Excel-like cell edit UI", () => {
   it("does not show autocomplete after =, and names complete after a letter", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    await selectVat(session);
+    const { session } = await renderWorkbookCanvas();
+    await selectMix(session);
     const bar = formulaBar()!;
     await act(async () => {
       fireEvent.change(bar, { target: { value: "=" } });
     });
     expect(screen.queryByRole("listbox")).toBeNull();
     await act(async () => {
-      fireEvent.change(bar, { target: { value: "=V" } });
+      fireEvent.change(bar, { target: { value: "=Mi" } });
     });
-    expect(screen.getByRole("option", { name: /Vat/ }).textContent).toContain("Vat");
+    expect(screen.getByRole("option", { name: /Mix/ }).textContent).toContain("Mix");
     await act(async () => {
-      fireEvent.change(bar, { target: { value: "=Sa" } });
+      fireEvent.change(bar, { target: { value: "=Li" } });
     });
-    expect(screen.getByRole("option", { name: /Sales/ }).textContent).toContain("Sales");
+    expect(screen.getByRole("option", { name: /Lines/ }).textContent).toContain("Lines");
   });
 
   it("inserts a name without parentheses and a function with them", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    await selectVat(session);
+    const { session } = await renderWorkbookCanvas();
+    await selectMix(session);
     const bar = formulaBar()!;
     await act(async () => {
-      fireEvent.change(bar, { target: { value: "=V" } });
+      fireEvent.change(bar, { target: { value: "=Mi" } });
     });
-    const vatOption = screen.getByRole("option", { name: /Vat/ });
+    const vatOption = screen.getByRole("option", { name: /Mix/ });
     await act(async () => {
       fireEvent.mouseDown(vatOption);
     });
-    expect(bar.value).toBe("=Vat");
+    expect(bar.value).toBe("=Mix");
     await act(async () => {
       fireEvent.change(bar, { target: { value: "=Su" } });
       fireEvent.keyDown(formulaBar()!, { key: "Enter" });
@@ -77,8 +77,8 @@ describe("Excel-like cell edit UI", () => {
   });
 
   it("commits a literal from the formula bar when another cell is clicked", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    await selectVat(session);
+    const { session } = await renderWorkbookCanvas();
+    await selectMix(session);
     const bar = formulaBar()!;
     await act(async () => {
       fireEvent.change(bar, { target: { value: "12" } });
@@ -90,12 +90,12 @@ describe("Excel-like cell edit UI", () => {
       kind: "input",
       value: 12,
     });
-    expect(session.selection).toMatchObject({ tableId: "tbl-params", rowId: "row-cnc-share" });
+    expect(session.selection).toMatchObject({ tableId: "tbl-params", rowId: "row-top-share" });
   });
 
   it("inserts a pointed ref from a grid click without leaving Value", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    await selectVat(session);
+    const { session } = await renderWorkbookCanvas();
+    await selectMix(session);
     const bar = formulaBar()!;
     await act(async () => {
       fireEvent.change(bar, { target: { value: "=" } });
@@ -103,14 +103,14 @@ describe("Excel-like cell edit UI", () => {
     });
     await clickProjectedCell(session, "tbl-params", 1, 4);
     await blurFormulaBar();
-    expect(session.formulaEdit?.draft).toBe("=CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare");
     expect(session.formulaEdit?.mode).toBe("point");
-    expect(formulaBar()!.value).toBe("=CncShare");
+    expect(formulaBar()!.value).toBe("=TopShare");
   });
 
-  it("points a Defined name with non-Latin letters like Vat", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    await selectVat(session);
+  it("points a Defined name with non-Latin letters like Mix", async () => {
+    const { session } = await renderWorkbookCanvas();
+    await selectMix(session);
     const bar = formulaBar()!;
     await act(async () => {
       fireEvent.change(bar, { target: { value: "=" } });
@@ -118,14 +118,14 @@ describe("Excel-like cell edit UI", () => {
     });
     await clickProjectedCell(session, "tbl-params", 1, 1);
     await blurFormulaBar();
-    expect(session.formulaEdit?.draft).toBe("=AnnualSales");
+    expect(session.formulaEdit?.draft).toBe("=AnnualUnits");
     expect(session.formulaEdit?.mode).toBe("point");
-    expect(formulaBar()!.value).toBe("=AnnualSales");
+    expect(formulaBar()!.value).toBe("=AnnualUnits");
   });
 
   it("starts Edit in Value on F2", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    await selectVat(session);
+    const { session } = await renderWorkbookCanvas();
+    await selectMix(session);
     await act(async () => {
       fireEvent.keyDown(window, { key: "F2" });
     });
@@ -134,20 +134,20 @@ describe("Excel-like cell edit UI", () => {
   });
 
   it("drag-extends a pointed range from a grid click-drag", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    await selectVat(session);
+    const { session } = await renderWorkbookCanvas();
+    await selectMix(session);
     await act(async () => {
       fireEvent.change(formulaBar()!, { target: { value: "=" } });
     });
     await clickProjectedCell(session, "tbl-params", 1, 3);
     await dragProjectedCell(session, "tbl-params", 1, 4);
     await blurFormulaBar();
-    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare");
-    expect(formulaBar()!.value).toBe("=Vat:CncShare");
+    expect(session.formulaEdit?.draft).toBe("=Mix:TopShare");
+    expect(formulaBar()!.value).toBe("=Mix:TopShare");
   });
 
   it("anchors the Formula-edit popup on the edited cell at one line, not 120px", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
     const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor");
     expect(Number.parseFloat(editor!.style.height)).toBe(28);
@@ -175,7 +175,7 @@ describe("Excel-like cell edit UI", () => {
   });
 
   it("matches the Inline draft to the Edit cell size and padding", async () => {
-    const { session } = await renderPlaygroundCanvas({ formulaEditPlacement: "inline" });
+    const { session } = await renderWorkbookCanvas({ formulaEditPlacement: "inline" });
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
     const host = document.querySelector<HTMLElement>(".wk-overlay-editor-host")!;
     const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
@@ -189,7 +189,7 @@ describe("Excel-like cell edit UI", () => {
   });
 
   it("edits Inline in the Edit cell without a Popup", async () => {
-    const { session } = await renderPlaygroundCanvas({ formulaEditPlacement: "inline" });
+    const { session } = await renderWorkbookCanvas({ formulaEditPlacement: "inline" });
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
     const host = document.querySelector<HTMLElement>(".wk-overlay-editor-host");
     expect(host!.classList.contains("is-inline")).toBe(true);
@@ -206,7 +206,7 @@ describe("Excel-like cell edit UI", () => {
   });
 
   it("scrolls Inline Formula text with the Caret", async () => {
-    const { session } = await renderPlaygroundCanvas({ formulaEditPlacement: "inline" });
+    const { session } = await renderWorkbookCanvas({ formulaEditPlacement: "inline" });
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
     const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
     const long = `=${"X".repeat(80)}`;
@@ -220,19 +220,19 @@ describe("Excel-like cell edit UI", () => {
   });
 
   it("does not select the pointed Formula ref in the Formula-edit popup", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
     const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
     await act(async () => {
       fireEvent.keyDown(editor, { key: "ArrowDown" });
     });
-    expect(session.formulaEdit?.draft).toBe("=CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare");
     expect(editor.selectionStart).toBe(editor.selectionEnd);
-    expect(editor.selectionStart).toBe("=CncShare".length);
+    expect(editor.selectionStart).toBe("=TopShare".length);
   });
 
   it("moves the Caret after typing =, dragging a Formula range, then clicking Formula text", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
     const overlay = document.querySelector(".wk-overlay-editor");
     expect(overlay, "in-cell editor").toBeInstanceOf(HTMLTextAreaElement);
@@ -241,7 +241,7 @@ describe("Excel-like cell edit UI", () => {
     await dragProjectedCell(session, "tbl-params", 1, 4);
     expect(session.formulaEdit, "mouse Formula range must not Cancel").not.toBeNull();
     expect(session.formulaEdit?.mode).toBe("point");
-    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare");
+    expect(session.formulaEdit?.draft).toBe("=Mix:TopShare");
     expect(document.querySelector(".wk-overlay-editor"), "in-cell editor must stay open while Pointing").toBe(overlay);
 
     const field = await clickFormulaText(4);
@@ -250,7 +250,7 @@ describe("Excel-like cell edit UI", () => {
     expect(document.activeElement).toBe(field);
     expect(session.formulaEdit, "clicking Formula text must not Cancel").not.toBeNull();
     expect(session.formulaEdit?.mode).toBe("edit");
-    expect(field.value).toBe("=Vat:CncShare");
+    expect(field.value).toBe("=Mix:TopShare");
     expect(field.selectionStart).toBe(4);
     expect(field.selectionEnd).toBe(4);
 
@@ -258,21 +258,21 @@ describe("Excel-like cell edit UI", () => {
     expect(document.activeElement).toBe(field);
     expect(field.selectionStart).toBe(3);
     expect(field.selectionEnd).toBe(3);
-    expect(field.value).toBe("=Vat:CncShare");
+    expect(field.value).toBe("=Mix:TopShare");
     expect(session.formulaEdit?.mode).toBe("edit");
-    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare");
+    expect(session.formulaEdit?.draft).toBe("=Mix:TopShare");
   });
 
   it("moves the Caret after a Formula-text click then )", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    await selectVat(session);
+    const { session } = await renderWorkbookCanvas();
+    await selectMix(session);
     await act(async () => {
       fireEvent.keyDown(window, { key: "F2" });
       fireEvent.change(formulaBar()!, { target: { value: "=" } });
     });
     await clickProjectedCell(session, "tbl-params", 1, 3);
     await dragProjectedCell(session, "tbl-params", 1, 4);
-    expect(formulaBar()!.value).toBe("=Vat:CncShare");
+    expect(formulaBar()!.value).toBe("=Mix:TopShare");
     expect(document.activeElement).toBe(formulaBar());
     const bar = formulaBar()!;
     await act(async () => {
@@ -283,10 +283,10 @@ describe("Excel-like cell edit UI", () => {
     expect(session.formulaEdit?.mode).toBe("edit");
     await act(async () => {
       expect(fireEvent.keyDown(formulaBar()!, { key: ")", cancelable: true }), ") must stay in Edit mode").toBe(true);
-      fireEvent.change(formulaBar()!, { target: { value: "=Vat:CncShare)" } });
+      fireEvent.change(formulaBar()!, { target: { value: "=Mix:TopShare)" } });
     });
     expect(session.formulaEdit?.mode).toBe("edit");
-    expect(formulaBar()!.value).toBe("=Vat:CncShare)");
+    expect(formulaBar()!.value).toBe("=Mix:TopShare)");
     expect(document.activeElement).toBe(formulaBar());
     const next = formulaBar()!;
     next.focus();
@@ -298,64 +298,64 @@ describe("Excel-like cell edit UI", () => {
       session.setFormulaEditMode("point");
       session.setFormulaEditMode("edit");
     });
-    expect(formulaBar()!.selectionStart).toBe("=Vat:CncShare)".length - 2);
+    expect(formulaBar()!.selectionStart).toBe("=Mix:TopShare)".length - 2);
     expect(document.activeElement).toBe(formulaBar());
-    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare)");
+    expect(session.formulaEdit?.draft).toBe("=Mix:TopShare)");
     expect(session.formulaEdit?.mode).toBe("edit");
   });
 
-  it("keeps the Formula range on Vat:CncShare after typing )", async () => {
-    const { session } = await renderPlaygroundCanvas();
+  it("keeps the Formula range on Mix:TopShare after typing )", async () => {
+    const { session } = await renderWorkbookCanvas();
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
     await clickProjectedCell(session, "tbl-params", 1, 3);
     await dragProjectedCell(session, "tbl-params", 1, 4);
-    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare");
+    expect(session.formulaEdit?.draft).toBe("=Mix:TopShare");
     expect(session.formulaEdit?.rangeAnchor).toEqual({ tableId: "tbl-params", col: 1, row: 3 });
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 4 });
 
-    const field = await clickFormulaText("=Vat:CncShare".length);
+    const field = await clickFormulaText("=Mix:TopShare".length);
     await act(async () => {
       fireEvent.keyDown(field, { key: ")", cancelable: true });
-      fireEvent.change(field, { target: { value: "=Vat:CncShare)" } });
+      fireEvent.change(field, { target: { value: "=Mix:TopShare)" } });
     });
-    expect(field.value).toBe("=Vat:CncShare)");
-    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare)");
+    expect(field.value).toBe("=Mix:TopShare)");
+    expect(session.formulaEdit?.draft).toBe("=Mix:TopShare)");
     expect(session.formulaEdit?.rangeAnchor).toEqual({ tableId: "tbl-params", col: 1, row: 3 });
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 4 });
   });
 
-  it("colors Formula refs in the Formula bar and marks Vat on the grid", async () => {
-    const { session } = await renderPlaygroundCanvas();
-    await selectVat(session);
+  it("colors Formula refs in the Formula bar and marks Mix on the grid", async () => {
+    const { session } = await renderWorkbookCanvas();
+    await selectMix(session);
     const bar = formulaBar()!;
     await act(async () => {
-      fireEvent.change(bar, { target: { value: "=Vat+CncShare" } });
+      fireEvent.change(bar, { target: { value: "=Mix+TopShare" } });
     });
-    const vat = document.querySelectorAll('[data-formula-ref="Vat"]');
-    const shares = document.querySelectorAll('[data-formula-ref="CncShare"]');
+    const vat = document.querySelectorAll('[data-formula-ref="Mix"]');
+    const shares = document.querySelectorAll('[data-formula-ref="TopShare"]');
     expect(vat.length).toBeGreaterThan(0);
     expect(shares.length).toBeGreaterThan(0);
     expect((vat[0] as HTMLElement).style.color).toBe("rgb(0, 0, 255)");
     expect((shares[0] as HTMLElement).style.color).toBe("rgb(255, 0, 0)");
     const marks = document.querySelector("[data-formula-ref-marks]")?.getAttribute("data-formula-ref-marks");
     expect(marks).toContain("#0000FF");
-    expect(marks).toContain("Vat");
+    expect(marks).toContain("Mix");
   });
 
   it("points a Formula ref on another Sheet from Explorer", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
-    await selectVat(session);
+    const { session } = await renderWorkbookCanvas({ chrome: true });
+    await selectMix(session);
     const bar = formulaBar()!;
     await act(async () => {
       fireEvent.change(bar, { target: { value: "=" } });
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
+      fireEvent.click(screen.getByRole("button", { name: "Lines" }));
     });
     expect(session.formulaEdit).not.toBeNull();
     expect(formulaBar()).toBeTruthy();
-    await clickProjectedCell(session, "tbl-sales", 1, 1);
-    expect(formulaBar()?.value).toMatch(/Sales\[/);
+    await clickProjectedCell(session, "tbl-lines", 1, 1);
+    expect(formulaBar()?.value).toMatch(/Lines\[/);
     expect(session.formulaEdit).not.toBeNull();
     await act(async () => {
       fireEvent.keyDown(formulaBar()!, { key: "Enter" });
@@ -365,13 +365,13 @@ describe("Excel-like cell edit UI", () => {
   });
 
   it("does not point a Formula ref at the Edit cell", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await typeEqualsOnProjectedCell(session, "tbl-params", 1, 3);
     const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
     await act(async () => {
       fireEvent.keyDown(editor, { key: "ArrowDown" });
     });
-    expect(session.formulaEdit?.draft).toBe("=CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare");
     await act(async () => {
       fireEvent.keyDown(editor, { key: "ArrowUp" });
     });
@@ -379,38 +379,38 @@ describe("Excel-like cell edit UI", () => {
     await act(async () => {
       fireEvent.keyDown(editor, { key: "ArrowDown" });
     });
-    expect(session.formulaEdit?.draft).toBe("=CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare");
   });
 
   it("points a Local Formula ref on the same Table", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Sales" }));
+      fireEvent.click(screen.getByRole("button", { name: "Lines" }));
     });
-    await typeEqualsOnProjectedCell(session, "tbl-sales", 1, 1);
-    await clickProjectedCell(session, "tbl-sales", 1, 2);
-    expect(session.formulaEdit?.draft).toBe("=[@][Outsource]");
+    await typeEqualsOnProjectedCell(session, "tbl-lines", 1, 1);
+    await clickProjectedCell(session, "tbl-lines", 1, 2);
+    expect(session.formulaEdit?.draft).toBe("=[@][Secondary]");
     const editor = document.querySelector<HTMLTextAreaElement>(".wk-overlay-editor")!;
     await act(async () => {
       fireEvent.keyDown(editor, { key: "F4" });
     });
-    expect(session.formulaEdit?.draft).toBe("=[$Jan][$Outsource]");
+    expect(session.formulaEdit?.draft).toBe("=[$Jan][$Secondary]");
     await act(async () => {
       fireEvent.keyDown(editor, { key: "F4" });
     });
-    expect(session.formulaEdit?.draft).toBe("=[@][$Outsource]");
+    expect(session.formulaEdit?.draft).toBe("=[@][$Secondary]");
     await act(async () => {
       fireEvent.keyDown(editor, { key: "F4" });
     });
-    expect(session.formulaEdit?.draft).toBe("=[$Jan][Outsource]");
+    expect(session.formulaEdit?.draft).toBe("=[$Jan][Secondary]");
     await act(async () => {
       fireEvent.keyDown(editor, { key: "F4" });
     });
-    expect(session.formulaEdit?.draft).toBe("=[@][Outsource]");
+    expect(session.formulaEdit?.draft).toBe("=[@][Secondary]");
   });
 
   it("shows a Growth-cell inspector with only Value", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await selectProjectedCell(session, "tbl-params", 0, 8);
     expect(session.selection).toMatchObject({ kind: "growth", tableId: "tbl-params" });
     expect(screen.getByRole("heading", { name: "Growth cell" })).toBeTruthy();
@@ -420,7 +420,7 @@ describe("Excel-like cell edit UI", () => {
   });
 
   it("shows a Growth-cell inspector for a data Growth cell", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await selectProjectedCell(session, "tbl-params", 1, 8);
     expect(session.selection).toEqual({ kind: "growth", tableId: "tbl-params", col: 1, row: 8 });
     expect(screen.getByRole("heading", { name: "Growth cell" })).toBeTruthy();

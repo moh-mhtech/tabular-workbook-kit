@@ -12,12 +12,12 @@ afterEach(cleanup);
 
 const inert = { evaluate: () => ({}) };
 
-function sessionWithSelection(kind: "aarsalg" | "vat") {
+function sessionWithSelection(kind: "aarlines" | "vat") {
   const session = new WorkbookSession(createSampleWorkbook(), inert);
   session.setSelection({
     kind: "cell",
     tableId: "tbl-params",
-    rowId: kind === "aarsalg" ? "row-annual" : "row-vat",
+    rowId: kind === "aarlines" ? "row-annual" : "row-vat",
     columnId: "Value",
   });
   return session;
@@ -25,7 +25,7 @@ function sessionWithSelection(kind: "aarsalg" | "vat") {
 
 describe("exampleNumberFromSelection", () => {
   it("reads the first cell of a cell or column selection", () => {
-    const session = sessionWithSelection("aarsalg");
+    const session = sessionWithSelection("aarlines");
     expect(exampleNumberFromSelection(session)).toBe(8_000_000);
     session.setSelection({ kind: "column", tableId: "tbl-params", columnId: "Value" });
     expect(exampleNumberFromSelection(session)).toBe(8_000_000);

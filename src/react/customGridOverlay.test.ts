@@ -85,52 +85,52 @@ describe("custom grid overlay navigation", () => {
   it("only points from a formula draft", () => {
     expect(canPointFromDraft("")).toBe(false);
     expect(canPointFromDraft("=")).toBe(true);
-    expect(canPointFromDraft("=Vat")).toBe(true);
+    expect(canPointFromDraft("=Mix")).toBe(true);
     expect(canPointFromDraft("100")).toBe(false);
   });
 
   it("inserts a pointed ref at the caret and replaces the last pointed token", () => {
-    expect(applyPointedRef("=", null, "Vat", 1)).toEqual({
-      draft: "=Vat",
+    expect(applyPointedRef("=", null, "Mix", 1)).toEqual({
+      draft: "=Mix",
       span: { start: 1, end: 4 },
     });
-    expect(applyPointedRef("=Vat", { start: 1, end: 4 }, "CncShare")).toEqual({
-      draft: "=CncShare",
+    expect(applyPointedRef("=Mix", { start: 1, end: 4 }, "TopShare")).toEqual({
+      draft: "=TopShare",
       span: { start: 1, end: 9 },
     });
-    expect(applyPointedRef("=Vat+", null, "CncShare", 5)).toEqual({
-      draft: "=Vat+CncShare",
+    expect(applyPointedRef("=Mix+", null, "TopShare", 5)).toEqual({
+      draft: "=Mix+TopShare",
       span: { start: 5, end: 13 },
     });
-    expect(applyPointedRef("", null, "Vat")).toEqual({
-      draft: "=Vat",
+    expect(applyPointedRef("", null, "Mix")).toEqual({
+      draft: "=Mix",
       span: { start: 1, end: 4 },
     });
-    expect(applyPointedRef("100", null, "Vat")).toEqual({
-      draft: "=Vat",
+    expect(applyPointedRef("100", null, "Mix")).toEqual({
+      draft: "=Mix",
       span: { start: 1, end: 4 },
     });
   });
 
   it("finds the formula ref at the caret or an exact selection", () => {
-    expect(formulaRefSpans("=Vat+CncShare")).toEqual([
+    expect(formulaRefSpans("=Mix+TopShare")).toEqual([
       { start: 1, end: 4 },
       { start: 5, end: 13 },
     ]);
-    expect(cursorFormulaRef("=Vat", 4, 4)).toEqual({ start: 1, end: 4 });
-    expect(cursorFormulaRef("=Vat+", 5, 5)).toBeNull();
-    expect(cursorFormulaRef("=Vat+CncShare", 4, 4)).toEqual({ start: 1, end: 4 });
-    expect(cursorFormulaRef("=Vat+CncShare", 5, 5)).toBeNull();
-    expect(cursorFormulaRef("=Vat+CncShare", 13, 13)).toEqual({ start: 5, end: 13 });
-    expect(cursorFormulaRef("=Vat", 1, 4)).toEqual({ start: 1, end: 4 });
-    expect(cursorFormulaRef("=Vat", 1, 3)).toBeNull();
-    expect(cursorFormulaRef("=Vat+", 0, 5)).toBeNull();
-    expect(cursorFormulaRef("=SUM(Vat)", 8, 8)).toEqual({ start: 5, end: 8 });
+    expect(cursorFormulaRef("=Mix", 4, 4)).toEqual({ start: 1, end: 4 });
+    expect(cursorFormulaRef("=Mix+", 5, 5)).toBeNull();
+    expect(cursorFormulaRef("=Mix+TopShare", 4, 4)).toEqual({ start: 1, end: 4 });
+    expect(cursorFormulaRef("=Mix+TopShare", 5, 5)).toBeNull();
+    expect(cursorFormulaRef("=Mix+TopShare", 13, 13)).toEqual({ start: 5, end: 13 });
+    expect(cursorFormulaRef("=Mix", 1, 4)).toEqual({ start: 1, end: 4 });
+    expect(cursorFormulaRef("=Mix", 1, 3)).toBeNull();
+    expect(cursorFormulaRef("=Mix+", 0, 5)).toBeNull();
+    expect(cursorFormulaRef("=SUM(Mix)", 8, 8)).toEqual({ start: 5, end: 8 });
     expect(cursorFormulaRef("=SUM(", 5, 5)).toBeNull();
     expect(cursorFormulaRef("=Params[Growth]", 15, 15)).toEqual({ start: 1, end: 15 });
     expect(cursorFormulaRef("=", 1, 1)).toBeNull();
-    expect(formulaRefSpans("=Vat:CncShare")).toEqual([{ start: 1, end: 13 }]);
-    expect(cursorFormulaRef("=Vat:CncShare", 13, 13)).toEqual({ start: 1, end: 13 });
+    expect(formulaRefSpans("=Mix:TopShare")).toEqual([{ start: 1, end: 13 }]);
+    expect(cursorFormulaRef("=Mix:TopShare", 13, 13)).toEqual({ start: 1, end: 13 });
   });
 
   it("keeps the formula edit open when a click or arrow points at a cell", () => {
@@ -148,9 +148,9 @@ describe("custom grid overlay navigation", () => {
 
     expect(pointFromArrow(session, [1, 3], [0, 1], projection, layout)).toEqual({
       location: [1, 4],
-      ref: "CncShare",
+      ref: "TopShare",
     });
-    expect(session.formulaEdit?.draft).toBe("=CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare");
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 4 });
   });
 
@@ -166,12 +166,12 @@ describe("custom grid overlay navigation", () => {
 
     expect(pointFromArrow(session, [1, 3], [0, 1], projection, layout)).toEqual({
       location: [1, 4],
-      ref: "CncShare",
+      ref: "TopShare",
     });
-    expect(session.formulaEdit?.draft).toBe("=CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare");
 
-    const afterOp = applyFormulaOperator("=CncShare", session.formulaEdit?.activeFormulaRef ?? null, 1, 9, "+");
-    expect(afterOp).toEqual({ draft: "=CncShare+", caret: 10 });
+    const afterOp = applyFormulaOperator("=TopShare", session.formulaEdit?.activeFormulaRef ?? null, 1, 9, "+");
+    expect(afterOp).toEqual({ draft: "=TopShare+", caret: 10 });
     session.setFormulaEditMode("enter");
     session.syncFormulaEditCursor(afterOp.draft, afterOp.caret, afterOp.caret);
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 3 });
@@ -180,16 +180,16 @@ describe("custom grid overlay navigation", () => {
 
     expect(pointFromArrow(session, [1, 3], [0, 1], projection, layout)).toEqual({
       location: [1, 4],
-      ref: "CncShare",
+      ref: "TopShare",
     });
-    expect(session.formulaEdit?.draft).toBe("=CncShare+CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare+TopShare");
   });
 
   it("walks from the edit cell when inserting even if the old target cell is stale", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
-    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=CncShare+", {
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=TopShare+", {
       pointing: true,
       editCell: { tableId: "tbl-params", col: 1, row: 3 },
     });
@@ -201,27 +201,27 @@ describe("custom grid overlay navigation", () => {
     expect(targetWalkStart(session, [1, 5], projection)).toEqual([1, 3]);
     expect(pointFromArrow(session, [1, 5], [0, 1], projection, layout)).toEqual({
       location: [1, 4],
-      ref: "CncShare",
+      ref: "TopShare",
     });
-    expect(session.formulaEdit?.draft).toBe("=CncShare+CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare+TopShare");
   });
 
   it("updates the ref under the caret instead of appending", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
-    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=Vat+CncShare", {
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=Mix+TopShare", {
       pointing: true,
       editCell: { tableId: "tbl-params", col: 1, row: 3 },
     });
-    session.syncFormulaEditCursor("=Vat+CncShare", 4, 4);
+    session.syncFormulaEditCursor("=Mix+TopShare", 4, 4);
 
     expect(pointAtProjectedCell(session, projection, layout, 1, 5)).toBe(true);
-    expect(session.formulaEdit?.draft).toBe("=OutsourceShare+CncShare");
+    expect(session.formulaEdit?.draft).toBe("=AlternateShare+TopShare");
 
-    session.syncFormulaEditCursor("=OutsourceShare+CncShare", 16, 24);
+    session.syncFormulaEditCursor("=AlternateShare+TopShare", 16, 24);
     expect(pointAtProjectedCell(session, projection, layout, 1, 3)).toBe(true);
-    expect(session.formulaEdit?.draft).toBe("=OutsourceShare+");
+    expect(session.formulaEdit?.draft).toBe("=AlternateShare+");
   });
 
   it("treats spreadsheet and overlay clicks as in-grid pointing, not outside clicks", () => {
@@ -236,7 +236,7 @@ describe("custom grid overlay navigation", () => {
 
   it("does not treat Formula text as an outside click while Pointing a Formula range", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
-    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=Vat:CncShare", {
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=Mix:TopShare", {
       pointing: true,
       mode: "point",
       editCell: { tableId: "tbl-params", col: 1, row: 3 },
@@ -270,10 +270,10 @@ describe("custom grid overlay navigation", () => {
     const layout = layoutWorkbook(createSampleWorkbook());
     const projection = projectTable(layout, "tbl-params")!;
 
-    expect(formulaRefForProjectedCell(projection, layout, 1, 3)).toBe("Vat");
+    expect(formulaRefForProjectedCell(projection, layout, 1, 3)).toBe("Mix");
     expect(nextPointableCell([1, 3], [0, 1], projection, layout)).toEqual({
       location: [1, 4],
-      ref: "CncShare",
+      ref: "TopShare",
     });
     expect(nextPointableCell([1, 1], [0, -1], projection, layout)).toEqual({
       location: [1, 0],
@@ -281,22 +281,22 @@ describe("custom grid overlay navigation", () => {
     });
     expect(nextPointableCell([1, 1], [-1, 0], projection, layout)).toEqual({
       location: [0, 1],
-      ref: "AnnualSales",
+      ref: "AnnualUnits",
     });
   });
 
   it("writes a Local Formula ref on the Edit cell's Table", () => {
     const layout = layoutWorkbook(createSampleWorkbook());
-    const salg = projectTable(layout, "tbl-sales")!;
-    expect(formulaRefForProjectedCell(salg, layout, 1, 1)).toBe("Sales[Jan][CNC]");
-    expect(formulaRefForProjectedCell(salg, layout, 1, 1, "tbl-sales")).toBe("[Jan][CNC]");
-    expect(formulaRefForProjectedCell(salg, layout, 1, 2, "tbl-sales")).toBe("[Jan][Outsource]");
-    expect(formulaRefForProjectedCell(salg, layout, 1, 1, "tbl-params")).toBe("Sales[Jan][CNC]");
+    const lines = projectTable(layout, "tbl-lines")!;
+    expect(formulaRefForProjectedCell(lines, layout, 1, 1)).toBe("Lines[Jan][Red]");
+    expect(formulaRefForProjectedCell(lines, layout, 1, 1, "tbl-lines")).toBe("[Jan][Red]");
+    expect(formulaRefForProjectedCell(lines, layout, 1, 2, "tbl-lines")).toBe("[Jan][Secondary]");
+    expect(formulaRefForProjectedCell(lines, layout, 1, 1, "tbl-params")).toBe("Lines[Jan][Red]");
     expect(
-      formulaRefForProjectedCell(salg, layout, 1, 2, { tableId: "tbl-sales", col: 1, row: 1 }),
-    ).toBe("[@][Outsource]");
+      formulaRefForProjectedCell(lines, layout, 1, 2, { tableId: "tbl-lines", col: 1, row: 1 }),
+    ).toBe("[@][Secondary]");
     expect(
-      formulaRefForProjectedCell(salg, layout, 2, 1, { tableId: "tbl-sales", col: 1, row: 1 }),
+      formulaRefForProjectedCell(lines, layout, 2, 1, { tableId: "tbl-lines", col: 1, row: 1 }),
     ).toBe("[Feb][@]");
   });
 
@@ -322,7 +322,7 @@ describe("custom grid overlay navigation", () => {
     expect(session.selection).toEqual({
       kind: "cell",
       tableId: "tbl-params",
-      rowId: "row-cnc-share",
+      rowId: "row-top-share",
       columnId: "Value",
     });
   });
@@ -331,17 +331,17 @@ describe("custom grid overlay navigation", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
-    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=Vat");
+    session.beginFormulaEdit("tbl-params", "row-vat", "Value", "=Mix");
     expect(commitLiteralEditAndSelect(session, projection, layout, 1, 4)).toBe(false);
-    expect(session.formulaEdit?.draft).toBe("=Vat");
+    expect(session.formulaEdit?.draft).toBe("=Mix");
   });
 
   it("points a click in Edit only at a valid insert point", () => {
     expect(isValidInsertPoint("=", 1)).toBe(true);
-    expect(isValidInsertPoint("=Vat+", 5)).toBe(true);
+    expect(isValidInsertPoint("=Mix+", 5)).toBe(true);
     expect(isValidInsertPoint("=SUM(", 5)).toBe(true);
-    expect(isValidInsertPoint("=SUM(Vat)", 3)).toBe(false);
-    expect(isValidInsertPoint("=Vat", 4)).toBe(true);
+    expect(isValidInsertPoint("=SUM(Mix)", 3)).toBe(false);
+    expect(isValidInsertPoint("=Mix", 4)).toBe(true);
   });
 
   it("lets suggestions steal arrows only when the list is visible", () => {
@@ -373,13 +373,13 @@ describe("custom grid overlay navigation", () => {
     expect(pointAtProjectedCell(session, projection, layout, 1, 3)).toBe(true);
     expect(session.formulaEdit?.draft).toBe("=");
     expect(pointAtProjectedCell(session, projection, layout, 1, 4, { extend: true })).toBe(true);
-    expect(session.formulaEdit?.draft).toBe("=Vat:CncShare");
+    expect(session.formulaEdit?.draft).toBe("=Mix:TopShare");
     expect(session.formulaEdit?.mode).toBe("point");
     expect(pointFromArrow(session, [1, 4], [0, 1], projection, layout, { extend: true })).toEqual({
       location: [1, 5],
-      ref: "OutsourceShare",
+      ref: "AlternateShare",
     });
-    expect(session.formulaEdit?.draft).toBe("=Vat:OutsourceShare");
+    expect(session.formulaEdit?.draft).toBe("=Mix:AlternateShare");
   });
 
   it("points a formula click and commits a literal click away from the edit cell", () => {
@@ -392,7 +392,7 @@ describe("custom grid overlay navigation", () => {
       editCell: { tableId: "tbl-params", col: 1, row: 3 },
     });
     expect(applyGridPointerToFormulaEdit(session, projection, layout, 1, 4)).toBe("point");
-    expect(session.formulaEdit?.draft).toBe("=CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare");
     session.cancelFormulaEdit();
     session.beginFormulaEdit("tbl-params", "row-vat", "Value", "12", {
       mode: "edit",

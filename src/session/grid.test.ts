@@ -9,13 +9,13 @@ import { WorkbookSession } from "./WorkbookSession.js";
 /** These cases are about grid geometry, so they skip the calculation round trip. */
 const inert: FormulaEngine = { evaluate: () => ({}) };
 
-function playground() {
+function sampleSession() {
   return new WorkbookSession(createSampleWorkbook(), inert);
 }
 
 /** A sheet holding one plain table: header at row 0, one row, key plus Value. */
 function scratch(looseCells?: Record<string, CellSnapshot>) {
-  const seed = playground();
+  const seed = sampleSession();
   const sheetId = seed.addSheet("Scratch").id;
   seed.addTable(sheetId, { name: "Notes" });
   if (!looseCells) return { session: seed, sheetId };
@@ -104,22 +104,22 @@ describe("table auto-expansion", () => {
 
 describe("auto-expansion against table invariants", () => {
   it("grows a time-axis table downwards but never rightwards", () => {
-    const session = playground();
+    const session = sampleSession();
     const sheetId = sheetIdOf(session, "Assumptions");
 
-    // Sales is 4 rows plus a header, and 1 key column plus 12 periods.
+    // Lines is 4 rows plus a header, and 1 key column plus 12 periods.
     session.writeGridCell(sheetId, 1, 13, "x");
-    expect(table(session, "Sales").attributeColumns).toHaveLength(0);
+    expect(table(session, "Lines").attributeColumns).toHaveLength(0);
     expect(looseCells(session, sheetId)["1:13"]).toEqual({ kind: "input", value: "x" });
 
     session.writeGridCell(sheetId, 5, 1, "999");
-    const salg = table(session, "Sales");
-    expect(salg.rows).toHaveLength(5);
-    expect(salg.rows[4].cells["2025-01"]).toEqual({ kind: "input", value: 999 });
+    const lines = table(session, "Lines");
+    expect(lines.rows).toHaveLength(5);
+    expect(lines.rows[4].cells["2025-01"]).toEqual({ kind: "input", value: 999 });
   });
 
   it("keeps a promoteRowKeys table at one data column and allocates a promotable key", () => {
-    const session = playground();
+    const session = sampleSession();
     const sheetId = sheetIdOf(session, "Parameters");
 
     // Params is 7 rows plus a header, and 1 key column plus Value.
@@ -135,7 +135,7 @@ describe("auto-expansion against table invariants", () => {
   });
 
   it("rolls the whole expansion back when the new row key is not a legal name", () => {
-    const session = playground();
+    const session = sampleSession();
     const sheetId = sheetIdOf(session, "Parameters");
 
     expect(() => session.writeGridCell(sheetId, 8, 0, "SUM")).toThrow(/reserved/);
@@ -144,7 +144,7 @@ describe("auto-expansion against table invariants", () => {
   });
 
   it("still expands a locked table, since locked only blocks deletion", () => {
-    const session = playground();
+    const session = sampleSession();
     const sheetId = sheetIdOf(session, "Parameters");
     session.writeGridCell(sheetId, 8, 0, "Levy");
 
@@ -265,12 +265,12 @@ describe("sheet extent", () => {
 
 describe("cell value edits keep formatting", () => {
   it("preserves number format and cell style across writeCell, setInput, and setFormula", () => {
-    const session = playground();
+    const session = sampleSession();
     const style = { bold: true, italic: true, fontSize: 24, fillColor: "#fff6d6" };
     session.setCellStyle("tbl-params", "row-vat", "Value", style);
     session.setCellFormat("tbl-params", "row-vat", "Value", "0.00");
 
-    session.writeCell("Params", "Vat", "Value", "0.5");
+    session.writeCell("Params", "Mix", "Value", "0.5");
     expect(table(session, "Params").rows[2]!.cells.Value).toEqual({
       kind: "input",
       value: 0.5,
@@ -278,7 +278,7 @@ describe("cell value edits keep formatting", () => {
       style,
     });
 
-    session.setInput("Params", "Vat", "Value", 0.4);
+    session.setInput("Params", "Mix", "Value", 0.4);
     expect(table(session, "Params").rows[2]!.cells.Value).toEqual({
       kind: "input",
       value: 0.4,
@@ -286,7 +286,7 @@ describe("cell value edits keep formatting", () => {
       style,
     });
 
-    session.setFormula("Params", "Vat", "Value", "=1+1");
+    session.setFormula("Params", "Mix", "Value", "=1+1");
     expect(table(session, "Params").rows[2]!.cells.Value).toEqual({
       kind: "formula",
       formula: "=1+1",

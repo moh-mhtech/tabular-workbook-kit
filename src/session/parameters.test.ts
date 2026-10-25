@@ -18,12 +18,12 @@ describe("parameters sheet and table", () => {
     const table = snapshot.tables.find((t) => t.promoteRowKeys);
     expect(sheet?.name).toBe("Parameters");
     expect(sheet?.tableIds).toEqual(["tbl-params"]);
-    expect(snapshot.sheets.find((g) => g.name === "Assumptions")?.tableIds).toEqual(["tbl-sales"]);
+    expect(snapshot.sheets.find((g) => g.name === "Assumptions")?.tableIds).toEqual(["tbl-lines"]);
     expect(table?.name).toBe("Params");
     expect(promotedNames(snapshot).map((p) => p.name)).toEqual(
-      expect.arrayContaining(["AnnualSales", "Growth", "Vat", "Start"]),
+      expect.arrayContaining(["AnnualUnits", "Growth", "Mix", "Start"]),
     );
-    expect(session.getCell("Params", "Vat", "Value").computed).toBe(0.25);
+    expect(session.getCell("Params", "Mix", "Value").computed).toBe(0.25);
   });
 
   it("refuses to delete the parameters table or sheet", async () => {
@@ -54,17 +54,17 @@ describe("parameters sheet and table", () => {
   it("does not change stored values or formula results when a compact format is applied", async () => {
     const session = await open();
     const start = session.getCell("Params", "Start", "Value").computed;
-    session.setColumnFormat("Params", "Value", "USD G3A");
+    session.setColumnFormat("Params", "Value", "PRE G3A");
     await session.recalculate();
-    expect(session.getCell("Params", "AnnualSales", "Value").computed).toBe(8_000_000);
+    expect(session.getCell("Params", "AnnualUnits", "Value").computed).toBe(8_000_000);
     expect(session.getCell("Params", "Start", "Value").computed).toBeCloseTo(Number(start), 6);
   });
 
   it("rejects parameter keys that collide with functions or tables", async () => {
     const session = await open();
-    expect(() => session.renameRow("Params", "Vat", "SUM")).toThrow(/reserved/);
-    expect(() => session.renameRow("Params", "Vat", "Sales")).toThrow(/collides with table/);
-    expect(() => session.renameTable("Sales", "Vat")).toThrow(/promoted key/);
+    expect(() => session.renameRow("Params", "Mix", "SUM")).toThrow(/reserved/);
+    expect(() => session.renameRow("Params", "Mix", "Lines")).toThrow(/collides with table/);
+    expect(() => session.renameTable("Lines", "Mix")).toThrow(/promoted key/);
     const added = session.addRow("Params");
     expect(added.key).toBe("Param");
     session.renameRow("Params", added.id, "Levy");
@@ -74,10 +74,10 @@ describe("parameters sheet and table", () => {
   it("accepts a Defined name with accented letters", async () => {
     const session = new WorkbookSession(createSampleWorkbook(), new HyperFormulaEngine());
     await session.recalculate();
-    session.renameRow("Params", "Vat", "Café");
-    session.setFormula("Params", "CncShare", "Value", "=Café");
+    session.renameRow("Params", "Mix", "Café");
+    session.setFormula("Params", "TopShare", "Value", "=Café");
     await session.recalculate();
     expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2]!.key).toBe("Café");
-    expect(session.getCell("Params", "CncShare", "Value").computed).toBe(0.25);
+    expect(session.getCell("Params", "TopShare", "Value").computed).toBe(0.25);
   });
 });

@@ -16,20 +16,20 @@ describe("table structure editing", () => {
     expect(session.getTable("Drivers").rows.find((r) => r.key === "Start")!.cells.Value.formula).toContain(
       "Drivers[",
     );
-    expect(session.getTable("Sales").rows.find((r) => r.key === "CNC")!.cells["2025-01"].formula).toContain(
+    expect(session.getTable("Lines").rows.find((r) => r.key === "Red")!.cells["2025-01"].formula).toContain(
       "Drivers[Start]",
     );
 
-    session.renameRow("Staff", "Karol", "CamLead");
+    session.renameRow("Teams", "Karol", "CamLead");
     await session.recalculate();
-    expect(session.getTable("Result").rows.find((r) => r.key === "Wages")!.cells["2025-01"].formula).toContain(
-      "Staff[@][CamLead]",
+    expect(session.getTable("Result").rows.find((r) => r.key === "Usage")!.cells["2025-01"].formula).toContain(
+      "Teams[@][CamLead]",
     );
 
-    session.renameColumn("Staff", "BaseSalary", "Salary");
+    session.renameColumn("Teams", "BaseNumber", "Salary");
     await session.recalculate();
-    expect(session.getTable("Staff").rows.find((r) => r.key === "CamLead")!.cells["2025-01"].formula).toBe("=[Salary]");
-    expect(session.getCell("Staff", "CamLead", "Salary").computed).toBe(45000);
+    expect(session.getTable("Teams").rows.find((r) => r.key === "CamLead")!.cells["2025-01"].formula).toBe("=[Salary]");
+    expect(session.getCell("Teams", "CamLead", "Salary").computed).toBe(45000);
   });
 
   it("rewrites Defined name Formula refs when a Key is renamed", async () => {
@@ -39,32 +39,32 @@ describe("table structure editing", () => {
     const param2 = session.addRow("Params");
     expect(param2.key).toBe("Param2");
     session.setInput("Params", param2.id, "Value", 1);
-    session.setFormula("Params", "OutsourceShare", "Value", "=Vat");
-    session.setFormula("Params", extra.id, "Value", "=Vat:CncShare");
-    session.setFormula("Params", "BendShare", "Value", "=Param2");
-    session.renameRow("Params", "Vat", "Levy");
+    session.setFormula("Params", "AlternateShare", "Value", "=Mix");
+    session.setFormula("Params", extra.id, "Value", "=Mix:TopShare");
+    session.setFormula("Params", "LastShare", "Value", "=Param2");
+    session.renameRow("Params", "Mix", "Levy");
     await session.recalculate();
-    expect(session.getTable("Params").rows.find((row) => row.id === "row-outsource-share")!.cells.Value.formula).toBe("=Levy");
-    expect(session.getTable("Params").rows.find((row) => row.id === extra.id)!.cells.Value.formula).toBe("=Levy:CncShare");
-    expect(session.getTable("Params").rows.find((row) => row.id === "row-bend-share")!.cells.Value.formula).toBe(
+    expect(session.getTable("Params").rows.find((row) => row.id === "row-alt-share")!.cells.Value.formula).toBe("=Levy");
+    expect(session.getTable("Params").rows.find((row) => row.id === extra.id)!.cells.Value.formula).toBe("=Levy:TopShare");
+    expect(session.getTable("Params").rows.find((row) => row.id === "row-last-share")!.cells.Value.formula).toBe(
       "=Param2",
     );
-    expect(session.getCell("Params", "OutsourceShare", "Value").computed).toBe(0.25);
+    expect(session.getCell("Params", "AlternateShare", "Value").computed).toBe(0.25);
     expect(session.getCell("Params", extra.key, "Value").computed).toBe(1.05);
 
-    session.setFormula("Params", "CncShare", "Value", "=Param");
+    session.setFormula("Params", "TopShare", "Value", "=Param");
     session.renameRow("Params", extra.id, "Keep");
     await session.recalculate();
-    expect(session.getTable("Params").rows.find((row) => row.id === "row-cnc-share")!.cells.Value.formula).toBe("=Keep");
-    expect(session.getTable("Params").rows.find((row) => row.id === "row-bend-share")!.cells.Value.formula).toBe(
+    expect(session.getTable("Params").rows.find((row) => row.id === "row-top-share")!.cells.Value.formula).toBe("=Keep");
+    expect(session.getTable("Params").rows.find((row) => row.id === "row-last-share")!.cells.Value.formula).toBe(
       "=Param2",
     );
-    expect(session.getCell("Params", "BendShare", "Value").computed).toBe(1);
+    expect(session.getCell("Params", "LastShare", "Value").computed).toBe(1);
   });
 
   it("adds and deletes rows and attribute columns", async () => {
     const session = await open();
-    const row = session.addRow("Params", "AnnualSales");
+    const row = session.addRow("Params", "AnnualUnits");
     await session.recalculate();
     expect(session.getTable("Params").rows.map((r) => r.key)).toContain(row.key);
     session.renameRow("Params", row.id, "Note");
@@ -72,17 +72,17 @@ describe("table structure editing", () => {
     await session.recalculate();
     expect(session.getCell("Params", "Note", "Value").computed).toBe("hello");
 
-    const col = session.addColumn("Staff", "Role");
+    const col = session.addColumn("Teams", "Role");
     await session.recalculate();
-    expect(session.getTable("Staff").columns.some((c) => c.id === col.id)).toBe(true);
-    session.renameColumn("Staff", col.id, "Comment");
-    session.setInput("Staff", "Karol", "Comment", "senior");
+    expect(session.getTable("Teams").columns.some((c) => c.id === col.id)).toBe(true);
+    session.renameColumn("Teams", col.id, "Comment");
+    session.setInput("Teams", "Karol", "Comment", "senior");
     await session.recalculate();
-    expect(session.getCell("Staff", "Karol", "Comment").computed).toBe("senior");
+    expect(session.getCell("Teams", "Karol", "Comment").computed).toBe("senior");
 
-    session.deleteColumn("Staff", "Comment");
+    session.deleteColumn("Teams", "Comment");
     await session.recalculate();
-    expect(session.getTable("Staff").columns.some((c) => c.name === "Comment")).toBe(false);
+    expect(session.getTable("Teams").columns.some((c) => c.name === "Comment")).toBe(false);
 
     session.deleteRow("Params", "Note");
     await session.recalculate();

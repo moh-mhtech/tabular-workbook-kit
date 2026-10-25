@@ -17,7 +17,7 @@ import { ProjectedOverlayEditor, SpreadsheetTextEditor } from "./customGridEdito
 import { applyCustomGridEdits } from "./customGridInteractions.js";
 import { PropertiesPanel } from "./PropertiesPanel.js";
 import { WorkbookProvider, useSnapshot, useWorkbook } from "./WorkbookProvider.js";
-import { installGridDom } from "./playgroundCanvasTest.js";
+import { installGridDom } from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -106,7 +106,7 @@ function CommitEditorHost({
   );
 }
 
-async function renderPlayground(withCellEditor = false) {
+async function renderWorkbook(withCellEditor = false) {
   const session = new WorkbookSession(createSampleWorkbook(), new HyperFormulaEngine());
   await session.recalculate();
   session.setSelection({
@@ -150,11 +150,11 @@ function trapErrors() {
   return { alerts, errors };
 }
 
-function expectVatCommitted(session: WorkbookSession) {
+function expectMixCommitted(session: WorkbookSession) {
   expect(session.selection).toEqual({
     kind: "cell",
     tableId: "tbl-params",
-    rowId: "row-cnc-share",
+    rowId: "row-top-share",
     columnId: "Value",
   });
   expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2].cells.Value).toEqual({
@@ -166,7 +166,7 @@ function expectVatCommitted(session: WorkbookSession) {
 describe("cell commit UI", () => {
   it("commits the value field on Enter and selects the next row without erroring", async () => {
     const { alerts, errors } = trapErrors();
-    const { session, valueField } = await renderPlayground();
+    const { session, valueField } = await renderWorkbook();
     expect(valueField).toBeTruthy();
     await act(async () => {
       fireEvent.change(valueField, { target: { value: "0.3" } });
@@ -175,12 +175,12 @@ describe("cell commit UI", () => {
 
     expect(alerts).toEqual([]);
     expect(errors).toEqual([]);
-    expectVatCommitted(session);
+    expectMixCommitted(session);
   });
 
   it("commits the in-cell editor on Enter and selects the next row without erroring", async () => {
     const { alerts, errors } = trapErrors();
-    const { session } = await renderPlayground(true);
+    const { session } = await renderWorkbook(true);
     const editor = screen.getByLabelText("Cell editor") as HTMLTextAreaElement;
     await act(async () => {
       fireEvent.change(editor, { target: { value: "0.3" } });
@@ -189,7 +189,7 @@ describe("cell commit UI", () => {
 
     expect(alerts).toEqual([]);
     expect(errors).toEqual([]);
-    expectVatCommitted(session);
+    expectMixCommitted(session);
   });
 
   it("commits a Key cell on Enter and selects the next Key cell", async () => {
@@ -198,14 +198,14 @@ describe("cell commit UI", () => {
     await act(async () => {
       render(
         <WorkbookProvider session={session}>
-          <CommitEditorHost tableId="tbl-params" location={[0, 3]} data="Vat" />
+          <CommitEditorHost tableId="tbl-params" location={[0, 3]} data="Mix" />
         </WorkbookProvider>,
       );
     });
     await act(async () => {
       fireEvent.keyDown(screen.getByLabelText("Cell editor"), { key: "Enter" });
     });
-    expect(session.selection).toEqual({ kind: "row", tableId: "tbl-params", rowId: "row-cnc-share" });
+    expect(session.selection).toEqual({ kind: "row", tableId: "tbl-params", rowId: "row-top-share" });
     expect(session.gridFocus).toEqual({ tableId: "tbl-params", col: 0, row: 4 });
   });
 
@@ -215,14 +215,14 @@ describe("cell commit UI", () => {
     await act(async () => {
       render(
         <WorkbookProvider session={session}>
-          <CommitEditorHost tableId="tbl-staff" location={[1, 0]} data="Role" />
+          <CommitEditorHost tableId="tbl-teams" location={[1, 0]} data="Role" />
         </WorkbookProvider>,
       );
     });
     await act(async () => {
       fireEvent.keyDown(screen.getByLabelText("Cell editor"), { key: "Tab" });
     });
-    expect(session.selection).toEqual({ kind: "column", tableId: "tbl-staff", columnId: "BaseSalary" });
-    expect(session.gridFocus).toEqual({ tableId: "tbl-staff", col: 2, row: 0 });
+    expect(session.selection).toEqual({ kind: "column", tableId: "tbl-teams", columnId: "BaseNumber" });
+    expect(session.gridFocus).toEqual({ tableId: "tbl-teams", col: 2, row: 0 });
   });
 });

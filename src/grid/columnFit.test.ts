@@ -26,9 +26,9 @@ describe("column fit", () => {
     expect(fittedColumnWidth([], TABLE_KEY_COLUMN_WIDTH)).toBe(TABLE_KEY_COLUMN_WIDTH);
     expect(fittedColumnWidth([{ text: "1" }], TABLE_KEY_COLUMN_WIDTH)).toBe(TABLE_KEY_COLUMN_WIDTH);
     expect(
-      fittedColumnWidth([{ text: "OutsourceShare", bold: true }], TABLE_KEY_COLUMN_WIDTH),
+      fittedColumnWidth([{ text: "AlternateShare", bold: true }], TABLE_KEY_COLUMN_WIDTH),
     ).toBe(
-      Math.ceil(estimateTextWidth("OutsourceShare", true) + TABLE_CELL_X_PADDING),
+      Math.ceil(estimateTextWidth("AlternateShare", true) + TABLE_CELL_X_PADDING),
     );
     expect(fittedColumnWidth([{ text: "x".repeat(80) }], TABLE_KEY_COLUMN_WIDTH)).toBe(TABLE_MAX_COLUMN_WIDTH);
   });
@@ -37,20 +37,20 @@ describe("column fit", () => {
     const snapshot = createSampleWorkbook();
     const layout = layoutWorkbook(snapshot);
     const params = projectTable(layout, "tbl-params")!;
-    const salg = projectTable(layout, "tbl-sales")!;
+    const lines = projectTable(layout, "tbl-lines")!;
     const columns = fitProjectedColumnWidths(params, layout);
 
     expect(params.growthColumn).toBe(false);
     expect(columns[2]).toBeUndefined();
     expect(columns[0]!.width).toBeGreaterThan(TABLE_GROWTH_COLUMN_WIDTH);
     expect(columns[0]!.width).toBe(
-      Math.ceil(estimateTextWidth("OutsourceShare", true) + TABLE_CELL_X_PADDING),
+      Math.ceil(estimateTextWidth("AlternateShare", true) + TABLE_CELL_X_PADDING),
     );
     expect(columns[1]!.width).toBeGreaterThan(TABLE_GROWTH_COLUMN_WIDTH);
     expect(columns[1]!.width).toBeGreaterThanOrEqual(
       Math.ceil(estimateTextWidth(formatDisplayValue(8_000_000)) + TABLE_CELL_X_PADDING),
     );
-    expect(fitProjectedColumnWidths(salg, layout).at(-1)?.width).toBe(TABLE_GROWTH_COLUMN_WIDTH);
+    expect(fitProjectedColumnWidths(lines, layout).at(-1)?.width).toBe(TABLE_GROWTH_COLUMN_WIDTH);
   });
 
   it("uses evaluated display values, not formula text", () => {
@@ -58,7 +58,7 @@ describe("column fit", () => {
     const projection = projectTable(layout, "tbl-params")!;
     expect(visibleCellText(projection, layout, new Map(), 1, 7)).toBe("");
     expect(visibleCellText(projection, layout, new Map(), 0, 8)).toBe(GROWTH_HEADER_MARK);
-    expect(visibleCellText(projectTable(layout, "tbl-sales")!, layout, new Map(), projectTable(layout, "tbl-sales")!.colCount - 1, 0)).toBe(
+    expect(visibleCellText(projectTable(layout, "tbl-lines")!, layout, new Map(), projectTable(layout, "tbl-lines")!.colCount - 1, 0)).toBe(
       GROWTH_HEADER_MARK,
     );
 
@@ -88,8 +88,8 @@ describe("column fit", () => {
   });
 
   it("treats cell bold as wider than the same text at regular weight", () => {
-    expect(fittedColumnWidth([{ text: "OutsourceShare", bold: true }], 0)).toBeGreaterThan(
-      fittedColumnWidth([{ text: "OutsourceShare" }], 0),
+    expect(fittedColumnWidth([{ text: "AlternateShare", bold: true }], 0)).toBeGreaterThan(
+      fittedColumnWidth([{ text: "AlternateShare" }], 0),
     );
     const plainSnapshot = createSampleWorkbook();
     const styledSnapshot = createSampleWorkbook();

@@ -20,7 +20,7 @@ describe("cell style", () => {
   it("toggles flags and strikes through display text", () => {
     expect(toggleStyleFlag(undefined, "bold")).toEqual({ bold: true });
     expect(toggleStyleFlag({ bold: true }, "bold")).toEqual({});
-    expect(applyStrikethrough("Vat", { strikethrough: true })).toContain("\u0336");
+    expect(applyStrikethrough("Mix", { strikethrough: true })).toContain("\u0336");
     expect(styleFont({ bold: true })).toBe("bold 13px");
     expect(styleFont({ italic: true, fontSize: 16 })).toBe("italic 16px");
     expect(styleFont({ fillColor: "#fff" })).toBeUndefined();

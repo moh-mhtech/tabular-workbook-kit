@@ -14,8 +14,8 @@ const FORMAT_EXAMPLES: Array<{ pattern: string; note: string }> = [
   { pattern: "G3K", note: "fixed thousands" },
   { pattern: "G3M", note: "fixed millions" },
   { pattern: "G3B", note: "fixed billions" },
-  { pattern: "USD G3A", note: "prefix + compact" },
-  { pattern: 'G3A" kr"', note: "quoted suffix" },
+  { pattern: "PRE G3A", note: "prefix + compact" },
+  { pattern: 'G3A" unit"', note: "quoted suffix" },
   { pattern: "0.00", note: "2 decimal places" },
   { pattern: "0%", note: "percent" },
 ];

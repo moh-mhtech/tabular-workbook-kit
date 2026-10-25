@@ -9,7 +9,7 @@
     "./react": "./src/react/index.ts",
     "./postgres": "./src/persist/postgres/index.ts",
     "./pglite": "./src/persist/pglite/index.ts",
-    "./testing": "./src/react/playgroundCanvasTest.tsx",
+    "./testing": "./src/react/canvasTest.tsx",
     "./sample": "./sample/createSampleWorkbook.ts"
   },
   "scripts": {

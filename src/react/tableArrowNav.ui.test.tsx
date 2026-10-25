@@ -8,7 +8,7 @@ import { selectedCellRefs, type WorkbookSnapshot } from "../model/types.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 import { WorkbookProvider } from "./WorkbookProvider.js";
-import { installGridDom, pressTableKey, renderPlaygroundCanvas, selectProjectedCell } from "./playgroundCanvasTest.js";
+import { installGridDom, pressTableKey, renderWorkbookCanvas, selectProjectedCell } from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -358,7 +358,7 @@ function mockNarrowSheetViewport() {
 
 describe("shift ctrl arrow cell range", () => {
   it("extends the Cell range to the next Phase change", async () => {
-    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    const { session } = await renderWorkbookCanvas({ snapshot: filledWorkbook() });
     await selectProjectedCell(session, "tbl-a", 1, 1);
     await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
     expect(session.selection).toMatchObject({
@@ -374,7 +374,7 @@ describe("shift ctrl arrow cell range", () => {
   });
 
   it("does not select Growth cells", async () => {
-    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    const { session } = await renderWorkbookCanvas({ snapshot: filledWorkbook() });
     await selectProjectedCell(session, "tbl-a", 1, 3);
     await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
     expect(session.selection).toMatchObject({
@@ -393,7 +393,7 @@ describe("shift ctrl arrow cell range", () => {
   });
 
   it("does not cross into another Table", async () => {
-    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    const { session } = await renderWorkbookCanvas({ snapshot: filledWorkbook() });
     await selectProjectedCell(session, "tbl-a", 1, 2);
     await pressTableKey("tbl-a", "ArrowDown", { ctrlKey: true, shiftKey: true });
     expect(session.selection).toMatchObject({
@@ -408,7 +408,7 @@ describe("shift ctrl arrow cell range", () => {
   });
 
   it("keeps the Cell range origin while jumping to the next Phase change", async () => {
-    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    const { session } = await renderWorkbookCanvas({ snapshot: filledWorkbook() });
     await selectProjectedCell(session, "tbl-a", 1, 1);
     await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
     await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
@@ -427,7 +427,7 @@ describe("shift ctrl arrow cell range", () => {
   });
 
   it("Shift+Arrow extends the Cell range by one cell after Shift+Ctrl+arrow", async () => {
-    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    const { session } = await renderWorkbookCanvas({ snapshot: filledWorkbook() });
     await selectProjectedCell(session, "tbl-a", 1, 1);
     await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
     await pressTableKey("tbl-a", "ArrowRight", { shiftKey: true });
@@ -445,7 +445,7 @@ describe("shift ctrl arrow cell range", () => {
   });
 
   it("Shift+Arrow extends a Cell range by one cell", async () => {
-    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    const { session } = await renderWorkbookCanvas({ snapshot: filledWorkbook() });
     await selectProjectedCell(session, "tbl-a", 1, 1);
     await pressTableKey("tbl-a", "ArrowDown", { shiftKey: true });
     expect(selectedCellRefs(session.selection)).toEqual([
@@ -455,7 +455,7 @@ describe("shift ctrl arrow cell range", () => {
   });
 
   it("does not select Growth cells with Shift+Arrow", async () => {
-    const { session } = await renderPlaygroundCanvas({ snapshot: filledWorkbook() });
+    const { session } = await renderWorkbookCanvas({ snapshot: filledWorkbook() });
     await selectProjectedCell(session, "tbl-a", 5, 1);
     await pressTableKey("tbl-a", "ArrowRight", { shiftKey: true });
     await pressTableKey("tbl-a", "ArrowLeft", { shiftKey: true });
@@ -468,7 +468,7 @@ describe("shift ctrl arrow cell range", () => {
   it("scrolls the viewport to the moving Cell of a Shift+Ctrl+arrow range", async () => {
     const snapshot = filledWorkbook();
     snapshot.sheets[0]!.horizontalScroll = "sheet";
-    const { session } = await renderPlaygroundCanvas({ snapshot });
+    const { session } = await renderWorkbookCanvas({ snapshot });
     await selectProjectedCell(session, "tbl-a", 1, 3);
     const canvas = mockNarrowSheetViewport();
     await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true, shiftKey: true });
@@ -479,7 +479,7 @@ describe("shift ctrl arrow cell range", () => {
   it("scrolls the viewport to the landing Cell of Ctrl+arrow", async () => {
     const snapshot = filledWorkbook();
     snapshot.sheets[0]!.horizontalScroll = "sheet";
-    const { session } = await renderPlaygroundCanvas({ snapshot });
+    const { session } = await renderWorkbookCanvas({ snapshot });
     await selectProjectedCell(session, "tbl-a", 1, 1);
     const canvas = mockNarrowSheetViewport();
     await pressTableKey("tbl-a", "ArrowRight", { ctrlKey: true });

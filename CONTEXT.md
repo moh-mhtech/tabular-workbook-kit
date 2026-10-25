@@ -1,6 +1,6 @@
 # Workbook
 
-The language of a tabular Workbook a host embeds: named tables on sheets, a calendar, and scenarios. It is not an unstructured spreadsheet, not a financial statement, and not a product. It does not require a parameters table, a fiscal year, or a particular spoken language.
+The language of a tabular Workbook a host embeds: named tables on sheets, a calendar, and scenarios. It is not an unstructured spreadsheet and not an application. A host may use it for a plan, a budget, or any other tabular model. It does not require a parameters table, a reporting year, or a particular spoken language.
 
 ## Language
 
@@ -8,7 +8,7 @@ The language of a tabular Workbook a host embeds: named tables on sheets, a cale
 
 **Workbook**:
 A named set of Tables, Sheets, a Calendar, and Scenarios that calculate together.
-_Avoid_: Spreadsheet, workbook file, budget, model (when you mean this document)
+_Avoid_: Spreadsheet, workbook file, budget, account, financial statement, model (when you mean this document)
 
 **Sheet**:
 A named canvas that holds Tables stacked as bands. A Sheet is not a data container; values live in Tables. The Sheet name can qualify a Table in a Formula when names collide across Sheets.
@@ -20,7 +20,7 @@ _Avoid_: Sheet, range, post list, dataset, table kind
 
 **Calendar**:
 The Workbook’s ordered monthly Periods, the shared time line year-columns join on.
-_Avoid_: Timeline, date range, fiscal year (a host concept)
+_Avoid_: Timeline, date range, fiscal year
 
 **Period**:
 One month on the Calendar. The join key between year-column tables.
@@ -35,13 +35,13 @@ The Workbook Inputs with no Scenario overlay applied.
 _Avoid_: Default scenario, original, master
 
 **Sample workbook**:
-An English Workbook that shows Sheets, Tables, year-columns, Formulas, and a Scenario. Names such as Parameters, Sales, Staff, and Result are examples, not required objects.
-_Avoid_: Budget seed, Parametre, product template, host workbook
+An English Workbook that shows Sheets, Tables, year-columns, Defined names, Formulas, and a Scenario. Names such as Parameters, Lines, Teams, and Result are examples of those features, not a required domain.
+_Avoid_: Host seed, product template, required workbook, budget model, chart of accounts
 
 ### Tables
 
 **Row key**:
-The identity of a row in a Table (Karol, Vat). If the user has not named it, the row still has a stable id — not an Excel row number.
+The identity of a row in a Table (Karol, Mix). If the user has not named it, the row still has a stable id — not an Excel row number.
 _Avoid_: Row number, A1 row
 
 **Key cell**:
@@ -65,7 +65,7 @@ The display grouping of a Year column: month, quarter, or year. Storage is alway
 _Avoid_: Workbook grain, table kind, zoom
 
 **Key-value policy**:
-A Table with one Value column whose row keys become Defined names. Not a second Table type. New parameters are rows; there is no growth column.
+A Table with one Value column whose row keys become Defined names. Not a second Table type. New names are new rows; there is no growth column.
 _Avoid_: Parameter class, Params type (as a kit table kind)
 
 **Locked**:
@@ -151,7 +151,7 @@ Removes Cell style from the Cell. Does not change Number format or Stored value.
 _Avoid_: Clear (that clears Stored value), reset style
 
 **Number format**:
-How a numeric Display value is shown. The Cell’s pattern wins, then the column’s (**Column format**), then the default: three significant digits with grouping. Patterns include `G3`, `#,##G3`, `G3A` (auto K/M/B/T from 1,000), `G3K` / `G3M` / `G3B` / `G3T`, `0.00`, `0%`, and a prefix or quoted suffix (`USD G3A`, `G3A" kr"`). It does not change Stored value or Computed value. Text and `TRUE`/`FALSE` are shown as-is.
+How a numeric Display value is shown. The Cell’s pattern wins, then the column’s (**Column format**), then the default: three significant digits with grouping. Patterns include `G3`, `#,##G3`, `G3A` (auto K/M/B/T from 1,000), `G3K` / `G3M` / `G3B` / `G3T`, `0.00`, `0%`, and a prefix or quoted suffix (`PRE G3A`, `G3A" unit"`). It does not change Stored value or Computed value. Text and `TRUE`/`FALSE` are shown as-is.
 _Avoid_: Cell style, rounding the stored value
 
 **Column format**:
@@ -187,15 +187,15 @@ _Avoid_: Rollup, pivot, aggregate, bucket
 ### Formulas
 
 **Defined name**:
-A Workbook-wide name for one Cell. A key-value Table registers each row key as the name of that row’s Value cell (`Vat`, `AnnualSales`, `Café`). Letters in any script, digits, and underscore; unique against other promoted keys, Table names, Sheet names, and reserved functions. New rows on a key-value Table get `Param`, `Param2`, … — not `1`, `2`, `3` (those are default Row keys on other Tables, and cannot be Defined names).
+A Workbook-wide name for one Cell. A key-value Table registers each row key as the name of that row’s Value cell (`Mix`, `AnnualUnits`, `Café`). Letters in any script, digits, and underscore; unique against other promoted keys, Table names, Sheet names, and reserved functions. New rows on a key-value Table get `Param`, `Param2`, … — not `1`, `2`, `3` (those are default Row keys on other Tables, and cannot be Defined names).
 _Avoid_: Name-as-formula (`=@-1`), P table, ASCII-only names
 
 **Formula ref**:
-One complete structured-ref or Defined name token in Formula text (`Vat`, `[Jan][CNC]`, `Sales[Jan][CNC]`, `Vat:CncShare`). On the Edit cell’s Table the token is a Local Formula ref; on another Table it names that Table.
+One complete structured-ref or Defined name token in Formula text (`Mix`, `[Jan][Red]`, `Lines[Jan][Red]`, `Mix:TopShare`). On the Edit cell’s Table the token is a Local Formula ref; on another Table it names that Table.
 _Avoid_: A1 token, range address (as Excel `B12`)
 
 **Local Formula ref**:
-A Formula ref that omits the Table name because the Edit cell is on that Table (`[Jan][CNC]`, `[Jan][@]`, `[@][Outsource]`, `[Value]`). A Defined name stays a Defined name (`Vat`).
+A Formula ref that omits the Table name because the Edit cell is on that Table (`[Jan][Red]`, `[Jan][@]`, `[@][Secondary]`, `[Value]`). A Defined name stays a Defined name (`Mix`).
 _Avoid_: Unqualified ref, relative A1
 
 **This-row**:
@@ -203,7 +203,7 @@ _Avoid_: Unqualified ref, relative A1
 _Avoid_: Current line (say This-row), [@] as a Defined name
 
 **This-column**:
-`@` in the column slot of a Formula ref (`[@][CNC]`, `[@-1][@]`). The target is the Edit cell’s column.
+`@` in the column slot of a Formula ref (`[@][Red]`, `[@-1][@]`). The target is the Edit cell’s column.
 _Avoid_: Current column (say This-column)
 
 **Relative**:
@@ -211,7 +211,7 @@ A Formula ref that uses This-row and/or This-column so the target moves with the
 _Avoid_: Unlocked, floating ref
 
 **Fixed**:
-A Formula ref that names the column and/or row, with `$` when locked (`[$Jan][$CNC]`). The target stays when the Formula is filled.
+A Formula ref that names the column and/or row, with `$` when locked (`[$Jan][$Red]`). The target stays when the Formula is filled.
 _Avoid_: Absolute (Excel A1 `$A$1`), locked name
 
 **F4**:
@@ -219,7 +219,7 @@ Cycles the Active formula ref: Relative → Fixed both → Fixed row → Fixed c
 _Avoid_: Toggle lock, absolute shortcut
 
 **Formula range**:
-A Formula ref of two same-Table names joined by `:` (`Vat:CncShare`), produced in Point by click-drag or Shift+Arrow.
+A Formula ref of two same-Table names joined by `:` (`Mix:TopShare`), produced in Point by click-drag or Shift+Arrow.
 _Avoid_: Cell range (that is Selection), A1 range
 
 ### Editing

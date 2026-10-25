@@ -255,26 +255,26 @@ describe("table arrow navigation", () => {
     expect(session.gridFocus).toEqual({ tableId: "tbl-narrow", col: 1, row: 0 });
   });
 
-  it("lands on Sales's locked time-axis Growth column as a Growth-cell", () => {
+  it("lands on Lines's locked time-axis Growth column as a Growth-cell", () => {
     const snapshot = createSampleWorkbook();
     const session = new WorkbookSession(snapshot, inert);
     const layout = layoutWorkbook(snapshot);
-    const salg = projectTable(layout, "tbl-sales")!;
-    const lastPeriodCol = salg.colCount - 2;
-    const growthCol = salg.colCount - 1;
+    const lines = projectTable(layout, "tbl-lines")!;
+    const lastPeriodCol = lines.colCount - 2;
+    const growthCol = lines.colCount - 1;
     session.setSelection({
       kind: "cell",
-      tableId: "tbl-sales",
-      rowId: "row-cnc",
+      tableId: "tbl-lines",
+      rowId: "row-red",
       columnId: "2025-12",
     });
-    expect(focusAdjacentTable(session, [salg], { tableId: "tbl-sales", col: lastPeriodCol, row: 1 }, "right", layout)).toEqual({
-      tableId: "tbl-sales",
+    expect(focusAdjacentTable(session, [lines], { tableId: "tbl-lines", col: lastPeriodCol, row: 1 }, "right", layout)).toEqual({
+      tableId: "tbl-lines",
       col: growthCol,
       row: 1,
     });
-    expect(session.selection).toEqual({ kind: "growth", tableId: "tbl-sales", col: growthCol, row: 1 });
-    expect(session.gridFocus).toEqual({ tableId: "tbl-sales", col: growthCol, row: 1 });
+    expect(session.selection).toEqual({ kind: "growth", tableId: "tbl-lines", col: growthCol, row: 1 });
+    expect(session.gridFocus).toEqual({ tableId: "tbl-lines", col: growthCol, row: 1 });
   });
 });
 

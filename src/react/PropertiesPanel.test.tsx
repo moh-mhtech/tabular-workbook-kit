@@ -38,7 +38,7 @@ describe("properties value field commit navigation", () => {
     expect(session.selection).toEqual({
       kind: "cell",
       tableId: "tbl-params",
-      rowId: "row-cnc-share",
+      rowId: "row-top-share",
       columnId: "Value",
     });
     expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows[2].cells.Value).toEqual({
@@ -51,8 +51,8 @@ describe("properties value field commit navigation", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
     session.setSelection({
       kind: "cell",
-      tableId: "tbl-sales",
-      rowId: "row-cnc",
+      tableId: "tbl-lines",
+      rowId: "row-red",
       columnId: "2025-01",
     });
     act(() => {
@@ -66,8 +66,8 @@ describe("properties value field commit navigation", () => {
     fireEvent.keyDown(input, { key: "Tab" });
     expect(session.selection).toEqual({
       kind: "cell",
-      tableId: "tbl-sales",
-      rowId: "row-cnc",
+      tableId: "tbl-lines",
+      rowId: "row-red",
       columnId: "2025-02",
     });
   });

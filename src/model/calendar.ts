@@ -97,13 +97,13 @@ export function resolvePeriodToken(token: string, periods: Period[]): Period | u
   return undefined;
 }
 
-export const dkk = new Intl.NumberFormat("da-DK", {
+const groupedNumber = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
 });
 
 export function formatValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return "";
-  if (typeof value === "number" && Number.isFinite(value)) return dkk.format(value);
+  if (typeof value === "number" && Number.isFinite(value)) return groupedNumber.format(value);
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   return String(value);
 }

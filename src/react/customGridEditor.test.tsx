@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { useCallback, useRef, useState } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { clickFormulaText, pressCaretKey } from "./playgroundCanvasTest.js";
+import { clickFormulaText, pressCaretKey } from "./canvasTest.js";
 import { GridCellKind, type GridCell } from "@glideapps/glide-data-grid";
 import { afterEach, describe, expect, it } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
@@ -90,8 +90,8 @@ function KeyEditorHost() {
   const projection = projectTable(layout, "tbl-params")!;
   const [value, setValue] = useState<GridCell>({
     kind: GridCellKind.Text,
-    data: "Vat",
-    displayData: "Vat",
+    data: "Mix",
+    displayData: "Mix",
     allowOverlay: true,
   });
 
@@ -167,7 +167,7 @@ function renderEditor(host: "loop" | "stable" | "double-click" | "key" | "growth
   const session = new WorkbookSession(createSampleWorkbook(), inert);
   if (host === "growth-column") {
     act(() => {
-      session.addTable("sheet-forud", { name: "Notes" });
+      session.addTable("sheet-assumptions", { name: "Notes" });
     });
   }
   const navMode = host === "double-click" ? overlayModeForActivation("double-click") : "enter";
@@ -256,11 +256,11 @@ describe("custom grid editor UI", () => {
     const { session } = renderEditor("stable");
     fireEvent.change(cellEditor(), { target: { value: "=" } });
     fireEvent.keyDown(cellEditor(), { key: "ArrowDown" });
-    expect(session.formulaEdit?.draft).toBe("=CncShare");
+    expect(session.formulaEdit?.draft).toBe("=TopShare");
     expect(document.activeElement).toBe(cellEditor());
 
     fireEvent.keyDown(cellEditor(), { key: "ArrowDown" });
-    expect(cellEditor().value).toBe("=OutsourceShare");
+    expect(cellEditor().value).toBe("=AlternateShare");
 
     const layout = layoutWorkbook(session.getSnapshot());
     const projection = projectTable(layout, "tbl-params")!;
@@ -285,7 +285,7 @@ describe("custom grid editor UI", () => {
       pointAtProjectedCell(session, projection, layout, 1, 3);
       pointAtProjectedCell(session, projection, layout, 1, 4, { extend: true });
     });
-    expect(editor.value).toBe("=Vat:CncShare");
+    expect(editor.value).toBe("=Mix:TopShare");
     expect(session.formulaEdit?.mode).toBe("point");
     expect(document.querySelector(".wk-overlay-editor")).toBe(editor);
 
@@ -301,7 +301,7 @@ describe("custom grid editor UI", () => {
     expect(document.activeElement).toBe(editor);
     expect(editor.selectionStart).toBe(3);
     expect(editor.selectionEnd).toBe(3);
-    expect(editor.value).toBe("=Vat:CncShare");
+    expect(editor.value).toBe("=Mix:TopShare");
     expect(session.formulaEdit?.mode).toBe("edit");
   });
 
@@ -310,19 +310,19 @@ describe("custom grid editor UI", () => {
     const editor = cellEditor();
     fireEvent.change(editor, { target: { value: "=", selectionStart: 1, selectionEnd: 1 } });
     fireEvent.keyDown(editor, { key: "ArrowDown" });
-    expect(editor.value).toBe("=CncShare");
+    expect(editor.value).toBe("=TopShare");
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 4 });
 
     fireEvent.keyDown(editor, { key: "+" });
-    expect(editor.value).toBe("=CncShare+");
+    expect(editor.value).toBe("=TopShare+");
     expect(session.formulaEdit?.activeFormulaRef).toBeNull();
     expect(session.formulaEdit?.targetCell).toEqual({ tableId: "tbl-params", col: 1, row: 3 });
 
     fireEvent.keyDown(editor, { key: "ArrowDown" });
-    expect(editor.value).toBe("=CncShare+CncShare");
+    expect(editor.value).toBe("=TopShare+TopShare");
 
     fireEvent.keyDown(editor, { key: "ArrowDown" });
-    expect(editor.value).toBe("=CncShare+OutsourceShare");
+    expect(editor.value).toBe("=TopShare+AlternateShare");
   });
 
   it("does not point a cell when the draft is a literal", () => {
@@ -375,14 +375,14 @@ describe("custom grid editor UI", () => {
     const editor = cellEditor();
     fireEvent.change(editor, { target: { value: "=" } });
     fireEvent.keyDown(editor, { key: "ArrowDown" });
-    expect(editor.value).toBe("=CncShare");
+    expect(editor.value).toBe("=TopShare");
     fireEvent.pointerDown(editor);
     expect(session.formulaEdit?.mode).toBe("edit");
     editor.setSelectionRange(editor.value.length, editor.value.length);
     fireEvent.select(editor);
     expect(editor.selectionStart).toBe(editor.value.length);
     expect(fireEvent.keyDown(editor, { key: ")", cancelable: true }), ") must stay in Edit mode").toBe(true);
-    fireEvent.change(editor, { target: { value: "=CncShare)" } });
+    fireEvent.change(editor, { target: { value: "=TopShare)" } });
     editor.setSelectionRange(editor.value.length, editor.value.length);
     fireEvent.select(editor);
     expect(session.formulaEdit?.mode).toBe("edit");
@@ -396,8 +396,8 @@ describe("custom grid editor UI", () => {
       session.setFormulaEditMode("edit");
     });
     expect(editor.selectionStart).toBe(caret);
-    expect(editor.value).toBe("=CncShare)");
-    expect(session.formulaEdit?.draft).toBe("=CncShare)");
+    expect(editor.value).toBe("=TopShare)");
+    expect(session.formulaEdit?.draft).toBe("=TopShare)");
     expect(session.formulaEdit?.mode).toBe("edit");
   });
 
@@ -407,7 +407,7 @@ describe("custom grid editor UI", () => {
     fireEvent.change(editor, { target: { value: "=" } });
     expect(Number.parseFloat(editor.style.minWidth || editor.style.width)).toBe(110);
     expect(Number.parseFloat(editor.style.height)).toBe(28);
-    fireEvent.change(editor, { target: { value: `=${"Vat+".repeat(40)}Vat` } });
+    fireEvent.change(editor, { target: { value: `=${"Mix+".repeat(40)}Mix` } });
     expect(Number.parseFloat(editor.style.width)).toBe(400);
     expect(Number.parseFloat(editor.style.maxHeight || editor.style.height)).toBe(120);
   });

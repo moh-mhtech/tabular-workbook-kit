@@ -7,7 +7,7 @@ import { layoutWorkbook } from "../model/layout.js";
 import { projectTable } from "../grid/sheetProjection.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 import { evaluatedCells, gridCell } from "./CustomSheetCanvas.js";
-import { installGridDom, renderPlaygroundCanvas } from "./playgroundCanvasTest.js";
+import { installGridDom, renderWorkbookCanvas } from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -60,7 +60,7 @@ function readGridCell() {
 describe("grid formatting UI", () => {
   it("gives layout memos a new snapshot identity after a style or format edit", async () => {
     const renders: Array<{ snapshot: object; getCell: () => unknown }> = [];
-    const { session } = await renderPlaygroundCanvas({
+    const { session } = await renderWorkbookCanvas({
       extra: <SnapshotIdentityProbe onRender={(snapshot, getCell) => renders.push({ snapshot, getCell })} />,
     });
     const before = renders.at(-1)!;
@@ -73,7 +73,7 @@ describe("grid formatting UI", () => {
   });
 
   it("paints number format and cell style onto the grid cell after inspector edits", async () => {
-    const { session } = await renderPlaygroundCanvas({
+    const { session } = await renderWorkbookCanvas({
       chrome: true,
       extra: <GridCellProbe col={1} row={1} />,
     });
@@ -142,7 +142,7 @@ describe("grid formatting UI", () => {
   });
 
   it("applies a column style to every cell in that column on the grid", async () => {
-    const { session } = await renderPlaygroundCanvas({
+    const { session } = await renderWorkbookCanvas({
       chrome: true,
       extra: <GridCellProbe col={1} row={3} />,
     });
@@ -157,7 +157,7 @@ describe("grid formatting UI", () => {
   });
 
   it("grows the table grid when a cell font is larger than the default", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     const sheet = document.querySelector(".wk-table-spreadsheet") as HTMLElement;
     const beforeHeight = Number.parseFloat(sheet.style.height);
     const beforeWidth = Number.parseFloat(sheet.style.width);
@@ -172,7 +172,7 @@ describe("grid formatting UI", () => {
   });
 
   it("keeps painted style after the cell value is edited", async () => {
-    const { session } = await renderPlaygroundCanvas({
+    const { session } = await renderWorkbookCanvas({
       extra: <GridCellProbe col={1} row={3} />,
     });
     await act(async () => {
@@ -184,7 +184,7 @@ describe("grid formatting UI", () => {
       });
     });
     await act(async () => {
-      session.writeCell("Params", "Vat", "Value", "0.3");
+      session.writeCell("Params", "Mix", "Value", "0.3");
     });
     expect(session.getSnapshot().tables[0]!.rows[2]!.cells.Value).toMatchObject({
       kind: "input",
@@ -198,7 +198,7 @@ describe("grid formatting UI", () => {
   });
 
   it("clears cell style from the inspector and picks a palette swatch", async () => {
-    const { session } = await renderPlaygroundCanvas({
+    const { session } = await renderWorkbookCanvas({
       chrome: true,
       extra: <GridCellProbe col={1} row={1} />,
     });

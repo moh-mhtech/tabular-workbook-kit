@@ -21,23 +21,23 @@ describe("headless engine", () => {
   it("evaluates IFS, growth, and cross-table refs", async () => {
     const session = await open();
     const params = session.getTable("Params");
-    const aarsalg = params.rows.find((r) => r.key === "AnnualSales")!.cells.Value.computed;
-    expect(aarsalg).toBe(8_000_000);
+    const aarlines = params.rows.find((r) => r.key === "AnnualUnits")!.cells.Value.computed;
+    expect(aarlines).toBe(8_000_000);
 
-    const salg = session.getTable("Sales");
-    const janTotal = num(salg.rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
-    const decTotal = num(salg.rows.find((r) => r.key === "Total")!.cells["2025-12"].computed);
+    const lines = session.getTable("Lines");
+    const janTotal = num(lines.rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
+    const decTotal = num(lines.rows.find((r) => r.key === "Total")!.cells["2025-12"].computed);
     expect(formatValue(janTotal)).toMatch(/563/);
     expect(janTotal).toBeGreaterThan(500_000);
     expect(decTotal).toBeGreaterThan(janTotal);
 
-    const staff = session.getTable("Staff");
+    const staff = session.getTable("Teams");
     expect(staff.rows.find((r) => r.key === "Karol")!.cells["2025-01"].computed).toBe(45000);
-    const fte = staff.rows.find((r) => r.key === "RequiredFTE")!.cells["2025-01"].computed;
+    const fte = staff.rows.find((r) => r.key === "RequiredNum")!.cells["2025-01"].computed;
     expect(fte === 1 || fte === 2).toBe(true);
 
     const resultat = session.getTable("Result");
-    const oms = num(resultat.rows.find((r) => r.key === "Revenue")!.cells["2025-01"].computed);
+    const oms = num(resultat.rows.find((r) => r.key === "Inbound")!.cells["2025-01"].computed);
     expect(oms).toBeCloseTo(janTotal, 4);
   }, 60_000);
 });
@@ -46,22 +46,22 @@ describe("scenarios", () => {
   it("overlays inputs only and does not rewrite formulas", async () => {
     const snapshot = createSampleWorkbook();
     const baseFormula = snapshot.tables
-      .find((t) => t.name === "Sales")!
-      .rows.find((r) => r.key === "CNC")!.cells["2025-01"].formula;
+      .find((t) => t.name === "Lines")!
+      .rows.find((r) => r.key === "Red")!.cells["2025-01"].formula;
     const session = new WorkbookSession(snapshot, new HyperFormulaEngine());
     await session.recalculate();
 
-    const baseJan = num(session.getTable("Sales").rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
+    const baseJan = num(session.getTable("Lines").rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
     session.activateScenario("scn-growth");
     await session.recalculate();
-    expect(session.getCell("Params", "AnnualSales", "Value").overlay).toBe(true);
-    expect(session.getCell("Params", "AnnualSales", "Value").computed).toBe(10_000_000);
+    expect(session.getCell("Params", "AnnualUnits", "Value").overlay).toBe(true);
+    expect(session.getCell("Params", "AnnualUnits", "Value").computed).toBe(10_000_000);
 
     const after = session.toSnapshot();
-    const still = after.tables.find((t) => t.name === "Sales")!.rows.find((r) => r.key === "CNC")!.cells["2025-01"].formula;
+    const still = after.tables.find((t) => t.name === "Lines")!.rows.find((r) => r.key === "Red")!.cells["2025-01"].formula;
     expect(still).toBe(baseFormula);
 
-    const vaekstJan = num(session.getTable("Sales").rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
+    const vaekstJan = num(session.getTable("Lines").rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
     expect(vaekstJan).toBeGreaterThan(baseJan);
     expect(vaekstJan / baseJan).toBeCloseTo(10 / 8, 5);
   }, 60_000);
@@ -70,9 +70,9 @@ describe("scenarios", () => {
 describe("time grain views", () => {
   it("aggregates months into quarters and year without changing storage", async () => {
     const session = await open();
-    const month = session.getTable("Sales", { timeGrain: "month" });
-    const quarter = session.getTable("Sales", { timeGrain: "quarter" });
-    const year = session.getTable("Sales", { timeGrain: "year" });
+    const month = session.getTable("Lines", { timeGrain: "month" });
+    const quarter = session.getTable("Lines", { timeGrain: "quarter" });
+    const year = session.getTable("Lines", { timeGrain: "year" });
 
     const jan = num(month.rows.find((r) => r.key === "Total")!.cells["2025-01"].computed);
     const feb = num(month.rows.find((r) => r.key === "Total")!.cells["2025-02"].computed);

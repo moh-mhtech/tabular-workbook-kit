@@ -9,7 +9,7 @@ describe("PostgresWorkbookStore via SqlClient", () => {
     const store = new PostgresWorkbookStore(pgliteClient(new PGlite()), "hosted-shaped");
     await store.save(createSampleWorkbook());
     const vat = await store.sql<{ Value: unknown }>(
-      `SELECT "Value" FROM "Parameters"."Params.c" WHERE row_key = 'Vat'`,
+      `SELECT "Value" FROM "Parameters"."Params.c" WHERE row_key = 'Mix'`,
     );
     expect(vat.rows[0]?.Value).toBe(0.25);
   });

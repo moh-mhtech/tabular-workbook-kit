@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formulaBar, installGridDom, renderPlaygroundCanvas } from "./playgroundCanvasTest.js";
+import { formulaBar, installGridDom, renderWorkbookCanvas } from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -13,7 +13,7 @@ afterEach(() => {
 
 describe("cell style UI", () => {
   it("toggles bold italic and strikethrough from shortcuts", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await act(async () => {
       session.setSelection({
         kind: "cell",
@@ -35,7 +35,7 @@ describe("cell style UI", () => {
   });
 
   it("does not steal shortcuts while the formula bar is focused", async () => {
-    const { session } = await renderPlaygroundCanvas();
+    const { session } = await renderWorkbookCanvas();
     await act(async () => {
       session.setSelection({
         kind: "cell",
@@ -53,7 +53,7 @@ describe("cell style UI", () => {
   });
 
   it("toggles bold from the inspector and keeps a scenario overlay", async () => {
-    const { session } = await renderPlaygroundCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await act(async () => {
       session.activateScenario("scn-growth");
       session.setSelection({
@@ -77,6 +77,6 @@ describe("cell style UI", () => {
     expect(screen.getByLabelText("Increase font size").tagName).toBe("BUTTON");
     expect(screen.getByLabelText("Decrease font size").tagName).toBe("BUTTON");
     expect(session.getSnapshot().tables[0]!.rows[0]!.cells.Value!.style).toEqual({ bold: true });
-    expect(session.getCell("Params", "AnnualSales", "Value").overlay).toBe(true);
+    expect(session.getCell("Params", "AnnualUnits", "Value").overlay).toBe(true);
   });
 });

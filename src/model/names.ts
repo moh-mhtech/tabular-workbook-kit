@@ -151,19 +151,6 @@ export function invalidColumnName(
   return undefined;
 }
 
-export function nextPromotableKey(snapshot: WorkbookSnapshot): string {
-  let i = 1;
-  for (;;) {
-    const candidate = i === 1 ? "Param" : `Param${i}`;
-    try {
-      return assertGlobalName(snapshot, candidate);
-    } catch {
-      i++;
-      if (i > 1000) throw new Error("Could not allocate a parameter key.");
-    }
-  }
-}
-
 export function getCellName(
   layout: WorkbookLayout,
   tableId: string,

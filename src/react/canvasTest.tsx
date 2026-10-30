@@ -6,7 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { expect, vi } from "vitest";
 import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import { fitProjectedColumnWidths, fitProjectedRowHeights } from "../grid/columnFit.js";
-import { projectTable, selectionForProjectedCell } from "../grid/sheetProjection.js";
+import { projectTable, projectedLocationForRef, selectionForProjectedCell } from "../grid/sheetProjection.js";
+import { KEY_COLUMN_ID, selectedCellRefs } from "../model/types.js";
 import { applyGridPointerToFormulaEdit, canPointFromDraft } from "./customGridOverlay.js";
 import { layoutWorkbook } from "../model/layout.js";
 import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
@@ -118,6 +119,15 @@ export async function renderWorkbookCanvas(
   return { session };
 }
 
+export async function openGridContextMenu(session: WorkbookSession, tableId: string, col: number, row: number) {
+  const host = document.querySelector(`[data-table-id="${tableId}"] .wk-table-spreadsheet`);
+  expect(host).toBeTruthy();
+  const { clientX, clientY } = projectedCellPointer(session, tableId, col, row);
+  await act(async () => {
+    fireEvent.contextMenu(host!, { clientX, clientY, bubbles: true });
+  });
+}
+
 export async function selectProjectedCell(session: WorkbookSession, tableId: string, col: number, row: number) {
   const layout = layoutWorkbook(session.getSnapshot());
   const projection = projectTable(layout, tableId)!;
@@ -139,10 +149,46 @@ export async function pressTableKey(
   });
 }
 
+export function gridNavCell(
+  session: WorkbookSession,
+): { tableId: string; col: number; row: number } | null {
+  const focus = session.gridFocus;
+  if (focus) return focus;
+  const selection = session.selection;
+  if (!selection || !("tableId" in selection)) return null;
+  if (selection.kind === "growth") {
+    return { tableId: selection.tableId, col: selection.col, row: selection.row };
+  }
+  if (selection.kind === "corner") {
+    return { tableId: selection.tableId, col: 0, row: 0 };
+  }
+  if (selection.kind === "row") {
+    const layout = layoutWorkbook(session.getSnapshot());
+    const projection = projectTable(layout, selection.tableId);
+    if (!projection) return null;
+    const location = projectedLocationForRef(projection, layout, {
+      tableId: selection.tableId,
+      rowId: selection.rowId,
+      columnId: KEY_COLUMN_ID,
+    });
+    if (!location) return null;
+    return { tableId: selection.tableId, col: location[0], row: location[1] };
+  }
+  if (selection.kind !== "cell") return null;
+  const ref = selectedCellRefs(selection)[0];
+  if (!ref) return null;
+  const layout = layoutWorkbook(session.getSnapshot());
+  const projection = projectTable(layout, ref.tableId);
+  if (!projection) return null;
+  const location = projectedLocationForRef(projection, layout, ref);
+  if (!location) return null;
+  return { tableId: ref.tableId, col: location[0], row: location[1] };
+}
+
 export function trackFocus(session: WorkbookSession) {
-  let current = session.gridFocus;
+  let current = gridNavCell(session);
   session.subscribe(() => {
-    if (session.gridFocus) current = session.gridFocus;
+    current = gridNavCell(session);
   });
   return {
     expectAt(tableId: string, col: number, row: number) {
@@ -205,6 +251,7 @@ function dispatchGridPointer(element: Element, type: "pointerdown" | "pointermov
   Object.defineProperties(event, {
     clientX: { get: () => clientX },
     clientY: { get: () => clientY },
+    button: { get: () => 0 },
     buttons: { get: () => 1 },
     pointerId: { get: () => 1 },
     pointerType: { get: () => "mouse" },

@@ -1,4 +1,5 @@
-import type { CellSnapshot, TableSnapshot, WorkbookSnapshot } from "../model/types.js";
+import { assertGlobalName } from "./names.js";
+import type { CellSnapshot, TableSnapshot, WorkbookSnapshot } from "./types.js";
 
 /** Identifier start: Unicode letter or underscore. */
 export const IDENT_START = String.raw`\p{L}_`;
@@ -35,24 +36,6 @@ export function uniqueName(existing: string[], base: string): string {
   return `${base}${i}`;
 }
 
-/** Excel-style default identifier for the next unnamed table column. */
-export function nextColumnIdentifier(existing: string[]): string {
-  const used = new Set(existing.map((name) => name.toUpperCase()));
-  for (let index = 0; ; index++) {
-    const candidate = columnIdentifier(index);
-    if (!used.has(candidate)) return candidate;
-  }
-}
-
-/** Excel-style default identifier for the next unnamed table row. */
-export function nextRowIdentifier(existing: string[]): string {
-  const used = new Set(existing);
-  for (let index = 1; ; index++) {
-    const candidate = String(index);
-    if (!used.has(candidate)) return candidate;
-  }
-}
-
 function columnIdentifier(index: number): string {
   let n = index + 1;
   let out = "";
@@ -71,6 +54,54 @@ export function defaultRowKeyAt(table: { promoteRowKeys?: boolean }, index: numb
 
 export function defaultColumnNameAt(index: number): string {
   return columnIdentifier(index);
+}
+
+function uniquifyLocal(existing: readonly string[], base: string, except?: string): string {
+  const lower = new Set(existing.filter((name) => name !== except).map((name) => name.toLowerCase()));
+  if (!lower.has(base.toLowerCase())) return base;
+  let i = 2;
+  while (lower.has(`${base}${i}`.toLowerCase())) i++;
+  return `${base}${i}`;
+}
+
+/** Default row key at `index`, made unique in the table (and workbook when keys are promoted). */
+export function allocateRowKeyAt(
+  table: TableSnapshot,
+  snapshot: WorkbookSnapshot,
+  index: number,
+  exceptRowId?: string,
+): string {
+  const base = defaultRowKeyAt(table, index);
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    const candidate = attempt === 0 ? base : `${base}${attempt + 1}`;
+    const localClash = table.rows.some(
+      (row) => row.id !== exceptRowId && row.key.toLowerCase() === candidate.toLowerCase(),
+    );
+    if (localClash) continue;
+    if (table.promoteRowKeys) {
+      try {
+        assertGlobalName(snapshot, candidate, { tableId: table.id, rowId: exceptRowId });
+        return candidate;
+      } catch {
+        continue;
+      }
+    }
+    return candidate;
+  }
+  throw new Error("Could not allocate a row key.");
+}
+
+/** Default column name at `index`, made unique among attribute columns on the table. */
+export function allocateColumnNameAt(
+  table: TableSnapshot,
+  index: number,
+  exceptColumnId?: string,
+): string {
+  const base = defaultColumnNameAt(index);
+  const names = table.attributeColumns
+    .filter((col) => col.id !== exceptColumnId)
+    .map((col) => col.name);
+  return uniquifyLocal(names, base);
 }
 
 export function rewriteFormulas(snapshot: WorkbookSnapshot, rewrite: (formula: string) => string) {

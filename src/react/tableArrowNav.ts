@@ -367,7 +367,12 @@ export function focusAdjacentTable(
   from: TableArrowNavCell,
   direction: ArrowNavDirection,
   layout: WorkbookLayout,
-  options: { ctrl?: boolean; evaluated?: ReadonlyMap<string, EvaluatedCell> } = {},
+  options: {
+    ctrl?: boolean;
+    evaluated?: ReadonlyMap<string, EvaluatedCell>;
+    /** When `cross-table-only`, same-table moves skip `gridFocus` so the canvas can paint selection synchronously. */
+    gridFocus?: "always" | "cross-table-only";
+  } = {},
 ): TableArrowNavCell | undefined {
   const target = options.ctrl
     ? ctrlArrowNavTarget(tables, from, direction, layout, options.evaluated)
@@ -375,7 +380,10 @@ export function focusAdjacentTable(
   if (!target) return undefined;
   const projection = tables.find((table) => table.tableId === target.tableId);
   if (!projection) return undefined;
-  session.setGridFocus({ tableId: target.tableId, col: target.col, row: target.row });
+  const gridFocusMode = options.gridFocus ?? "always";
+  if (gridFocusMode === "always" || target.tableId !== from.tableId) {
+    session.setGridFocus({ tableId: target.tableId, col: target.col, row: target.row });
+  }
   session.setSelection(selectionForProjectedCell(projection, layout, target.col, target.row));
   return target;
 }

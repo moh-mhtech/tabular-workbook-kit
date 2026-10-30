@@ -1,4 +1,14 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
+import { flushSync } from "react-dom";
 import DataEditor, {
   CompactSelection,
   GridCellKind,
@@ -51,6 +61,8 @@ import {
   applyCustomGridPaste,
   expandEditAcrossRange,
   focusAfterCommitMove,
+  movementToCommitDelta,
+  runFinishEditNavigation,
 } from "./customGridInteractions.js";
 import { GRID_CELL_PAD_X, GRID_CELL_PAD_Y, isIdentifierEdit, overlayProvideOptions, ProjectedOverlayEditor, type OverlayEditorProps } from "./customGridEditor.js";
 import {
@@ -72,6 +84,22 @@ import { showTableGrid } from "../model/tableHidden.js";
 import { TableVisibilityButton } from "./components.js";
 import { TableGridCollapse } from "./TableGridCollapse.js";
 import { tableNeedsValuesRefresh } from "./tableDisplayRefresh.js";
+import { GridContextMenu } from "./GridContextMenu.js";
+import {
+  selectionIncludesProjectedCell,
+  structureDeleteCommands,
+  structureDeleteCommandsForTableRange,
+  type StructureDeleteCommands,
+} from "./gridStructureDelete.js";
+import { ignoreTableCornerDuringRangeDrag } from "./tableCornerSelection.js";
+import {
+  commitProjectedCellEdit,
+  filterRedundantGridEdits,
+  pendingCellDisplayKey,
+  type PendingCellDisplay,
+} from "./commitProjectedCellEdit.js";
+import { GridCommitProvider, type GridCommitApi } from "./gridCommitContext.js";
+import { appendEntryQueue, takeEntryQueue, type EntryQueueState } from "./entryQueue.js";
 import { useFormulaEdit, useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 
 const EMPTY_SELECTION: GridSelection = {
@@ -252,6 +280,7 @@ export function gridCell(
   layout: WorkbookLayout,
   evaluated: Map<string, EvaluatedCell>,
   location: Item,
+  pendingDisplay?: PendingCellDisplay,
 ): GridCell {
   const [col, row] = location;
   const projected = projectedCell(projection, layout, col, row);
@@ -357,11 +386,22 @@ export function gridCell(
   const formulas = sources.map((item) => (item.kind === "formula" ? item.formula ?? "" : ""));
   const sameFormula = formulas.length > 0 && formulas.every((item) => item && item === formulas[0]);
   const computed = bucketComputed(values, sources);
+  const pendingKey = pendingCellDisplayKey(hit.tableId, hit.rowId, hit.columnId);
+  const pendingRaw = pendingDisplay?.get(pendingKey);
+  const liveSource = effectiveCell(layout.snapshot, hit.tableId, hit.rowId, hit.columnId);
+  const snapshotInputRaw =
+    liveSource.kind === "input"
+      ? rawEditValue(liveSource.value)
+      : liveSource.kind === "formula"
+        ? liveSource.formula ?? ""
+        : undefined;
   const raw = sameFormula
     ? formulas[0]!
     : value?.kind === "formula" || source.kind === "formula"
       ? value?.formula ?? source.formula ?? ""
-      : rawEditValue(periodIds.length > 1 ? computed : value?.input ?? source.value ?? null);
+      : pendingRaw ??
+        snapshotInputRaw ??
+        rawEditValue(periodIds.length > 1 ? computed : value?.input ?? source.value ?? null);
   const style = resolveCellStyle(tableLayout.table, periodIds[0] ?? hit.columnId, sourceRow?.cells[periodIds[0] ?? hit.columnId]);
   const themeOverride = {
     ...(values.some((item) => item?.error)
@@ -375,8 +415,15 @@ export function gridCell(
     ...(style?.textColor ? { textDark: style.textColor, textLight: style.textColor } : {}),
     ...(styleFont(style) ? { baseFontStyle: styleFont(style) } : {}),
   };
+  const displayFromInput =
+    pendingRaw !== undefined || (liveSource.kind === "input" && !sameFormula && source.kind !== "formula")
+      ? pendingRaw ?? snapshotInputRaw ?? raw
+      : undefined;
   return textCell(raw, {
-    displayData: applyStrikethrough(formatDisplayValue(computed, pattern), style),
+    displayData: applyStrikethrough(
+      displayFromInput ?? formatDisplayValue(computed, pattern),
+      style,
+    ),
     contentAlign: typeof computed === "number" ? "right" : "left",
     themeOverride,
   });
@@ -565,10 +612,26 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
     [layout, projection],
   );
   const [gridSelection, setGridSelection] = useState<GridSelection>(EMPTY_SELECTION);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    commands: StructureDeleteCommands;
+  } | null>(null);
+  useEffect(() => {
+    if (formulaEdit) setContextMenu(null);
+  }, [formulaEdit]);
   const overlayStartModeRef = useRef<OverlayNavMode>(overlayModeForActivation("double-click"));
   const overlayOpenRef = useRef(false);
+  const finishEditNavigationGate = useRef({ active: false }).current;
+  const pendingDisplayRef = useRef<PendingCellDisplay>(new Map());
+  const entryQueueRef = useRef<EntryQueueState>(null);
+  const [displayEpoch, setDisplayEpoch] = useState(0);
+  useEffect(() => {
+    pendingDisplayRef.current.clear();
+  }, [dataVersion]);
   const pointingDragRef = useRef(false);
   const cornerPointerRef = useRef(false);
+  const rangeSelectDragRef = useRef(false);
   const ignoreCornerEchoRef = useRef(false);
   const lastClickWasDoubleRef = useRef(false);
   const editingLocationRef = useRef<Item | null>(null);
@@ -587,6 +650,68 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
   });
   editorHostRef.current.projection = projection;
   editorHostRef.current.layout = layout;
+  const gridCommitEnvRef = useRef({
+    session,
+    projection,
+    layout,
+    tableId,
+    setDisplayEpoch,
+    setGridSelection,
+  });
+  gridCommitEnvRef.current = {
+    session,
+    projection,
+    layout,
+    tableId,
+    setDisplayEpoch,
+    setGridSelection,
+  };
+  const gridCommitApi = useRef<GridCommitApi>({
+    pendingDisplay: pendingDisplayRef.current,
+    commitAt(location, raw) {
+      const env = gridCommitEnvRef.current;
+      if (!env.projection) return;
+      const written = commitProjectedCellEdit(
+        env.session,
+        env.projection,
+        env.layout,
+        location,
+        raw,
+        pendingDisplayRef.current,
+      );
+      if (written) env.setDisplayEpoch((epoch) => epoch + 1);
+    },
+    syncNavigateAfterCommit(from, movement) {
+      const env = gridCommitEnvRef.current;
+      if (!env.projection?.tableId) return undefined;
+      const delta = movementToCommitDelta(movement);
+      if (delta[0] === 0 && delta[1] === 0) return from;
+      const next = focusAfterCommitMove(env.session, env.tableId, from, delta);
+      if (!next) return undefined;
+      const selection = cellGridSelection(next.location);
+      flushSync(() => {
+        env.setGridSelection(selection);
+      });
+      gridSelectionRef.current = selection;
+      editorHostRef.current.editingLocation = next.location;
+      return next.location;
+    },
+    queueTypedChar(char) {
+      const env = gridCommitEnvRef.current;
+      const focus = env.session.gridFocus;
+      if (!focus || focus.tableId !== env.tableId) return;
+      entryQueueRef.current = appendEntryQueue(entryQueueRef.current, focus.col, focus.row, char);
+    },
+    takeQueuedChars(location) {
+      const taken = takeEntryQueue(entryQueueRef.current, location[0], location[1]);
+      entryQueueRef.current = taken.queue;
+      return taken.chars;
+    },
+    noteCommitInFlight: () => {},
+    clearCommitInFlight: () => {},
+    commitInFlight: () => false,
+  }).current;
+  gridCommitApi.pendingDisplay = pendingDisplayRef.current;
   const targetCell = formulaEdit?.targetCell;
   const rangeAnchor = formulaEdit?.rangeAnchor;
   const hostRef = useRef<HTMLDivElement>(null);
@@ -691,11 +816,13 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
   const getCellContent = useCallback(
     (location: Item): GridCell => {
       if (!projection) return textCell("", { allowOverlay: false, readonly: true });
-      const cell = gridCell(projection, layout, values, location) as GridCell & { location?: Item };
+      const cell = gridCell(projection, layout, values, location, pendingDisplayRef.current) as GridCell & {
+        location?: Item;
+      };
       cell.location = location;
       return cell;
     },
-    [layout, projection, values],
+    [displayEpoch, layout, projection, values],
   );
 
   const onGridSelectionChange = useCallback(
@@ -709,6 +836,18 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
       const unit =
         !next.current?.range || (next.current.range.width === 1 && next.current.range.height === 1);
       if (isTableCorner(projection, active[0], active[1]) && unit && projection.tableId) {
+        const previous = gridSelectionRef.current.current;
+        if (
+          ignoreTableCornerDuringRangeDrag({
+            onTableCorner: true,
+            unitSelection: unit,
+            cornerPointerDown: cornerPointerRef.current,
+            rangeSelectDrag: rangeSelectDragRef.current,
+            previousRange: previous?.range ?? null,
+          })
+        ) {
+          return;
+        }
         if (cornerPointerRef.current) {
           const rect = labeledTableRect(projection);
           const labeled = rangeGridSelection(
@@ -723,7 +862,6 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
           cornerPointerRef.current = false;
           return;
         }
-        const previous = gridSelectionRef.current.current;
         const alreadyOnCorner =
           previous?.cell &&
           isTableCorner(projection, previous.cell[0], previous.cell[1]) &&
@@ -785,12 +923,10 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
     (edits: readonly { location: Item; value: EditableGridCell }[]) => {
       if (!projection) return true;
       try {
-        applyCustomGridEdits(
-          session,
-          projection,
-          layout,
-          expandEditAcrossRange(projection, layout, edits, gridSelectionRef.current.current?.range),
-        );
+        const batch = expandEditAcrossRange(projection, layout, edits, gridSelectionRef.current.current?.range);
+        const pending = filterRedundantGridEdits(session, projection, layout, batch);
+        if (!pending.length) return true;
+        applyCustomGridEdits(session, projection, layout, pending);
       } catch (error) {
         showError(error);
       }
@@ -819,19 +955,24 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
     [layout, projection, session],
   );
 
-  const BoundEditor = useCallback((props: OverlayEditorProps) => {
-    const host = editorHostRef.current;
-    if (!host.projection) return null;
-    return (
-      <ProjectedOverlayEditor
-        {...props}
-        initialNavMode={host.initialNavMode}
-        editingLocation={host.editingLocation}
-        projection={host.projection}
-        layout={host.layout}
-      />
-    );
-  }, []);
+  const BoundEditor = useCallback(
+    (props: OverlayEditorProps) => {
+      const host = editorHostRef.current;
+      if (!host.projection) return null;
+      return (
+        <GridCommitProvider value={gridCommitApi}>
+          <ProjectedOverlayEditor
+            {...props}
+            initialNavMode={host.initialNavMode}
+            editingLocation={host.editingLocation}
+            projection={host.projection}
+            layout={host.layout}
+          />
+        </GridCommitProvider>
+      );
+    },
+    [gridCommitApi],
+  );
 
   const provideEditor = useCallback((cell: GridCell) => {
     if (cell.kind !== GridCellKind.Text || !projection) return undefined;
@@ -844,6 +985,8 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
       isTableCorner(projection, editingLocation[0], editingLocation[1])
     ) return undefined;
     editorHostRef.current.editingLocation = editingLocation;
+    editingLocationRef.current = editingLocation;
+    overlayOpenRef.current = true;
     if (lastClickWasDoubleRef.current) overlayStartModeRef.current = overlayModeForActivation("double-click");
     editorHostRef.current.initialNavMode = overlayStartModeRef.current;
     const columnWidth = fittedColumns[editingLocation[0]]?.width ?? TABLE_DATA_COLUMN_WIDTH;
@@ -904,19 +1047,31 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
         event.preventDefault?.();
         if (!target || target.tableId !== tableId) return;
         onGridSelectionChange(rangeGridSelection(origin, [target.col, target.row]));
+        if ("stopPropagation" in event && typeof event.stopPropagation === "function") {
+          event.stopPropagation();
+        }
         return;
       }
-      const target = focusAdjacentTable(
-        session,
-        sheetTables,
-        { tableId, col: current[0], row: current[1] },
-        direction,
-        layout,
-        { ctrl, evaluated: values },
-      );
+      const from = { tableId, col: current[0], row: current[1] };
+      const target = focusAdjacentTable(session, sheetTables, from, direction, layout, {
+        ctrl,
+        evaluated: values,
+        gridFocus: "cross-table-only",
+      });
       if (!target) return;
       event.cancel?.();
       event.preventDefault?.();
+      if (target.tableId === tableId) {
+        const next = cellGridSelection([target.col, target.row]);
+        flushSync(() => {
+          setGridSelection(next);
+        });
+        gridSelectionRef.current = next;
+        editingLocationRef.current = [target.col, target.row];
+      }
+      if ("stopPropagation" in event && typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
     },
     [layout, onGridSelectionChange, projection, session, sheetTables, tableId, values],
   );
@@ -943,23 +1098,26 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
       if (keepPointing) return;
       session.cancelFormulaEdit();
       if (!projection?.tableId) return;
-      const current = editingLocationRef.current ?? gridSelectionRef.current.current?.cell;
-      if (!current) return;
-      const delta: readonly [-1 | 0 | 1, -1 | 0 | 1] = [
-        movement[0] < 0 ? -1 : movement[0] > 0 ? 1 : 0,
-        movement[1] < 0 ? -1 : movement[1] > 0 ? 1 : 0,
-      ];
+      const tableId = projection.tableId;
       try {
-        const next = focusAfterCommitMove(session, projection.tableId, current, delta);
-        if (!next) return;
-        setGridSelection(cellGridSelection(next.location));
-        editingLocationRef.current = [next.location[0], next.location[1]];
-        setActiveSheetId(projection.sheetId);
+        const commitFrom = editingLocationRef.current;
+        if (!commitFrom) return;
+        runFinishEditNavigation(finishEditNavigationGate, commitFrom, movement, (from, navDelta) => {
+          const next = focusAfterCommitMove(session, tableId, from, navDelta);
+          if (!next) return;
+          editingLocationRef.current = [next.location[0], next.location[1]];
+          editorHostRef.current.editingLocation = next.location;
+          const selection = cellGridSelection(next.location);
+          flushSync(() => {
+            setGridSelection(selection);
+          });
+          gridSelectionRef.current = selection;
+        });
       } catch (error) {
         showError(error);
       }
     },
-    [projection, session, setActiveSheetId],
+    [formulaEdit, projection, session, setActiveSheetId],
   );
 
   const onFillPattern = useCallback(
@@ -999,13 +1157,55 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
   const scrollbarGutter = horizontalScroll === "sheet" ? 0 : SCROLLBAR_GUTTER;
   const gridHeight = fittedRows.reduce((sum, height) => sum + height, 0) + scrollbarGutter;
 
+  const onHostContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (formulaEdit || !projection) return;
+    const location = gridLocationFromPointer(
+      event.currentTarget,
+      event.clientX,
+      event.clientY,
+      columnWidths,
+      fittedRows,
+    );
+    if (!location) return;
+    const onTableCorner = isTableCorner(projection, location[0], location[1]);
+    const projected = projectedCell(projection, layout, location[0], location[1]);
+    if (!onTableCorner && (projected.kind === "readonly" || projected.kind === "gap")) return;
+    const snapshot = session.getSnapshot();
+    const tableCellSelection =
+      session.selection?.kind === "cell" && session.selection.tableId === projection.tableId;
+    if (!tableCellSelection && !selectionIncludesProjectedCell(session.selection, projection, layout, location[0], location[1])) {
+      if (!onTableCorner) {
+        session.setSelection(selectionForProjectedCell(projection, layout, location[0], location[1]));
+      }
+    }
+    let commands: StructureDeleteCommands;
+    if (tableCellSelection) {
+      commands = structureDeleteCommands(snapshot, session.selection);
+    } else if (onTableCorner && projection.tableId) {
+      commands = structureDeleteCommandsForTableRange(snapshot, projection, layout);
+    } else {
+      commands = structureDeleteCommands(snapshot, session.selection);
+    }
+    if (!commands.rows && !commands.columns) {
+      setContextMenu(null);
+      return;
+    }
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY, commands });
+  };
+
   return (
+    <GridCommitProvider value={gridCommitApi}>
     <div
       ref={hostRef}
       className="wk-table-spreadsheet click-outside-ignore"
       tabIndex={0}
       data-formula-ref-marks={formulaMarks.length ? JSON.stringify(formulaMarks) : undefined}
-      onKeyDown={(event) => onEditorKeyDown(event)}
+      onContextMenu={onHostContextMenu}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        onEditorKeyDown(event);
+      }}
       onMouseDownCapture={(event) => {
         if (event.detail < 2) return;
         lastClickWasDoubleRef.current = true;
@@ -1014,9 +1214,11 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
       onPointerDownCapture={(event) => {
         lastClickWasDoubleRef.current = event.detail >= 2;
         if (event.detail >= 2) overlayStartModeRef.current = overlayModeForActivation("double-click");
-        if (projection) {
+        if (projection && (event.button === 0 || event.button === undefined)) {
           const location = gridLocationFromPointer(event.currentTarget, event.clientX, event.clientY, columnWidths, fittedRows);
-          cornerPointerRef.current = Boolean(location && isTableCorner(projection, location[0], location[1]));
+          const onCorner = Boolean(location && isTableCorner(projection, location[0], location[1]));
+          cornerPointerRef.current = onCorner;
+          rangeSelectDragRef.current = !onCorner;
           if (cornerPointerRef.current && !formulaEdit && !(event.detail >= 2)) {
             onGridSelectionChange(cellGridSelection(location!));
             event.preventDefault();
@@ -1053,6 +1255,7 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
       }}
       onPointerUp={() => {
         pointingDragRef.current = false;
+        rangeSelectDragRef.current = false;
       }}
       style={{
         width: gridWidth,
@@ -1153,6 +1356,15 @@ const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
           cellVerticalPadding: GRID_CELL_PAD_Y,
         }}
       />
+      {contextMenu ? (
+        <GridContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          commands={contextMenu.commands}
+          onClose={() => setContextMenu(null)}
+        />
+      ) : null}
     </div>
+    </GridCommitProvider>
   );
 });

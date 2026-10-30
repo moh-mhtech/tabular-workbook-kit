@@ -35,29 +35,29 @@ describe("table structure editing", () => {
   it("rewrites Defined name Formula refs when a Key is renamed", async () => {
     const session = await open();
     const extra = session.addRow("Params");
-    expect(extra.key).toBe("Param");
+    expect(extra.key).toBe("Param8");
     const param2 = session.addRow("Params");
-    expect(param2.key).toBe("Param2");
+    expect(param2.key).toBe("Param9");
     session.setInput("Params", param2.id, "Value", 1);
     session.setFormula("Params", "AlternateShare", "Value", "=Mix");
     session.setFormula("Params", extra.id, "Value", "=Mix:TopShare");
-    session.setFormula("Params", "LastShare", "Value", "=Param2");
+    session.setFormula("Params", "LastShare", "Value", "=Param9");
     session.renameRow("Params", "Mix", "Levy");
     await session.recalculate();
     expect(session.getTable("Params").rows.find((row) => row.id === "row-alt-share")!.cells.Value.formula).toBe("=Levy");
     expect(session.getTable("Params").rows.find((row) => row.id === extra.id)!.cells.Value.formula).toBe("=Levy:TopShare");
     expect(session.getTable("Params").rows.find((row) => row.id === "row-last-share")!.cells.Value.formula).toBe(
-      "=Param2",
+      "=Param9",
     );
     expect(session.getCell("Params", "AlternateShare", "Value").computed).toBe(0.25);
     expect(session.getCell("Params", extra.key, "Value").computed).toBe(1.05);
 
-    session.setFormula("Params", "TopShare", "Value", "=Param");
+    session.setFormula("Params", "TopShare", "Value", "=Param8");
     session.renameRow("Params", extra.id, "Keep");
     await session.recalculate();
     expect(session.getTable("Params").rows.find((row) => row.id === "row-top-share")!.cells.Value.formula).toBe("=Keep");
     expect(session.getTable("Params").rows.find((row) => row.id === "row-last-share")!.cells.Value.formula).toBe(
-      "=Param2",
+      "=Param9",
     );
     expect(session.getCell("Params", "LastShare", "Value").computed).toBe(1);
   });

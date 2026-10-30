@@ -66,7 +66,7 @@ describe("parameters sheet and table", () => {
     expect(() => session.renameRow("Params", "Mix", "Lines")).toThrow(/collides with table/);
     expect(() => session.renameTable("Lines", "Mix")).toThrow(/promoted key/);
     const added = session.addRow("Params");
-    expect(added.key).toBe("Param");
+    expect(added.key).toBe("Param8");
     session.renameRow("Params", added.id, "Levy");
     expect(promotedNames(session.getSnapshot()).map((p) => p.name)).toContain("Levy");
   });

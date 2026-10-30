@@ -28,6 +28,7 @@ import {
 } from "./formulaEditorPopup.js";
 import { FormulaColoredText } from "./FormulaColoredText.js";
 import { useWorkbook, type FormulaEditPlacement } from "./WorkbookProvider.js";
+import { useGridCommit } from "./gridCommitContext.js";
 
 export type OverlayEditorProps = {
   value: GridCell;
@@ -109,11 +110,18 @@ export function IdentifierEditor({
   layout,
 }: GridOverlayEditorProps) {
   const { session } = useWorkbook();
+  const gridCommit = useGridCommit();
   const inputRef = useRef<HTMLInputElement>(null);
   const initial = value.kind === GridCellKind.Text ? value.data : "";
   const [draft, setDraft] = useState(initial);
   const editing = projectedCell(projection, layout, editingLocation[0], editingLocation[1]);
   const error = identifierDraftError(editing, session.getSnapshot(), draft);
+
+  useLayoutEffect(() => {
+    const queued = gridCommit?.takeQueuedChars(editingLocation) ?? "";
+    if (!queued) return;
+    setDraft((current) => current + queued);
+  }, [editingLocation, gridCommit]);
 
   useEffect(() => {
     const input = inputRef.current;
@@ -147,6 +155,7 @@ export function IdentifierEditor({
         if (value.kind === GridCellKind.Text) onChange(next);
         const commitMove = commitKeyMovement(event);
         if (!commitMove) return;
+        gridCommit?.commitAt(editingLocation, draft);
         onFinishedEditing(next, commitMove);
       }}
     />
@@ -169,6 +178,7 @@ export function SpreadsheetTextEditor({
   layout: WorkbookLayout;
 }) {
   const { session, formulaEditPlacement } = useWorkbook();
+  const gridCommit = useGridCommit();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef({ start: 0, end: 0 });
@@ -179,6 +189,11 @@ export function SpreadsheetTextEditor({
   valueRef.current = value;
   const initial = value.kind === GridCellKind.Text ? value.data : "";
   const [draft, setDraft] = useState(initial);
+  useLayoutEffect(() => {
+    const queued = gridCommit?.takeQueuedChars(editingLocation) ?? "";
+    if (!queued) return;
+    setDraft((current) => current + queued);
+  }, [editingLocation, gridCommit]);
   const [activeSuggest, setActiveSuggest] = useState(0);
   const [suggestOpen, setSuggestOpen] = useState(true);
   const sessionDraft = session.formulaEdit?.draft;
@@ -447,6 +462,7 @@ export function SpreadsheetTextEditor({
           if (!commitMove) return;
           const next = value.kind === GridCellKind.Text ? { ...value, data: draft } : value;
           if (value.kind === GridCellKind.Text) onChange(next);
+          gridCommit?.commitAt(editingLocation, draft);
           onFinishedEditing(next, commitMove);
           return;
         }

@@ -8,7 +8,7 @@ import { selectedCellRefs, type WorkbookSnapshot } from "../model/types.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 import { WorkbookProvider } from "./WorkbookProvider.js";
-import { installGridDom, pressTableKey, renderWorkbookCanvas, selectProjectedCell } from "./canvasTest.js";
+import { installGridDom, pressTableKey, renderWorkbookCanvas, selectProjectedCell, trackFocus } from "./canvasTest.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -80,18 +80,6 @@ async function pressArrow(tableId: string, key: "ArrowRight" | "ArrowLeft" | "Ar
   await act(async () => {
     fireEvent.keyDown(host!, { key });
   });
-}
-
-function trackFocus(session: WorkbookSession) {
-  let current = session.gridFocus;
-  session.subscribe(() => {
-    if (session.gridFocus) current = session.gridFocus;
-  });
-  return {
-    expectAt(tableId: string, col: number, row: number) {
-      expect(current).toEqual({ tableId, col, row });
-    },
-  };
 }
 
 beforeEach(installGridDom);

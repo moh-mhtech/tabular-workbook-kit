@@ -1232,18 +1232,6 @@ body.wk-explorer-dragging .wk-explorer-table {
 .wk-shell.is-resizing .dvn-scroller,
 .wk-shell.is-resizing .dvn-container {
   pointer-events: none !important;
-}
-
-body.wk-column-resize-active {
-  cursor: col-resize !important;
-  user-select: none;
-}
-
-body.wk-column-resize-active .wk-canvas,
-body.wk-column-resize-active .wk-table-spreadsheet,
-body.wk-column-resize-active .dvn-scroller,
-body.wk-column-resize-active .dvn-container {
-  pointer-events: none !important;
   overflow: hidden !important;
 }
 
@@ -1927,6 +1915,27 @@ body.wk-column-resize-active .dvn-container {
 
 .wk-formula-ref {
   font: inherit;
+}
+
+.wk-properties-selection-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+.wk-properties-selection-head h2 {
+  margin: 0;
+}
+
+.wk-cell-reference {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  word-break: break-all;
+  color: #7a8a99;
 }
 
 .wk-overlay-editor {

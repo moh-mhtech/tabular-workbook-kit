@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { useMemo } from "react";
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
@@ -54,6 +54,24 @@ function GridCellProbe({ col, row }: { col: number; row: number }) {
 }
 
 describe("properties inspector UI", () => {
+  it("shows segmented Reference for a Defined name and for a structured cell", async () => {
+    const { session } = await renderWorkbookCanvas({ chrome: true });
+    const properties = screen.getByRole("complementary", { name: "Properties" });
+    await selectParamsCell(session, "row-vat");
+    expect(properties.querySelector(".wk-cell-reference")?.textContent).toBe("Mix");
+    expect(within(properties).queryByText("Reference")).toBeNull();
+    await act(async () => {
+      session.setSelection({
+        kind: "cell",
+        tableId: "tbl-lines",
+        rowId: "row-red",
+        columnId: "2025-01",
+      });
+    });
+    expect(properties.querySelector(".wk-cell-reference")?.textContent).toBe("Lines[Jan][Red]");
+    expect(properties.querySelector(".wk-properties-selection-head h2")?.textContent).toBe("Cell");
+  });
+
   it("labels format Format, omits a Style legend, and shows the evaluated result on the value field", async () => {
     const { session } = await renderWorkbookCanvas({ chrome: true });
     await selectParamsCell(session, "row-start");

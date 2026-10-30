@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { projectTable } from "../grid/sheetProjection.js";
@@ -504,6 +504,24 @@ describe("workbook chrome", () => {
       fireEvent.click(screen.getByRole("button", { name: "Delete row" }));
     });
     expect(session.getSnapshot().tables.find((table) => table.id === "tbl-params")!.rows.some((row) => row.id === "row-vat")).toBe(
+      false,
+    );
+  });
+
+  it("deletes a column from the inspector", async () => {
+    const { session } = await renderWorkbookCanvas({ chrome: true, extra: undefined });
+    await act(async () => {
+      session.setSelection({ kind: "column", tableId: "tbl-teams", columnId: "Role" });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Delete column" })).toBeTruthy();
+    });
+    const before = session.getSnapshot().tables.find((t) => t.id === "tbl-teams")!.attributeColumns.length;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete column" }));
+    });
+    expect(session.getSnapshot().tables.find((t) => t.id === "tbl-teams")!.attributeColumns.length).toBe(before - 1);
+    expect(session.getSnapshot().tables.find((t) => t.id === "tbl-teams")!.attributeColumns.some((c) => c.name === "Role")).toBe(
       false,
     );
   });

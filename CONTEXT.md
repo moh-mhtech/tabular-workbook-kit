@@ -215,7 +215,7 @@ _Avoid_: Rollup, pivot, aggregate, bucket
 ### Formulas
 
 **Defined name**:
-A Workbook-wide name for one Cell. A key-value Table registers each row key as the name of that row’s Value cell (`Mix`, `AnnualUnits`, `Café`). Letters in any script, digits, and underscore; unique against other promoted keys, Table names, Sheet names, and reserved functions. New rows on a key-value Table get `Param`, `Param2`, … — not `1`, `2`, `3` (those are default Row keys on other Tables, and cannot be Defined names).
+A Workbook-wide name for one Cell. A key-value Table registers each row key as the name of that row’s Value cell (`Mix`, `AnnualUnits`, `Café`). Letters in any script, digits, and underscore; unique against other promoted keys, Table names, Sheet names, and reserved functions. Default Row keys and Header names follow the row/column index (`1`, `2`, … or `A`, `B`, …; on a key-value Table `Param`, `Param2`, … for indices 0, 1, …). If that default is already taken in the Table or workbook, append digits until the name is unique.
 _Avoid_: Name-as-formula (`=@-1`), P table, ASCII-only names
 
 **Formula ref**:

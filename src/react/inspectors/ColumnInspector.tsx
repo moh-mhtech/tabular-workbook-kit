@@ -60,6 +60,11 @@ export function ColumnInspector({ tableId, columnId }: { tableId: string; column
           </select>
         </OutlinedField>
       ) : null}
+      {col ? (
+        <button type="button" onClick={() => tryCall(() => session.deleteColumn(table.id, col.id))}>
+          Delete column
+        </button>
+      ) : null}
     </section>
   );
 }

@@ -26,6 +26,44 @@ export interface GridRect {
   height: number;
 }
 
+export type FinishEditNavigationGate = { active: boolean };
+
+export function movementToCommitDelta(
+  movement: readonly [number, number],
+): readonly [-1 | 0 | 1, -1 | 0 | 1] {
+  return [
+    movement[0] < 0 ? -1 : movement[0] > 0 ? 1 : 0,
+    movement[1] < 0 ? -1 : movement[1] > 0 ? 1 : 0,
+  ];
+}
+
+/**
+ * Enter/Tab after an inline commit must move selection at most once. The grid may
+ * invoke finish-edit twice; the second call must not navigate again.
+ */
+export function runFinishEditNavigation(
+  gate: FinishEditNavigationGate,
+  from: readonly [number, number] | undefined,
+  movement: readonly [number, number],
+  navigate: (from: readonly [number, number], delta: readonly [-1 | 0 | 1, -1 | 0 | 1]) => void,
+): boolean {
+  const delta = movementToCommitDelta(movement);
+  if (delta[0] === 0 && delta[1] === 0) return false;
+  if (gate.active) return false;
+  if (!from) return false;
+  gate.active = true;
+  const commitFrom = from;
+  try {
+    navigate(commitFrom, delta);
+    return true;
+  } finally {
+    // Glide's overlay may invoke finish-edit again on setTimeout(0) after type-to-edit.
+    setTimeout(() => {
+      gate.active = false;
+    }, 0);
+  }
+}
+
 export function focusAfterCommitMove(
   session: WorkbookSession,
   tableId: string,
@@ -37,7 +75,7 @@ export function focusAfterCommitMove(
   if (!projection) return undefined;
   const next = cellAfterCommitMove(projection, layout, from, movement);
   if (!next) return undefined;
-  session.gridFocus = { tableId, col: next.location[0], row: next.location[1] };
+  session.setGridFocus({ tableId, col: next.location[0], row: next.location[1] });
   session.setSelection(next.selection);
   return next;
 }

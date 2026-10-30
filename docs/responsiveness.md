@@ -70,6 +70,10 @@ React subscriptions: `dataVersion`, `viewVersion`, `formulaEditVersion` in `Work
 
 6. **Regressions** — Run `npm test -w tabular-workbook-kit` (includes perf + contract tests) and `npm run ui:perf -w @budgettool/playground` when touching hot paths.
 
+7. **Fast Enter entry** — Overlay commits write the model synchronously (`commitProjectedCellEdit`); Glide `onCellsEdited` is idempotent. After Enter/Tab, `onFinishedEditing` applies commit navigation with `flushSync` on controlled `gridSelection` so the next type-to-edit targets the row below immediately. Input cells may paint from `pendingDisplay` / `displayEpoch` before `dataVersion` catches up after async recalc. `entryQueue` + editor flush merge any pre-overlay keystrokes without blocking Glide type-to-edit.
+
+8. **Arrow navigation** — Plain arrows cancel Glide’s built-in move (table rules differ from a flat grid). Same-table moves must update controlled `gridSelection` synchronously (`onGridSelectionChange` + `flushSync`), not only `session.gridFocus` via a later `useEffect`. Cross-table moves still use `focusAdjacentTable` so the destination grid picks up `gridFocus`. Each move still bumps `viewVersion` (Properties / Explorer) and re-layouts the sheet snapshot; that work remains even when no cell value changes.
+
 
 
 ## When recalc is required

@@ -30,12 +30,11 @@ export { GlossaryButton } from "./GlossaryDialog.js";
 export { parseGlossary } from "./glossary.js";
 export type { GlossaryDoc, GlossarySection, GlossaryTerm } from "./glossary.js";
 export {
-  ColumnResizeHandle,
   DEFAULT_EXPLORER_WIDTH,
   DEFAULT_PROPERTIES_WIDTH,
   MIN_EXPLORER_WIDTH,
   MIN_PROPERTIES_WIDTH,
   fitSideWidths,
   maxSideWidth,
-  useViewportWidth,
-} from "./columnResize.js";
+} from "./shellLayout.js";
+export { useViewportWidth } from "./useViewportWidth.js";

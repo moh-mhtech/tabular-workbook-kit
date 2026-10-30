@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { layoutWorkbook } from "../model/layout.js";
 import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
-import { projectSheet, projectTable } from "../grid/sheetProjection.js";
+import { cellAfterCommitMove, projectSheet, projectTable } from "../grid/sheetProjection.js";
 import {
   applyCustomGridClear,
   applyCustomGridEdits,
@@ -12,11 +12,55 @@ import {
   focusAfterCommitMove,
   moveSelectionAfterCommit,
   rawGridValue,
+  runFinishEditNavigation,
 } from "./customGridInteractions.js";
 
 const inert = { evaluate: () => ({}) };
 
 describe("custom grid interactions", () => {
+  it("runs Enter navigation at most once when finish-edit fires twice on a Key cell", async () => {
+    const session = new WorkbookSession(createSampleWorkbook(), inert);
+    const layout = layoutWorkbook(session.getSnapshot());
+    const projection = projectTable(layout, "tbl-params")!;
+    const gate = { active: false };
+    const navigate = (from: readonly [number, number], delta: readonly [-1 | 0 | 1, -1 | 0 | 1]) => {
+      const next = cellAfterCommitMove(projection, layout, from, delta);
+      if (next) {
+        session.setSelection(next.selection);
+        session.gridFocus = { tableId: "tbl-params", col: next.location[0], row: next.location[1] };
+      }
+    };
+    expect(runFinishEditNavigation(gate, [0, 3], [0, 1], navigate)).toBe(true);
+    expect(session.selection).toEqual({ kind: "row", tableId: "tbl-params", rowId: "row-top-share" });
+    expect(runFinishEditNavigation(gate, [0, 4], [0, 1], navigate)).toBe(false);
+    expect(session.selection).toEqual({ kind: "row", tableId: "tbl-params", rowId: "row-top-share" });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(runFinishEditNavigation(gate, [0, 4], [0, 1], navigate)).toBe(true);
+    expect(session.selection).toEqual({ kind: "row", tableId: "tbl-params", rowId: "row-alt-share" });
+  });
+
+  it("blocks a second finish-edit while the gate is active even when from changes", () => {
+    const gate = { active: false };
+    const seen: Array<readonly [number, number]> = [];
+    const navigate = (from: readonly [number, number]) => {
+      seen.push(from);
+    };
+    expect(runFinishEditNavigation(gate, [0, 3], [0, 1], navigate)).toBe(true);
+    expect(runFinishEditNavigation(gate, [0, 4], [0, 1], navigate)).toBe(false);
+    expect(seen).toEqual([[0, 3]]);
+  });
+
+  it("does not navigate on finish-edit when movement is zero", () => {
+    const gate = { active: false };
+    let navigated = false;
+    expect(
+      runFinishEditNavigation(gate, [0, 3], [0, 0], () => {
+        navigated = true;
+      }),
+    ).toBe(false);
+    expect(navigated).toBe(false);
+  });
+
   it("selects the next row or column after a cell commit", () => {
     const session = new WorkbookSession(createSampleWorkbook(), inert);
     session.setSelection({

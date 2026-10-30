@@ -25,7 +25,6 @@ import type { WorkbookViewSnapshot } from "../model/types.js";
 import {
   assertGlobalName,
   canPromoteRowKeys,
-  nextPromotableKey,
 } from "../model/names.js";
 import {
   hitTest,
@@ -72,12 +71,10 @@ import {
   writePeriodIds,
 } from "../model/yearColumns.js";
 import {
+  allocateColumnNameAt,
+  allocateRowKeyAt,
   assertTableName,
-  defaultColumnNameAt,
-  defaultRowKeyAt,
   emptyCells,
-  nextColumnIdentifier,
-  nextRowIdentifier,
   requireTable,
   rewriteColumnName,
   rewriteFormulas,
@@ -740,7 +737,7 @@ export class WorkbookSession {
     if (hit.kind === "key") {
       const table = requireTable(this.snapshot, hit.tableId);
       const index = table.rows.findIndex((row) => row.id === hit.rowId);
-      const next = raw.trim() || (index >= 0 ? defaultRowKeyAt(table, index) : "");
+      const next = raw.trim() || (index >= 0 ? allocateRowKeyAt(table, this.snapshot, index, hit.rowId) : "");
       if (!next) return;
       try {
         this.renameRow(hit.tableId, hit.rowId, next);
@@ -753,7 +750,7 @@ export class WorkbookSession {
       if (hit.columnId === KEY_COLUMN_ID) return;
       const table = requireTable(this.snapshot, hit.tableId);
       const index = table.attributeColumns.findIndex((column) => column.id === hit.columnId);
-      const next = raw.trim() || (index >= 0 ? defaultColumnNameAt(index) : "");
+      const next = raw.trim() || (index >= 0 ? allocateColumnNameAt(table, index, hit.columnId) : "");
       if (!next) return;
       try {
         this.renameColumn(hit.tableId, hit.columnId, next);
@@ -1056,13 +1053,12 @@ export class WorkbookSession {
   addRow(tableIdOrName: string, afterRowId?: string | null, opts?: { before?: boolean }) {
     return this.restack(() => {
       const table = requireTable(this.snapshot, tableIdOrName);
-      const key = table.promoteRowKeys
-        ? nextPromotableKey(this.snapshot)
-        : nextRowIdentifier(table.rows.map((r) => r.key));
       this.checkpoint();
+      const anchor = afterRowId ? table.rows.findIndex((r) => r.id === afterRowId || r.key === afterRowId) : -1;
+      const insertIndex = anchor >= 0 ? (opts?.before ? anchor : anchor + 1) : table.rows.length;
+      const key = allocateRowKeyAt(table, this.snapshot, insertIndex);
       const row = { id: uid("row"), key, cells: emptyCells(table) };
-      const index = afterRowId ? table.rows.findIndex((r) => r.id === afterRowId || r.key === afterRowId) : -1;
-      if (index >= 0) table.rows.splice(opts?.before ? index : index + 1, 0, row);
+      if (anchor >= 0) table.rows.splice(insertIndex, 0, row);
       else table.rows.push(row);
       this.selection = { kind: "cell", tableId: table.id, rowId: row.id, columnId: table.attributeColumns[0]?.id ?? KEY_COLUMN_ID };
       this.syncViewSelection();
@@ -1072,19 +1068,40 @@ export class WorkbookSession {
   }
 
   deleteRow(tableIdOrName: string, rowIdOrKey: string) {
+    this.deleteRows(tableIdOrName, [rowIdOrKey]);
+  }
+
+  deleteRows(tableIdOrName: string, rowIdsOrKeys: readonly string[]) {
     this.restack(() => {
       const table = requireTable(this.snapshot, tableIdOrName);
-      if (table.rows.length <= 1) throw new Error("A table must keep at least one row.");
-      const index = table.rows.findIndex((r) => r.id === rowIdOrKey || r.key === rowIdOrKey);
-      if (index < 0) throw new Error(`Unknown row "${rowIdOrKey}"`);
+      const unique = [...new Set(rowIdsOrKeys)];
+      if (!unique.length) return;
+      for (const token of unique) {
+        if (isTotalRowId(token)) throw new Error("The total row cannot be deleted.");
+      }
+      const indices = unique.map((token) => {
+        const index = table.rows.findIndex((r) => r.id === token || r.key === token);
+        if (index < 0) throw new Error(`Unknown row "${token}"`);
+        return index;
+      });
+      if (table.rows.length - indices.length < 1) {
+        throw new Error("A table must keep at least one row.");
+      }
       this.checkpoint();
-      const [removed] = table.rows.splice(index, 1);
-      for (const scenario of this.snapshot.scenarios) {
-        for (const key of Object.keys(scenario.overlays)) {
-          if (key.startsWith(`${table.id}\u001f${removed.id}\u001f`)) delete scenario.overlays[key];
+      const removedIds = new Set<string>();
+      for (const index of [...indices].sort((a, b) => b - a)) {
+        const [removed] = table.rows.splice(index, 1);
+        removedIds.add(removed.id);
+        for (const scenario of this.snapshot.scenarios) {
+          for (const key of Object.keys(scenario.overlays)) {
+            if (key.startsWith(`${table.id}\u001f${removed.id}\u001f`)) delete scenario.overlays[key];
+          }
         }
       }
-      if (this.selection && "rowId" in this.selection && this.selection.rowId === removed.id) {
+      if (this.selection && "rowId" in this.selection && removedIds.has(this.selection.rowId)) {
+        this.selection = null;
+        this.syncViewSelection();
+      } else if (this.selection?.kind === "cell" && this.selection.range?.some((ref) => removedIds.has(ref.rowId))) {
         this.selection = null;
         this.syncViewSelection();
       }
@@ -1097,13 +1114,14 @@ export class WorkbookSession {
     if (table.promoteRowKeys) {
       throw new Error("A promoteRowKeys table cannot gain extra columns.");
     }
-    const name = nextColumnIdentifier(table.attributeColumns.map((c) => c.name));
     this.checkpoint();
-    const col = { id: uid("col"), name };
-    const index = afterColumnId
+    const anchor = afterColumnId
       ? table.attributeColumns.findIndex((c) => c.id === afterColumnId || c.name === afterColumnId)
       : -1;
-    if (index >= 0) table.attributeColumns.splice(opts?.before ? index : index + 1, 0, col);
+    const insertIndex = anchor >= 0 ? (opts?.before ? anchor : anchor + 1) : table.attributeColumns.length;
+    const name = allocateColumnNameAt(table, insertIndex);
+    const col = { id: uid("col"), name };
+    if (anchor >= 0) table.attributeColumns.splice(insertIndex, 0, col);
     else table.attributeColumns.push(col);
     for (const row of table.rows) {
       row.cells[col.id] = { kind: "input", value: null };
@@ -1113,22 +1131,42 @@ export class WorkbookSession {
   }
 
   deleteColumn(tableIdOrName: string, columnIdOrName: string) {
+    this.deleteColumns(tableIdOrName, [columnIdOrName]);
+  }
+
+  deleteColumns(tableIdOrName: string, columnIdsOrNames: readonly string[]) {
     const table = requireTable(this.snapshot, tableIdOrName);
-    const index = table.attributeColumns.findIndex((c) => c.id === columnIdOrName || c.name === columnIdOrName);
-    if (index < 0) throw new Error("Only attribute columns can be deleted (period columns come from the calendar).");
-    const target = table.attributeColumns[index];
-    if (table.promoteRowKeys && table.attributeColumns[0]?.id === target.id) {
-      throw new Error("The promoted Value column cannot be deleted.");
+    const unique = [...new Set(columnIdsOrNames)];
+    if (!unique.length) return;
+    const indices: number[] = [];
+    for (const token of unique) {
+      const index = table.attributeColumns.findIndex((c) => c.id === token || c.name === token);
+      if (index < 0) throw new Error("Only attribute columns can be deleted (period columns come from the calendar).");
+      const target = table.attributeColumns[index]!;
+      if (table.promoteRowKeys && table.attributeColumns[0]?.id === target.id) {
+        throw new Error("The promoted Value column cannot be deleted.");
+      }
+      indices.push(index);
     }
     this.checkpoint();
-    const [removed] = table.attributeColumns.splice(index, 1);
-    for (const row of table.rows) delete row.cells[removed.id];
-    for (const scenario of this.snapshot.scenarios) {
-      for (const key of Object.keys(scenario.overlays)) {
-        if (key.endsWith(`\u001f${removed.id}`)) delete scenario.overlays[key];
+    const removedIds = new Set<string>();
+    for (const index of [...indices].sort((a, b) => b - a)) {
+      const [removed] = table.attributeColumns.splice(index, 1);
+      removedIds.add(removed.id);
+      for (const row of table.rows) delete row.cells[removed.id];
+      for (const scenario of this.snapshot.scenarios) {
+        for (const key of Object.keys(scenario.overlays)) {
+          if (key.endsWith(`\u001f${removed.id}`)) delete scenario.overlays[key];
+        }
       }
     }
-    if (this.selection && "columnId" in this.selection && this.selection.columnId === removed.id) {
+    if (this.selection && "columnId" in this.selection && removedIds.has(this.selection.columnId)) {
+      this.selection = null;
+      this.syncViewSelection();
+    } else if (
+      this.selection?.kind === "cell" &&
+      this.selection.range?.some((ref) => removedIds.has(ref.columnId))
+    ) {
       this.selection = null;
       this.syncViewSelection();
     }

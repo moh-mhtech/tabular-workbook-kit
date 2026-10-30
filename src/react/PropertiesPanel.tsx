@@ -29,6 +29,7 @@ import { TableInspector } from "./inspectors/TableInspector.js";
 import { ColumnInspector } from "./inspectors/ColumnInspector.js";
 import { RowInspector } from "./inspectors/RowInspector.js";
 import { CellInspector, CellNameField } from "./inspectors/CellInspector.js";
+import { CellReferenceField } from "./inspectors/CellReferenceField.js";
 
 export type HostInspectors = {
   workbook?: () => ReactNode;
@@ -78,7 +79,12 @@ export function PropertiesPanel({ hostInspectors }: { hostInspectors?: HostInspe
         <span className="wk-side-panel-title">Properties</span>
         <SidePanelPinButton side="properties" label="Properties" />
       </div>
-      {selection?.kind === "corner" ? null : <h2>{selectionTitle(selection)}</h2>}
+      {selection?.kind === "corner" ? null : (
+        <div className="wk-properties-selection-head">
+          <h2>{selectionTitle(selection)}</h2>
+          {selection?.kind === "cell" ? <CellReferenceField /> : null}
+        </div>
+      )}
       {(selection?.kind === "cell" && inspectorRefsAreFormulaEditable(selectedCellRefs(selection))) || formulaEdit ? (
         <>
           {selection?.kind === "cell" ? (

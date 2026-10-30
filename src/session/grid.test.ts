@@ -131,7 +131,7 @@ describe("auto-expansion against table invariants", () => {
     session.writeGridCell(sheetId, 8, 1, "5");
     const params = table(session, "Params");
     expect(params.rows).toHaveLength(8);
-    expect(params.rows[7].key).toBe("Param");
+    expect(params.rows[7].key).toBe("Param8");
     expect(params.rows[7].cells.Value).toEqual({ kind: "input", value: 5 });
   });
 

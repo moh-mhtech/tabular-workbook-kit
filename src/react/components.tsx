@@ -5,9 +5,11 @@ import {
   EXPLORER_SHEET_DRAG,
   EXPLORER_TABLE_DRAG,
   canDragTable,
+  dropHintAfterLastSheet,
   dropHintForSheetRow,
   dropHintForTable,
   dropHintsEqual,
+  dropSheetAfterSheet,
   dropSheetOnSheet,
   dropTableBeforeTable,
   dropTableOnSheet,
@@ -139,6 +141,8 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
     setDropHint((prev) => (dropHintsEqual(prev, next) ? prev : next));
   };
 
+  const lastSheetId = snapshot.sheets.at(-1)?.id;
+
   return (
     <nav className="wk-explorer" aria-label="Sheets" onDragEnd={endDrag}>
       <button
@@ -260,11 +264,27 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
                 </li>
               );
             })}
-            <li className="wk-explorer-table-append-marker">
-              <ExplorerDropMarker
-                active={dropHint?.placement === "append-tables" && dropHint.sheetId === sheet.id}
-              />
-            </li>
+            {showTables ? (
+              <li
+                className="wk-explorer-table-append-marker"
+                onDragOver={(event) => {
+                  allowExplorerDrop(event);
+                  if (dragPayloadRef.current?.kind !== "table") return;
+                  updateDropHint({ placement: "append-tables", sheetId: sheet.id });
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const payload = readExplorerDrag(event.dataTransfer);
+                  if (!payload || payload.kind !== "table") return;
+                  tryCall(() => dropTableOnSheet(session, payload.id, sheet.id));
+                  endDrag();
+                }}
+              >
+                <ExplorerDropMarker
+                  active={dropHint?.placement === "append-tables" && dropHint.sheetId === sheet.id}
+                />
+              </li>
+            ) : null}
             <li>
               <button
                 type="button"
@@ -289,6 +309,26 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
         </div>
       );
       })}
+      {lastSheetId ? (
+        <div
+          className="wk-explorer-sheet-append-target"
+          onDragOver={(event) => {
+            allowExplorerDrop(event);
+            const payload = dragPayloadRef.current;
+            if (!payload || payload.kind !== "sheet" || payload.id === lastSheetId) return;
+            updateDropHint(dropHintAfterLastSheet(snapshot.sheets));
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            const payload = readExplorerDrag(event.dataTransfer);
+            if (!payload || payload.kind !== "sheet") return;
+            tryCall(() => dropSheetAfterSheet(session, payload.id, lastSheetId));
+            endDrag();
+          }}
+        >
+          <ExplorerDropMarker active={dropHint?.placement === "after-sheet"} />
+        </div>
+      ) : null}
       <div className="wk-explorer-group">
         <button
           type="button"

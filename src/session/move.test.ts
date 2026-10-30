@@ -20,6 +20,17 @@ describe("explorer reorder", () => {
     ]);
   });
 
+  it("moves a sheet after the last sheet", async () => {
+    const session = await open();
+    session.moveSheet("sheet-assumptions", session.getSnapshot().sheets.length);
+    expect(session.getSnapshot().sheets.map((sheet) => sheet.id)).toEqual([
+      "sheet-params",
+      "sheet-capacity",
+      "sheet-res",
+      "sheet-assumptions",
+    ]);
+  });
+
   it("reorders tables within a sheet", async () => {
     const session = await open();
     const notes = session.addTable("sheet-assumptions", { name: "Notes", yearColumns: false });

@@ -932,11 +932,13 @@ export class WorkbookSession {
     const sheets = this.snapshot.sheets;
     const fromIndex = sheets.findIndex((sheet) => sheet.id === sheetId);
     if (fromIndex < 0) throw new Error(`Unknown sheet "${sheetId}"`);
-    const nextIndex = Math.max(0, Math.min(toIndex, sheets.length - 1));
-    if (fromIndex === nextIndex) return;
+    const clampedTo = Math.max(0, Math.min(toIndex, sheets.length));
+    let insertAt = clampedTo;
+    if (fromIndex < insertAt) insertAt -= 1;
+    if (fromIndex === insertAt) return;
     this.checkpoint();
     const [sheet] = sheets.splice(fromIndex, 1);
-    sheets.splice(nextIndex, 0, sheet!);
+    sheets.splice(insertAt, 0, sheet!);
     this.emit();
   }
 

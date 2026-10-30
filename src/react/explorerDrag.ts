@@ -6,6 +6,7 @@ export const EXPLORER_TABLE_DRAG = "application/x-wk-table-id";
 
 export type ExplorerDropHint =
   | { placement: "before-sheet"; sheetId: string }
+  | { placement: "after-sheet"; sheetId: string }
   | { placement: "append-tables"; sheetId: string }
   | { placement: "before-table"; sheetId: string; tableId: string };
 
@@ -44,11 +45,24 @@ export function dropHintForTable(
   return { placement: "before-table", sheetId: targetSheetId, tableId: targetTableId };
 }
 
+export function dropHintAfterLastSheet(sheets: { id: string }[]): ExplorerDropHint | null {
+  const last = sheets.at(-1);
+  if (!last) return null;
+  return { placement: "after-sheet", sheetId: last.id };
+}
+
 export function dropSheetOnSheet(session: WorkbookSession, draggedSheetId: string, targetSheetId: string) {
   const sheets = session.getSnapshot().sheets;
   const toIndex = sheets.findIndex((sheet) => sheet.id === targetSheetId);
   if (toIndex < 0) return;
   session.moveSheet(draggedSheetId, toIndex);
+}
+
+export function dropSheetAfterSheet(session: WorkbookSession, draggedSheetId: string, afterSheetId: string) {
+  const sheets = session.getSnapshot().sheets;
+  const afterIndex = sheets.findIndex((sheet) => sheet.id === afterSheetId);
+  if (afterIndex < 0) return;
+  session.moveSheet(draggedSheetId, afterIndex + 1);
 }
 
 export function dropTableOnSheet(session: WorkbookSession, draggedTableId: string, targetSheetId: string) {

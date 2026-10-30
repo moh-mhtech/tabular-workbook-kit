@@ -352,6 +352,13 @@ _Avoid_: Indeterminate, various, empty (when values differ)
 The always-mounted right column. A Formula bar plus one inspector per Selection kind. Hosts may add extra sections.
 _Avoid_: Host KPIs, property grid (as Excel VBA)
 
+**Pinned panel**:
+Navigation or Properties stays in the layout so the Sheet canvas shares width with fixed side columns. **Unpinned** panels auto-hide; a narrow **edge tab** (vertical title and chevron) stays visible on that side and the panel slides in on hover (full canvas width between hovers). The header **pin** control uses a thumbtack icon: filled when pinned, tilted outline when unpinned.
+
+**Icons**:
+Workbook chrome uses [Material Icons](https://fonts.google.com/icons) through `@mui/icons-material` (`src/react/icons.tsx`). Host logos stay custom.
+_Avoid_: Collapsed sidebar, flyout menu
+
 **Formula bar**:
 The Value field for the selected Cell’s Stored value (Input or Formula text). It stays mounted while Pointing so a Sheet switch does not cancel Formula edit. It shares Enter / Edit mode / Point with the in-cell editor. A click in it while Pointing is Edit mode, not Cancel. The grid still shows the Display value.
 _Avoid_: Formula line, name box

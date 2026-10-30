@@ -15,6 +15,7 @@ import { Explorer, FormulaEditPlacementSwitch, ScenarioBar, TimeGrainSwitch } fr
 import { CustomSheetCanvas, evaluatedCells } from "./CustomSheetCanvas.js";
 import { PropertiesPanel } from "./PropertiesPanel.js";
 import { WorkbookProvider, type FormulaEditPlacement } from "./WorkbookProvider.js";
+import { WorkbookShell } from "./WorkbookShell.js";
 
 function boxSize(element: HTMLElement, axis: "width" | "height"): number {
   const styled = Number.parseFloat(axis === "width" ? element.style.width : element.style.height);
@@ -62,6 +63,7 @@ export async function renderWorkbookCanvas(
     snapshot?: WorkbookSnapshot;
     extra?: ReactNode;
     chrome?: boolean;
+    shell?: boolean;
     formulaEditPlacement?: FormulaEditPlacement;
     explorerWorkbookFolderIcon?: boolean;
   } = {},
@@ -74,19 +76,34 @@ export async function renderWorkbookCanvas(
   await act(async () => {
     render(
       <WorkbookProvider session={session} formulaEditPlacement={options.formulaEditPlacement}>
-        <div className="wk-shell">
-          {options.chrome ? (
-            <>
-              <Explorer workbookFolderIcon={options.explorerWorkbookFolderIcon} />
-              <ScenarioBar />
-              <TimeGrainSwitch />
-              <FormulaEditPlacementSwitch />
-            </>
-          ) : null}
-          <CustomSheetCanvas />
-          <PropertiesPanel />
-          {options.extra}
-        </div>
+        {options.shell ? (
+          <WorkbookShell
+            explorerWorkbookFolderIcon={options.explorerWorkbookFolderIcon}
+            top={
+              options.chrome ? (
+                <>
+                  <ScenarioBar />
+                  <TimeGrainSwitch />
+                  <FormulaEditPlacementSwitch />
+                </>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="wk-shell">
+            {options.chrome ? (
+              <>
+                <Explorer workbookFolderIcon={options.explorerWorkbookFolderIcon} />
+                <ScenarioBar />
+                <TimeGrainSwitch />
+                <FormulaEditPlacementSwitch />
+              </>
+            ) : null}
+            <CustomSheetCanvas />
+            <PropertiesPanel />
+            {options.extra}
+          </div>
+        )}
       </WorkbookProvider>,
     );
   });

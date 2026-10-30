@@ -1,6 +1,8 @@
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { GlossaryDoc } from "./glossary.js";
+import { WkGlossaryIcon } from "./icons.js";
+import CloseIcon from "@mui/icons-material/Close";
 
 export function GlossaryButton({
   open,
@@ -16,7 +18,7 @@ export function GlossaryButton({
   return (
     <>
       <button type="button" className="wk-glossary-btn" aria-label="Glossary" title="Glossary" onClick={open ? onClose : onOpen}>
-        <GlossaryIcon />
+        <WkGlossaryIcon />
       </button>
       {open ? <GlossaryDialog documents={documents} onClose={onClose} /> : null}
     </>
@@ -44,7 +46,7 @@ function GlossaryDialog({ documents, onClose }: { documents: GlossaryDoc[]; onCl
         <header className="wk-glossary-head">
           <h2 id="wk-glossary-title">Glossary</h2>
           <button type="button" className="wk-glossary-close" aria-label="Close glossary" onClick={onClose}>
-            ×
+            <CloseIcon className="wk-mui-icon" sx={{ fontSize: 20 }} aria-hidden />
           </button>
         </header>
         <div className="wk-glossary-body">
@@ -91,15 +93,4 @@ function linkCode(text: string): ReactNode {
     }
     return part;
   });
-}
-
-function GlossaryIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M4.2 2.4h8.3c.9 0 1.6.7 1.6 1.6v12.2c0 .5-.4.9-.9.9H5.1c-1 0-1.8-.8-1.8-1.8V3.5c0-.6.5-1.1 1.1-1.1h.8Zm.2 1.6v11.7c0 .2.2.4.4.4h8.3V4c0-.2-.2-.4-.4-.4H4.4Zm10.7-.1h.6c.9 0 1.6.7 1.6 1.6v11.3c0 1-.8 1.8-1.8 1.8h-8c.3-.3.5-.7.5-1.1h7.5c.4 0 .7-.3.7-.7V5.5c0-.2-.2-.4-.4-.4h-.7V3.9Z"
-      />
-    </svg>
-  );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { WkMoreVertIcon } from "./icons.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 
 function tryCall(fn: () => void) {
@@ -55,11 +56,7 @@ export function ScenarioBar() {
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
         >
-          <span className="wk-scenario-menu-dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </span>
+          <WkMoreVertIcon />
         </button>
         {menuOpen ? (
           <ul className="wk-scenario-menu" role="menu">

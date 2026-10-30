@@ -186,6 +186,32 @@ export class WorkbookSession {
     this.notifyViewOnly();
   }
 
+  isExplorerPinned(): boolean {
+    return this.viewState.explorerPinned !== false;
+  }
+
+  isPropertiesPinned(): boolean {
+    return this.viewState.propertiesPinned !== false;
+  }
+
+  setExplorerPinned(pinned: boolean) {
+    if (this.isExplorerPinned() === pinned) return;
+    const next = { ...this.viewState };
+    if (pinned) delete next.explorerPinned;
+    else next.explorerPinned = false;
+    this.viewState = next;
+    this.notifyViewOnly();
+  }
+
+  setPropertiesPinned(pinned: boolean) {
+    if (this.isPropertiesPinned() === pinned) return;
+    const next = { ...this.viewState };
+    if (pinned) delete next.propertiesPinned;
+    else next.propertiesPinned = false;
+    this.viewState = next;
+    this.notifyViewOnly();
+  }
+
   private checkpoint() {
     if (this.txDepth > 0) return;
     this.pushHistory(cloneSnapshot(this.snapshot));

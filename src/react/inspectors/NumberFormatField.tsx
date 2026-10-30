@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { formatDisplayValue } from "../../model/numberFormat.js";
 import { KEY_COLUMN_ID, type Selection, type WorkbookSnapshot } from "../../model/types.js";
 import type { WorkbookSession } from "../../session/WorkbookSession.js";
+import { WkHelpOutlineIcon } from "../icons.js";
 import { MixedTextInput } from "../MixedTextInput.js";
 import { OutlinedField } from "../OutlinedField.js";
 import { useWorkbook } from "../WorkbookProvider.js";
@@ -105,7 +106,7 @@ function NumberFormatHelp() {
         onFocus={show}
         onBlur={() => setOpen(false)}
       >
-        ?
+        <WkHelpOutlineIcon />
       </button>
       {open
         ? createPortal(

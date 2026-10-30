@@ -20,6 +20,7 @@ import {
   pointFromArrow,
   toggleOverlayNavMode,
 } from "./customGridOverlay.js";
+import { SidePanelPinButton } from "./SidePanelPinButton.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 import { WorkbookInspector } from "./inspectors/WorkbookInspector.js";
 import { SheetInspector } from "./inspectors/SheetInspector.js";
@@ -57,7 +58,11 @@ export function PropertiesPanel({ hostInspectors }: { hostInspectors?: HostInspe
   const snapshot = useSnapshot();
   const selection = session.selection;
   return (
-    <aside className="wk-properties">
+    <aside className="wk-properties" aria-label="Properties">
+      <div className="wk-side-panel-head">
+        <span className="wk-side-panel-title">Properties</span>
+        <SidePanelPinButton side="properties" label="Properties" />
+      </div>
       {selection?.kind === "corner" ? null : <h2>{selectionTitle(selection)}</h2>}
       {(selection?.kind === "cell" && inspectorRefsAreData(selectedCellRefs(selection))) || session.formulaEdit ? (
         <>
@@ -302,8 +307,17 @@ function FormulaDraft({
   useLayoutEffect(() => {
     const area = areaRef.current;
     if (!area) return;
-    area.style.height = "0px";
-    area.style.height = `${area.scrollHeight}px`;
+    const fitHeight = () => {
+      area.style.removeProperty("height");
+      area.style.height = "0px";
+      area.style.height = `${Math.max(area.scrollHeight, 38)}px`;
+    };
+    fitHeight();
+    const observer = new ResizeObserver(fitHeight);
+    observer.observe(area);
+    const field = area.closest(".wk-outlined");
+    if (field) observer.observe(field);
+    return () => observer.disconnect();
   }, [draft]);
 
   const pendingCaretRef = useRef<{ start: number; end: number }>({

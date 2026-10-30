@@ -92,6 +92,10 @@ export interface ScenarioSnapshot {
 export interface WorkbookViewSnapshot {
   activeSheetId: string;
   selection: Selection | null;
+  /** Omitted or true: Navigation stays open. False: auto-hide until the left edge is hovered. */
+  explorerPinned?: boolean;
+  /** Omitted or true: Properties stays open. False: auto-hide until the right edge is hovered. */
+  propertiesPinned?: boolean;
 }
 
 export interface WorkbookSnapshot {

@@ -11,6 +11,266 @@
   --wk-control-h: 30px;
 }
 
+.wk-side-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+  min-height: 24px;
+}
+
+.wk-side-panel-title {
+  font: 600 11px/1.2 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wk-text-muted);
+}
+
+.wk-side-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wk-text-muted);
+  cursor: pointer;
+}
+
+.wk-side-pin:hover,
+.wk-side-pin:focus-visible {
+  color: var(--wk-text);
+  background: rgba(28, 36, 48, 0.06);
+  outline: none;
+}
+
+.wk-side-pin.is-pinned {
+  color: var(--wk-accent);
+}
+
+.wk-mui-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.wk-color-icon {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.wk-color-icon-bar {
+  width: 1.15em;
+  height: 3px;
+  border-radius: 1px;
+  margin-top: -1px;
+  box-sizing: border-box;
+  border: 1px solid rgba(28, 36, 48, 0.12);
+}
+
+.wk-side-panel-host {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wk-side-panel-host-properties {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.wk-shell-workspace {
+  grid-column: 1;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: var(--wk-explorer-width, 200px) 6px 1fr 6px var(--wk-properties-width, 260px);
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wk-side-edge {
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.wk-side-edge-left {
+  grid-column: 1;
+  flex-direction: row;
+}
+
+.wk-side-edge-right {
+  grid-column: 5;
+  flex-direction: row-reverse;
+}
+
+.wk-side-edge.is-autohide .wk-side-panel-host {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.wk-shell.is-explorer-reveal .wk-side-edge-left.is-autohide .wk-side-panel-host-explorer {
+  flex: 0 0 var(--wk-explorer-overlay-width, 200px);
+  width: var(--wk-explorer-overlay-width, 200px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.wk-shell.is-properties-reveal .wk-side-edge-right.is-autohide .wk-side-panel-host-properties {
+  flex: 0 0 var(--wk-properties-overlay-width, 260px);
+  width: var(--wk-properties-overlay-width, 260px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--wk-surface-muted);
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.wk-side-edge .wk-side-panel-host {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wk-side-edge:not(.is-autohide) .wk-side-panel-host-explorer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wk-side-edge:not(.is-autohide) .wk-side-panel-host-properties {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--wk-surface-muted);
+}
+
+.wk-side-edge:not(.is-autohide) .wk-explorer {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.wk-side-edge:not(.is-autohide) .wk-properties {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  align-self: stretch;
+}
+
+.wk-shell-workspace > .wk-canvas {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.wk-shell-workspace > .wk-col-resizer:not(.wk-col-resizer-spacer) {
+  grid-row: 1;
+}
+
+.wk-shell-workspace > .wk-col-resizer:nth-of-type(1) {
+  grid-column: 2;
+}
+
+.wk-shell-workspace > .wk-col-resizer:nth-of-type(2) {
+  grid-column: 4;
+}
+
+.wk-col-resizer-spacer {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.wk-side-reveal-tab {
+  flex: 0 0 var(--wk-side-tab-width, 28px);
+  width: var(--wk-side-tab-width, 28px);
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 28px 0 12px;
+  margin: 0;
+  border: 0;
+  cursor: pointer;
+  background: var(--wk-surface-muted);
+  color: var(--wk-text-muted);
+  border-right: 1px solid var(--wk-line);
+  z-index: 1;
+}
+
+.wk-side-reveal-tab:hover,
+.wk-side-reveal-tab:focus-visible {
+  color: var(--wk-accent);
+  background: var(--wk-accent-soft);
+  outline: none;
+}
+
+.wk-side-edge-right .wk-side-reveal-tab {
+  border-right: 0;
+  border-left: 1px solid var(--wk-line);
+}
+
+.wk-side-reveal-tab-glyph {
+  font: 600 14px/1 "Segoe UI", system-ui, sans-serif;
+  opacity: 0.7;
+}
+
+.wk-side-reveal-tab-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font: 600 10px/1.15 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  max-height: min(240px, 40vh);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wk-shell.is-explorer-reveal .wk-side-edge-left.is-autohide .wk-explorer {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  box-shadow: 4px 0 24px rgba(28, 36, 48, 0.12);
+}
+
+.wk-shell.is-properties-reveal .wk-side-edge-right.is-autohide .wk-properties {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  align-self: stretch;
+}
+
 .wk-explorer {
   font: 12.5px/1.25 "Segoe UI", system-ui, sans-serif;
   color: var(--wk-text);
@@ -19,6 +279,7 @@
   min-width: 0;
   overflow: auto;
   background: var(--wk-surface-muted);
+  min-height: 0;
 }
 
 .wk-explorer-group {
@@ -132,24 +393,18 @@
 
 .wk-explorer-chevron {
   display: block;
-  transition: transform 120ms ease;
-}
-
-.wk-explorer-chevron path {
-  stroke-width: 1;
-  opacity: 0.38;
+  opacity: 0.45;
   transition:
-    stroke-width 120ms ease,
+    transform 120ms ease,
     opacity 120ms ease;
 }
 
-.wk-explorer-sheet-row:has(.wk-explorer-group-btn.is-active) .wk-explorer-chevron path {
-  opacity: 0.55;
+.wk-explorer-sheet-row:has(.wk-explorer-group-btn.is-active) .wk-explorer-chevron {
+  opacity: 0.65;
 }
 
-.wk-explorer-chevron-btn:hover .wk-explorer-chevron path,
-.wk-explorer-chevron-btn:focus-visible .wk-explorer-chevron path {
-  stroke-width: 1.75;
+.wk-explorer-chevron-btn:hover .wk-explorer-chevron,
+.wk-explorer-chevron-btn:focus-visible .wk-explorer-chevron {
   opacity: 1;
 }
 
@@ -699,19 +954,8 @@ body.wk-explorer-dragging .wk-explorer-table {
   background: var(--wk-surface-muted);
 }
 
-.wk-scenario-menu-dots {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-}
-
-.wk-scenario-menu-dots span {
-  display: block;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--wk-text-muted);
+.wk-scenario-menu-icon {
+  color: var(--wk-text-muted);
 }
 
 .wk-scenario-menu {
@@ -895,13 +1139,17 @@ body.wk-explorer-dragging .wk-explorer-table {
 
 .wk-shell {
   display: grid;
-  grid-template-columns: var(--wk-explorer-width, 200px) 6px 1fr 6px var(--wk-properties-width, 260px);
   grid-template-rows: auto 1fr;
   height: 100vh;
   min-height: 0;
 }
 
 .wk-shell > * {
+  min-width: 0;
+  min-height: 0;
+}
+
+.wk-shell-workspace > * {
   min-width: 0;
   min-height: 0;
 }
@@ -947,7 +1195,8 @@ body.wk-explorer-dragging .wk-explorer-table {
 }
 
 .wk-shell-top {
-  grid-column: 1 / -1;
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -965,13 +1214,20 @@ body.wk-explorer-dragging .wk-explorer-table {
 .wk-properties {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 16px;
   padding: 16px 18px;
   border-left: 1px solid var(--wk-line);
-  background: var(--wk-surface-muted);
+  background: transparent;
   font: 13px/1.45 "Segoe UI", sans-serif;
   color: var(--wk-text);
-  overflow: auto;
+  overflow: visible;
+  min-height: 0;
+}
+
+.wk-properties > * {
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 .wk-properties h2,
@@ -1016,10 +1272,10 @@ body.wk-explorer-dragging .wk-explorer-table {
 
 .wk-properties .wk-outlined textarea {
   min-height: 38px;
+  height: auto;
   resize: none;
   overflow: hidden;
   font: 13px/1.4 ui-monospace, Consolas, monospace;
-  field-sizing: content;
 }
 
 .wk-properties .wk-outlined:focus-within :is(input, textarea, select) {
@@ -1116,16 +1372,22 @@ body.wk-explorer-dragging .wk-explorer-table {
 }
 
 .wk-help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   padding: 0;
-  border: 1px solid #2a6f97;
+  border: 0;
   border-radius: 50%;
-  background: #fff;
+  background: transparent;
   color: #2a6f97;
-  font: 650 11px/14px "Segoe UI", sans-serif;
   cursor: help;
+}
+
+.wk-help-icon .wk-mui-icon {
+  font-size: 18px;
 }
 
 .wk-help-pop {

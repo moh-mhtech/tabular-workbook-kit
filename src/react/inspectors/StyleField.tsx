@@ -3,6 +3,16 @@ import { createPortal } from "react-dom";
 import { CLEARED_CELL_STYLE, DEFAULT_CELL_FONT_SIZE } from "../../model/cellStyle.js";
 import type { CellStyle } from "../../model/types.js";
 import { blurOnEnter } from "../blurOnEnter.js";
+import {
+  WkFillColorIcon,
+  WkFormatBoldIcon,
+  WkFormatClearIcon,
+  WkFormatItalicIcon,
+  WkKeyboardArrowDownIcon,
+  WkKeyboardArrowUpIcon,
+  WkStrikethroughIcon,
+  WkTextColorIcon,
+} from "../icons.js";
 
 const MIN_FONT_SIZE = 1;
 const MAX_FONT_SIZE = 96;
@@ -120,7 +130,7 @@ function ColorWell({
         onClick={() => setOpen((current) => !current)}
       >
         <span className="wk-style-color-face" aria-hidden="true">
-          {kind === "text" ? <TextColorIcon color={swatch} /> : <FillColorIcon color={swatch} />}
+          {kind === "text" ? <WkTextColorIcon color={swatch} /> : <WkFillColorIcon color={swatch} />}
         </span>
       </button>
       {open
@@ -194,86 +204,6 @@ function ColorWell({
   );
 }
 
-function isLightHex(color: string): boolean {
-  const hex = parseHex(color);
-  if (!hex) return true;
-  const n = Number.parseInt(hex.slice(1), 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  return r * 0.299 + g * 0.587 + b * 0.114 > 186;
-}
-
-function ColorBar({ color, x, y, width, height }: { color: string; x: number; y: number; width: number; height: number }) {
-  const light = isLightHex(color);
-  return (
-    <rect
-      x={x}
-      y={y}
-      width={width}
-      height={height}
-      rx={0.7}
-      fill={color}
-      stroke={light ? "#94a3b4" : "none"}
-      strokeWidth={light ? 0.9 : 0}
-    />
-  );
-}
-
-function LetterGlyph({
-  letter,
-  italic,
-  x = 10,
-  y = 14.6,
-  size = 14.5,
-  weight = 650,
-}: {
-  letter: string;
-  italic?: boolean;
-  x?: number;
-  y?: number;
-  size?: number;
-  weight?: number;
-}) {
-  return (
-    <text
-      x={x}
-      y={y}
-      textAnchor="middle"
-      fill="currentColor"
-      fontFamily={italic ? 'Georgia, "Times New Roman", serif' : '"Segoe UI", system-ui, sans-serif'}
-      fontSize={size}
-      fontWeight={weight}
-      fontStyle={italic ? "italic" : undefined}
-    >
-      {letter}
-    </text>
-  );
-}
-
-function TextColorIcon({ color }: { color: string }) {
-  return (
-    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-      <LetterGlyph letter="A" y="12.35" size={13.6} weight={700} />
-      <ColorBar color={color} x="3.4" y="15.55" width="13.2" height="2.85" />
-    </svg>
-  );
-}
-
-function FillColorIcon({ color }: { color: string }) {
-  return (
-    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-      <g transform="translate(1.55 -1.55) scale(0.76)">
-        <path
-          fill="currentColor"
-          d="M2.695 14.763 1.433 17.917a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z"
-        />
-      </g>
-      <ColorBar color={color} x="3.2" y="15.7" width="13.6" height="2.85" />
-    </svg>
-  );
-}
-
 function StyleToggle({
   label,
   pressed,
@@ -295,59 +225,6 @@ function StyleToggle({
     >
       {children}
     </button>
-  );
-}
-
-function BoldIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-      <LetterGlyph letter="B" size={15.5} weight={800} />
-    </svg>
-  );
-}
-
-function ItalicIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-      <LetterGlyph letter="I" italic size={16.5} weight={700} />
-    </svg>
-  );
-}
-
-function StrikeIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-      <LetterGlyph letter="A" size={14.5} weight={700} />
-      <rect x="2.2" y="9.15" width="15.6" height="2.05" rx="0.35" fill="currentColor" />
-    </svg>
-  );
-}
-
-function ClearFormatIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-      <LetterGlyph letter="A" x="8" y="14.4" size={14.2} weight={700} />
-      <g transform="translate(14.15 14.35)" fill="#e11d2a">
-        <rect x="-4.15" y="-1.05" width="8.3" height="2.1" rx="0.55" transform="rotate(45)" />
-        <rect x="-4.15" y="-1.05" width="8.3" height="2.1" rx="0.55" transform="rotate(-45)" />
-      </g>
-    </svg>
-  );
-}
-
-function ChevronUpIcon() {
-  return (
-    <svg viewBox="0 0 10 6" width="9" height="5" aria-hidden="true">
-      <path fill="currentColor" d="M5 .35 9.6 5.4H.4Z" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg viewBox="0 0 10 6" width="9" height="5" aria-hidden="true">
-      <path fill="currentColor" d="M5 5.65.4.6h9.2Z" />
-    </svg>
   );
 }
 
@@ -408,10 +285,10 @@ function FontSizeStepper({
       <span className="wk-style-size-split" aria-hidden="true" />
       <span className="wk-style-size-steppers">
         <button type="button" aria-label="Increase font size" disabled={mixed} onClick={() => bump(1)}>
-          <ChevronUpIcon />
+          <WkKeyboardArrowUpIcon />
         </button>
         <button type="button" aria-label="Decrease font size" disabled={mixed} onClick={() => bump(-1)}>
-          <ChevronDownIcon />
+          <WkKeyboardArrowDownIcon />
         </button>
       </span>
     </span>
@@ -436,13 +313,13 @@ export function StyleField({
       <div className="wk-style-toolbar">
         <div className="wk-style-toggles" role="group" aria-label="Font style">
           <StyleToggle label="Bold" pressed={bold} onToggle={() => onCommit({ bold: bold !== true })}>
-            <BoldIcon />
+            <WkFormatBoldIcon />
           </StyleToggle>
           <StyleToggle label="Italic" pressed={italic} onToggle={() => onCommit({ italic: italic !== true })}>
-            <ItalicIcon />
+            <WkFormatItalicIcon />
           </StyleToggle>
           <StyleToggle label="Strikethrough" pressed={strike} onToggle={() => onCommit({ strikethrough: strike !== true })}>
-            <StrikeIcon />
+            <WkStrikethroughIcon />
           </StyleToggle>
         </div>
         <div className="wk-style-colors" role="group" aria-label="Colors">
@@ -463,7 +340,7 @@ export function StyleField({
         </div>
         <FontSizeStepper value={fontSize} onCommit={(next) => onCommit({ fontSize: next })} />
         <StyleToggle label="Clear formatting" onToggle={() => onCommit(CLEARED_CELL_STYLE)}>
-          <ClearFormatIcon />
+          <WkFormatClearIcon />
         </StyleToggle>
       </div>
     </fieldset>

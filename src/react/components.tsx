@@ -4,6 +4,8 @@ import { selectedYearColumn } from "../model/yearColumns.js";
 import { canDragTable, writeExplorerDragData, type ExplorerDragPayload } from "./explorerDrag.js";
 import { useExplorerDrag } from "./useExplorerDrag.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
+import { WkAddIcon, WkExplorerChevronIcon, WkFolderIcon } from "./icons.js";
+import { SidePanelPinButton } from "./SidePanelPinButton.js";
 import "./workbook.css";
 
 function ExplorerDropMarker({ active }: { active: boolean }) {
@@ -103,34 +105,6 @@ function ExplorerDragSource({
   );
 }
 
-function ExplorerFolderIcon() {
-  return (
-    <svg className="wk-explorer-folder-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M2 4.5 A1 1 0 0 1 3 3.5 H6.2 L7.4 5 H13 A1 1 0 0 1 14 6 V12.5 A1 1 0 0 1 13 13.5 H3 A1 1 0 0 1 2 12.5 Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ExplorerChevron() {
-  return (
-    <svg className="wk-explorer-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-      <path
-        d="M4 2.5 8 6 4 9.5"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: boolean }) {
   const {
     session,
@@ -161,12 +135,16 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
       onDropCapture={commitExplorerDrop}
       onDragEnd={endDragAfterRelease}
     >
+      <div className="wk-side-panel-head">
+        <span className="wk-side-panel-title">Navigation</span>
+        <SidePanelPinButton side="explorer" label="Navigation" />
+      </div>
       <button
         type="button"
         className="wk-explorer-group-btn wk-explorer-workbook"
         onClick={() => session.setSelection({ kind: "workbook" })}
       >
-        {workbookFolderIcon ? <ExplorerFolderIcon /> : null}
+        {workbookFolderIcon ? <WkFolderIcon /> : null}
         <span>{snapshot.name}</span>
       </button>
       {snapshot.sheets.map((sheet) => {
@@ -206,7 +184,7 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
               onClick={() => toggleSheetCollapsed(sheet.id)}
               onDragOver={allowExplorerDrop}
             >
-              <ExplorerChevron />
+              <WkExplorerChevronIcon />
             </button>
           </div>
           <ExplorerSheetTables showTables={showTables}>
@@ -276,9 +254,7 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
                   })
                 }
               >
-                <span className="wk-explorer-new-glyph" aria-hidden="true">
-                  +
-                </span>
+                <WkAddIcon />
                 New table
               </button>
             </li>
@@ -303,9 +279,7 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
           aria-label="New sheet"
           onClick={() => tryCall(() => session.addSheet())}
         >
-          <span className="wk-explorer-new-glyph" aria-hidden="true">
-            +
-          </span>
+          <WkAddIcon />
           New sheet
         </button>
       </div>

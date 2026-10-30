@@ -9,7 +9,12 @@ export function stripViewFromSnapshot(snapshot: WorkbookSnapshot): WorkbookSnaps
 
 export function shouldPersistView(snapshot: WorkbookSnapshot, view: WorkbookViewSnapshot): boolean {
   const defaults = resolvePersistedView(snapshot, undefined);
-  return view.activeSheetId !== defaults.activeSheetId || view.selection !== null;
+  return (
+    view.activeSheetId !== defaults.activeSheetId ||
+    view.selection !== null ||
+    view.explorerPinned === false ||
+    view.propertiesPinned === false
+  );
 }
 
 export function attachViewToSnapshot(snapshot: WorkbookSnapshot, view: WorkbookViewSnapshot): WorkbookSnapshot {
@@ -27,7 +32,14 @@ export function resolvePersistedView(
     activeSheetId = firstSheetId;
   }
   const selection = sanitizeSelection(snapshot, view?.selection ?? null);
-  return { activeSheetId, selection };
+  const explorerPinned = view?.explorerPinned !== false;
+  const propertiesPinned = view?.propertiesPinned !== false;
+  return {
+    activeSheetId,
+    selection,
+    ...(explorerPinned ? {} : { explorerPinned: false as const }),
+    ...(propertiesPinned ? {} : { propertiesPinned: false as const }),
+  };
 }
 
 export function sanitizeSelection(snapshot: WorkbookSnapshot, selection: Selection | null): Selection | null {

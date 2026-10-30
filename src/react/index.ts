@@ -8,6 +8,14 @@ export {
 export { ScenarioBar } from "./ScenarioBar.js";
 export type { FormulaEditPlacement } from "./WorkbookProvider.js";
 export { CustomSheetCanvas } from "./CustomSheetCanvas.js";
+export { WorkbookShell } from "./WorkbookShell.js";
+export {
+  measurePropertiesValueField,
+  runUiCaptureScenario,
+  type UiCaptureMetrics,
+  type UiCaptureScenarioId,
+} from "./uiCaptureScenarios.js";
+export { WkSettingsIcon } from "./icons.js";
 export { PropertiesPanel } from "./PropertiesPanel.js";
 export type { HostInspectors } from "./PropertiesPanel.js";
 export { GlossaryButton } from "./GlossaryDialog.js";

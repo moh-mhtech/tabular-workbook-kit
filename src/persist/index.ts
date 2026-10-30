@@ -26,6 +26,55 @@ export class MemoryPersistence implements PersistencePort {
   }
 }
 
+/** Coalesce rapid saves (e.g. selection moves) into one write after idle; flush before tab close. */
+export function debouncePersistence(port: PersistencePort, delayMs = 500): PersistencePort & { flush(): Promise<void> } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let inflight: Promise<void> | null = null;
+  let latest: WorkbookSnapshot | null = null;
+
+  const runFlush = async (): Promise<void> => {
+    if (!latest) return;
+    const snapshot = latest;
+    latest = null;
+    if (inflight) {
+      await inflight;
+      if (latest) return runFlush();
+      return;
+    }
+    inflight = port.save(snapshot).finally(() => {
+      inflight = null;
+    });
+    await inflight;
+    if (latest) return runFlush();
+  };
+
+  return {
+    load: () => port.load(),
+    clear: async () => {
+      if (timer) clearTimeout(timer);
+      timer = undefined;
+      latest = null;
+      if (inflight) await inflight;
+      await port.clear();
+    },
+    save(snapshot: WorkbookSnapshot) {
+      latest = structuredClone(snapshot);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = undefined;
+        void runFlush();
+      }, delayMs);
+    },
+    flush: async () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+      await runFlush();
+    },
+  };
+}
+
 export class IndexedDbPersistence implements PersistencePort {
   constructor(private readonly key = "workbook") {}
 

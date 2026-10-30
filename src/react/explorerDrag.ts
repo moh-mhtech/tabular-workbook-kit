@@ -195,6 +195,55 @@ export function readSheetRowBounds(root: Element): ExplorerRowBounds[] {
   });
 }
 
+/** Drop hint while the pointer is over the Explorer nav (bubble phase). */
+export function resolveExplorerDropHintForNavOver(
+  payload: ExplorerDragPayload,
+  nav: Element,
+  target: Element,
+  pointerY: number,
+  lastSheetId: string | undefined,
+): ExplorerDropHint | null {
+  if (payload.kind === "sheet") {
+    if (target.closest(".wk-explorer-sheet-append-target") && lastSheetId) {
+      return { placement: "after-sheet", sheetId: lastSheetId };
+    }
+    const tables = target.closest(".wk-explorer-tables");
+    if (tables) {
+      const sheetId = tables.closest("[data-explorer-sheet-id]")?.getAttribute("data-explorer-sheet-id");
+      if (sheetId) return { placement: "before-sheet", sheetId };
+    }
+    const sheetId = target
+      .closest(".wk-explorer-sheet-row")
+      ?.closest("[data-explorer-sheet-id]")
+      ?.getAttribute("data-explorer-sheet-id");
+    if (sheetId && sheetId !== payload.id) {
+      return { placement: "before-sheet", sheetId };
+    }
+    return closestSheetDropHint(payload.id, readSheetRowBounds(nav), pointerY);
+  }
+
+  const tableList = target.closest(".wk-explorer-tables");
+  if (tableList) {
+    const sheetId = tableList.closest("[data-explorer-sheet-id]")?.getAttribute("data-explorer-sheet-id");
+    if (sheetId) {
+      return resolveExplorerTableListDropHint(payload.id, sheetId, tableList, pointerY);
+    }
+  }
+  const group = target.closest(".wk-explorer-group[data-explorer-sheet-id]");
+  const sheetId = group?.getAttribute("data-explorer-sheet-id");
+  if (sheetId) return { placement: "append-tables", sheetId };
+  return null;
+}
+
+export function resolveExplorerTableListDropHint(
+  draggedTableId: string,
+  sheetId: string,
+  tableList: Element,
+  pointerY: number,
+): ExplorerDropHint {
+  return closestTableDropHint(draggedTableId, sheetId, readTableRowBounds(tableList), pointerY);
+}
+
 
 
 export function dropHintAfterLastSheet(sheets: { id: string }[]): ExplorerDropHint | null {

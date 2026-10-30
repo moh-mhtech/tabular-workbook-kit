@@ -332,6 +332,10 @@ _Avoid_: UI-only fold state, session-only collapse
 Selecting a Table from Explorer and scrolling the viewport to that Table’s start. Distinct from keeping the moving Cell in view while Arrow navigation, Ctrl+arrow, Shift+arrow, or Shift+Ctrl+arrow extends a Cell range.
 _Avoid_: Jump, scroll-into-view, follow selection
 
+**Saved view**:
+The last active Sheet and Selection stored on the Workbook snapshot (`view`), restored when the host reopens the Workbook (like Excel’s saved active cell). Hosts may debounce persisting it; the kit marks Selection and Explorer-only changes as view-only so UI stays responsive.
+_Avoid_: Session state (when you mean this persisted snapshot field), cursor position in Formula text
+
 **Selection**:
 The object the Properties panel edits: Workbook, Sheet, Table, column, row, Cell (optionally a Cell range), or Growth-cell. Clicking empty canvas selects the Sheet. Clicking a Key cell selects the row; a Header cell, the column. A 1×1 Table corner is not an object. A 1×1 data Growth cell is a Growth-cell. Selection never sits on an Unused corner. Arrow navigation, Ctrl+arrow, Shift+arrow, and Shift+Ctrl+arrow keep the moving Cell in view without Reveal.
 _Avoid_: A1 range (when you mean this), focus (when you mean Selection)

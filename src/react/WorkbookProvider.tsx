@@ -26,7 +26,11 @@ export function WorkbookProvider({
 }) {
   const [version, setVersion] = useState(0);
   const snapshot = session.getSnapshot();
-  const [activeSheetId, setActiveSheetId] = useState(snapshot.sheets[0]?.id ?? "");
+  const [activeSheetId, setActiveSheetIdState] = useState(session.getViewActiveSheetId());
+  const setActiveSheetId = (sheetId: string) => {
+    setActiveSheetIdState(sheetId);
+    session.setViewActiveSheet(sheetId);
+  };
   const [formulaEditPlacement, setFormulaEditPlacement] = useState<FormulaEditPlacement>(initialPlacement);
   const toggleSheetCollapsed = (sheetId: string) => {
     session.toggleSheetExplorerCollapsed(sheetId);

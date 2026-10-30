@@ -84,6 +84,12 @@ export interface ScenarioSnapshot {
   overlays: Record<string, Primitive>;
 }
 
+/** Last Explorer sheet and Selection, restored on open (like Excel's saved active cell). */
+export interface WorkbookViewSnapshot {
+  activeSheetId: string;
+  selection: Selection | null;
+}
+
 export interface WorkbookSnapshot {
   id: string;
   name: string;
@@ -92,6 +98,7 @@ export interface WorkbookSnapshot {
   tables: TableSnapshot[];
   scenarios: ScenarioSnapshot[];
   activeScenarioId: string | null;
+  view?: WorkbookViewSnapshot;
 }
 
 export interface EvaluatedCell {

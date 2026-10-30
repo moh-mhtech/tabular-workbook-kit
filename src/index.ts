@@ -18,6 +18,7 @@ export type {
   TableSnapshot,
   TimeGrain,
   WorkbookSnapshot,
+  WorkbookViewSnapshot,
   YearColumnSnapshot,
 } from "./model/types.js";
 export {
@@ -47,6 +48,6 @@ export { WorkbookSession } from "./session/WorkbookSession.js";
 export { HyperFormulaEngine } from "./engine/hyperformula.js";
 export type { HyperFormulaEngineOptions } from "./engine/hyperformula.js";
 export type { FormulaEngine } from "./engine/types.js";
-export { IndexedDbPersistence, MemoryPersistence } from "./persist/index.js";
+export { IndexedDbPersistence, MemoryPersistence, debouncePersistence } from "./persist/index.js";
 export type { PersistencePort } from "./persist/index.js";
 export { layoutWorkbook } from "./model/layout.js";

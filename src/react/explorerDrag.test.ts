@@ -1,3 +1,5 @@
+/** @vitest-environment jsdom */
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +9,7 @@ import {
   dropHintAfterLastSheet,
   dropHintForTable,
   readExplorerDragPayload,
+  resolveExplorerDropHintForNavOver,
 } from "./explorerDrag.js";
 import { WorkbookSession } from "../session/WorkbookSession.js";
 import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
@@ -132,17 +135,59 @@ describe("explorer drop hints", () => {
   });
 
   it("marks a sheet drop before the sheet when hovering its tables", () => {
-
     expect(dropHintForTable({ kind: "sheet", id: "sheet-a" }, "sheet-b", "tbl-x")).toEqual({
-
       placement: "before-sheet",
-
       sheetId: "sheet-b",
-
     });
-
   });
 
+  it("resolves after-sheet when the pointer is on the trailing append target", () => {
+    const nav = document.createElement("nav");
+    const trailing = document.createElement("div");
+    trailing.className = "wk-explorer-sheet-append-target";
+    nav.appendChild(trailing);
+    expect(
+      resolveExplorerDropHintForNavOver(
+        { kind: "sheet", id: "sheet-a" },
+        nav,
+        trailing,
+        0,
+        "sheet-last",
+      ),
+    ).toEqual({ placement: "after-sheet", sheetId: "sheet-last" });
+  });
+
+  it("resolves before-table from nav when the target is inside a table list", () => {
+    const nav = document.createElement("nav");
+    const group = document.createElement("div");
+    group.className = "wk-explorer-group";
+    group.setAttribute("data-explorer-sheet-id", "sheet-1");
+    const list = document.createElement("ul");
+    list.className = "wk-explorer-tables";
+    const rowA = document.createElement("li");
+    rowA.setAttribute("data-explorer-table-id", "tbl-a");
+    const rowB = document.createElement("li");
+    rowB.setAttribute("data-explorer-table-id", "tbl-b");
+    list.append(rowA, rowB);
+    group.append(list);
+    nav.append(group);
+    stubRowBounds(rowA, 0, 20);
+    stubRowBounds(rowB, 20, 40);
+    expect(
+      resolveExplorerDropHintForNavOver(
+        { kind: "table", id: "tbl-b" },
+        nav,
+        rowA,
+        10,
+        undefined,
+      ),
+    ).toEqual({ placement: "before-table", sheetId: "sheet-1", tableId: "tbl-a" });
+  });
 });
+
+function stubRowBounds(el: HTMLElement, top: number, bottom: number) {
+  el.getBoundingClientRect = () =>
+    ({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+}
 
 

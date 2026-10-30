@@ -126,6 +126,25 @@ describe("Explorer drag and drop", () => {
     ]);
   });
 
+  it("moves a table before another table when dropped between rows", async () => {
+    const { session } = await renderWorkbookCanvas({ chrome: true });
+    await act(async () => {
+      session.addTable("sheet-assumptions", { name: "Notes", yearColumns: false });
+    });
+    const notesId = session.getSnapshot().tables.find((t) => t.name === "Notes")!.id;
+    const nav = screen.getByRole("navigation", { name: "Sheets" });
+    await performExplorerDragDrop({
+      source: within(nav).getByRole("button", { name: "Lines" }),
+      over: within(nav).getByRole("button", { name: "Notes" }),
+      payload: { kind: "table", id: "tbl-lines" },
+      pointerFractionY: 0.2,
+    });
+    expect(session.getSnapshot().sheets.find((sheet) => sheet.id === "sheet-assumptions")!.tableIds).toEqual([
+      notesId,
+      "tbl-lines",
+    ]);
+  });
+
   it("moves a sheet after the last sheet when dropped on the trailing target", async () => {
     const { session } = await renderWorkbookCanvas({ chrome: true });
     const nav = screen.getByRole("navigation", { name: "Sheets" });

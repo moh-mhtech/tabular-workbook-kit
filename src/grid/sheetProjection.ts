@@ -211,6 +211,22 @@ function isLockedGrowthMargin(projection: SheetGridProjection, col: number, row:
   return (projection.growthColumn && col === projection.colCount - 1) || row === projection.rowCount - 1;
 }
 
+/** First projected grid cell whose Selection is a data Cell (not Key, Header, or Growth). */
+export function firstDataCellLocation(
+  projection: SheetGridProjection,
+  layout: WorkbookLayout,
+): readonly [number, number] | undefined {
+  const lastCol = projection.growthColumn ? projection.colCount - 1 : projection.colCount;
+  for (let row = 1; row < projection.rowCount - 1; row++) {
+    for (let col = 1; col < lastCol; col++) {
+      if (selectionForProjectedCell(projection, layout, col, row).kind === "cell") {
+        return [col, row];
+      }
+    }
+  }
+  return undefined;
+}
+
 export function selectionForProjectedCell(
   projection: SheetGridProjection,
   layout: WorkbookLayout,

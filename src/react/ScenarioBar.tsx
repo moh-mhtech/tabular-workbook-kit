@@ -33,9 +33,6 @@ export function ScenarioBar() {
 
   return (
     <div className="wk-scenario-bar" role="group" aria-label="Scenario">
-      <label className="wk-label" htmlFor="wk-scenario">
-        Scenario
-      </label>
       <div className="wk-scenario-combo" ref={comboRef}>
         <select
           id="wk-scenario"
@@ -43,7 +40,7 @@ export function ScenarioBar() {
           value={activeId ?? ""}
           onChange={(e) => session.activateScenario(e.target.value || null)}
         >
-          <option value="">Base</option>
+          <option value="">Base Scenario</option>
           {snapshot.scenarios.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}

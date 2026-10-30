@@ -57,7 +57,12 @@ describe("workbook chrome", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
     });
-    expect(session.selection).toEqual({ kind: "sheet", sheetId: "sheet-assumptions" });
+    expect(session.selection).toEqual({
+      kind: "cell",
+      tableId: "tbl-lines",
+      rowId: "row-red",
+      columnId: "2025-01",
+    });
     expect(document.querySelector('[data-table-id="tbl-lines"]')).toBeTruthy();
     expect(document.querySelector('[data-table-id="tbl-params"]')).toBeFalsy();
   });
@@ -67,7 +72,12 @@ describe("workbook chrome", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Lines" }));
     });
-    expect(session.selection).toEqual({ kind: "table", tableId: "tbl-lines" });
+    expect(session.selection).toEqual({
+      kind: "cell",
+      tableId: "tbl-lines",
+      rowId: "row-red",
+      columnId: "2025-01",
+    });
     expect(document.querySelector('[data-table-id="tbl-lines"] .wk-table-viewport-title')?.textContent).toBe("Lines");
   });
 
@@ -80,7 +90,12 @@ describe("workbook chrome", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Parameters" }));
     });
-    expect(session.selection).toEqual({ kind: "sheet", sheetId: "sheet-params" });
+    expect(session.selection).toEqual({
+      kind: "cell",
+      tableId: "tbl-params",
+      rowId: "row-annual",
+      columnId: "Value",
+    });
     expect(screen.queryByRole("button", { name: "Delete sheet" })).toBeNull();
     await act(async () => {
       session.revealTable("tbl-params");
@@ -109,6 +124,7 @@ describe("workbook chrome", () => {
     const { session } = await renderWorkbookCanvas({ chrome: true });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
+      session.setSelection({ kind: "sheet", sheetId: "sheet-assumptions" });
     });
     const name = screen.getByDisplayValue("Assumptions") as HTMLInputElement;
     await act(async () => {
@@ -181,6 +197,7 @@ describe("workbook chrome", () => {
     const { session } = await renderWorkbookCanvas({ chrome: true });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Lines" }));
+      session.setSelection({ kind: "table", tableId: "tbl-lines" });
     });
     const name = screen.getByDisplayValue("Lines") as HTMLInputElement;
     await act(async () => {
@@ -204,6 +221,7 @@ describe("workbook chrome", () => {
     const { session } = await renderWorkbookCanvas({ snapshot, chrome: true });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Notes" }));
+      session.setSelection({ kind: "table", tableId: "tbl-notes" });
     });
     const checkbox = screen.getByLabelText("Year columns") as HTMLInputElement;
     expect(checkbox.checked).toBe(false);
@@ -317,7 +335,7 @@ describe("workbook chrome", () => {
     const { session } = await renderWorkbookCanvas({ chrome: true });
     const formula = session.getSnapshot().tables.find((table) => table.id === "tbl-lines")!.rows[0]!.cells["2025-01"]!.formula;
     const base = session.getCell("Lines", "Total", "2025-01").computed as number;
-    const select = screen.getByDisplayValue("Base") as HTMLSelectElement;
+    const select = screen.getByDisplayValue("Base Scenario") as HTMLSelectElement;
     await act(async () => {
       fireEvent.change(select, { target: { value: "scn-growth" } });
     });

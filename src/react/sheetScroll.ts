@@ -201,3 +201,24 @@ export function clampCanvasScroll(container: HTMLElement) {
   const maxScroll = Math.max(0, sheetBottom(container) - container.clientHeight);
   if (container.scrollTop > maxScroll) container.scrollTop = maxScroll;
 }
+
+/** Table band at the top of the canvas scrollport (sticky section lead). */
+export function leadTableIdInCanvas(canvas: HTMLElement): string | null {
+  const cards = canvas.querySelectorAll<HTMLElement>("[data-table-id]");
+  if (!cards.length) return null;
+  const anchor = canvas.scrollTop + canvasPaddingTop(canvas) + 1;
+  let leadId: string | null = null;
+  let leadTop = -Infinity;
+  for (const card of cards) {
+    const top = contentOffset(card, canvas);
+    if (top <= anchor && top > leadTop) {
+      leadTop = top;
+      leadId = card.dataset.tableId ?? null;
+    }
+  }
+  if (leadId) return leadId;
+  if (canvas.scrollTop <= canvasPaddingTop(canvas) + 1) {
+    return cards[0]?.dataset.tableId ?? null;
+  }
+  return cards[cards.length - 1]?.dataset.tableId ?? null;
+}

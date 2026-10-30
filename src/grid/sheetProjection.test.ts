@@ -17,6 +17,7 @@ import {
   projectTable,
   projectedCell,
   projectedLocationForRef,
+  firstDataCellLocation,
   selectionForProjectedCell,
 } from "./sheetProjection.js";
 
@@ -53,6 +54,12 @@ describe("sheet grid projection", () => {
       row: 8,
       col: 2,
     });
+  });
+
+  it("finds the first data cell below the header row and after the key column", () => {
+    const layout = layoutWorkbook(createSampleWorkbook());
+    expect(firstDataCellLocation(projectTable(layout, "tbl-params")!, layout)).toEqual([1, 1]);
+    expect(firstDataCellLocation(projectTable(layout, "tbl-lines")!, layout)).toEqual([1, 1]);
   });
 
   it("maps cells, keys, headers, and margins to session selections", () => {

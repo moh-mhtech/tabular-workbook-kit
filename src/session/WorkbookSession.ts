@@ -10,6 +10,11 @@ import { effectiveCell, readComputed } from "../engine/compileWorkbook.js";
 import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import type { FormulaEngine, SheetGrid } from "../engine/types.js";
 import { buildPeriods, quarterId, yearId } from "../model/calendar.js";
+import {
+  firstDataCellLocation,
+  projectTable,
+  selectionForProjectedCell,
+} from "../grid/sheetProjection.js";
 import { layoutWorkbook } from "../model/layout.js";
 import {
   assertGlobalName,
@@ -62,6 +67,7 @@ import {
   rewriteFormulas,
   rewriteRowKey,
   rewriteTableName,
+  rewriteTableSheetQualification,
   uid,
   uniqueName,
 } from "../model/structure.js";
@@ -716,6 +722,22 @@ export class WorkbookSession {
     for (const listener of this.listeners) listener();
   }
 
+  focusFirstDataCell(tableId: string) {
+    const layout = layoutWorkbook(this.snapshot);
+    const projection = projectTable(layout, tableId);
+    if (!projection) return;
+    const location = firstDataCellLocation(projection, layout);
+    if (!location) {
+      this.revealTable(tableId);
+      return;
+    }
+    const [col, row] = location;
+    this.gridFocus = { tableId, col, row };
+    this.selection = selectionForProjectedCell(projection, layout, col, row);
+    this.revealNonce += 1;
+    for (const listener of this.listeners) listener();
+  }
+
   renameTable(tableIdOrName: string, name: string) {
     const table = requireTable(this.snapshot, tableIdOrName);
     const next = assertTableName(name, this.snapshot, table.id);
@@ -904,6 +926,42 @@ export class WorkbookSession {
     this.checkpoint();
     table.promoteRowKeys = enabled;
     this.emit();
+  }
+
+  moveSheet(sheetId: string, toIndex: number) {
+    const sheets = this.snapshot.sheets;
+    const fromIndex = sheets.findIndex((sheet) => sheet.id === sheetId);
+    if (fromIndex < 0) throw new Error(`Unknown sheet "${sheetId}"`);
+    const nextIndex = Math.max(0, Math.min(toIndex, sheets.length - 1));
+    if (fromIndex === nextIndex) return;
+    this.checkpoint();
+    const [sheet] = sheets.splice(fromIndex, 1);
+    sheets.splice(nextIndex, 0, sheet!);
+    this.emit();
+  }
+
+  moveTable(tableId: string, toSheetId: string, toIndex: number) {
+    return this.restack(() => {
+      const table = requireTable(this.snapshot, tableId);
+      if (table.locked) throw new Error("The table cannot be moved.");
+      const fromSheet = this.snapshot.sheets.find((sheet) => sheet.tableIds.includes(tableId));
+      const toSheet = this.snapshot.sheets.find((sheet) => sheet.id === toSheetId);
+      if (!fromSheet) throw new Error(`Table "${table.name}" is not on a sheet.`);
+      if (!toSheet) throw new Error(`Unknown sheet "${toSheetId}"`);
+      const fromIndex = fromSheet.tableIds.indexOf(tableId);
+      if (fromIndex < 0) throw new Error(`Table "${table.name}" is not on a sheet.`);
+      this.checkpoint();
+      const previousSheetName = fromSheet.name;
+      fromSheet.tableIds.splice(fromIndex, 1);
+      const insertAt = Math.max(0, Math.min(toIndex, toSheet.tableIds.length));
+      toSheet.tableIds.splice(insertAt, 0, tableId);
+      if (fromSheet.id !== toSheet.id) {
+        rewriteFormulas(this.snapshot, (formula) =>
+          rewriteTableSheetQualification(formula, table.name, previousSheetName, toSheet.name),
+        );
+      }
+      this.emit();
+    });
   }
 
   addSheet(name?: string) {

@@ -126,6 +126,25 @@ function rewriteAtoms(token: string, rewriteAtom: (atom: string) => string): str
   return splitRangeAtoms(token).map(rewriteAtom).join(":");
 }
 
+/** Updates Sheet.Table qualification when a table's home sheet changes. Unqualified table refs are unchanged. */
+export function rewriteTableSheetQualification(
+  formula: string,
+  tableName: string,
+  fromSheet: string,
+  toSheet: string,
+): string {
+  if (fromSheet === toSheet) return formula;
+  return mapFormulaRefs(formula, (token) =>
+    rewriteAtoms(token, (atom) => {
+      const sheeted = atom.match(new RegExp(`^(${IDENTIFIER})\\.(${IDENTIFIER})\\[`, "u"));
+      if (sheeted?.[1] === fromSheet && sheeted[2] === tableName) {
+        return `${toSheet}.${tableName}${atom.slice(sheeted[0].length - 1)}`;
+      }
+      return atom;
+    }),
+  );
+}
+
 export function rewriteTableName(formula: string, from: string, to: string): string {
   return mapFormulaRefs(formula, (token) =>
     rewriteAtoms(token, (atom) => {

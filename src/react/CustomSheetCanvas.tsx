@@ -52,7 +52,12 @@ import {
   type OverlayNavMode,
 } from "./customGridOverlay.js";
 import { formulaRefGridMarks } from "../formula/formulaRefColors.js";
-import { clampCanvasScroll, scrollCanvasToKeepCellVisible, scrollCanvasToKeepTableVisible } from "./sheetScroll.js";
+import {
+  clampCanvasScroll,
+  leadTableIdInCanvas,
+  scrollCanvasToKeepCellVisible,
+  scrollCanvasToKeepTableVisible,
+} from "./sheetScroll.js";
 import { arrowNavDirection, ctrlArrowNavTarget, focusAdjacentTable, shiftArrowNavTarget, sheetTableProjections } from "./tableArrowNav.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 
@@ -325,7 +330,7 @@ function ensureOverlayPortal() {
 const SCROLLBAR_GUTTER = 16;
 
 export function CustomSheetCanvas() {
-  const { session, activeSheetId } = useWorkbook();
+  const { session, activeSheetId, setViewportLeadTableId } = useWorkbook();
   const snapshot = useSnapshot();
   const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
   const sheet = layout.sheets.find((candidate) => candidate.sheetId === activeSheetId);
@@ -383,12 +388,14 @@ export function CustomSheetCanvas() {
       canvas.scrollTop = 0;
       canvas.scrollLeft = 0;
     }
-    if (lastRevealRef.current === session.revealNonce) return;
-    lastRevealRef.current = session.revealNonce;
-    if (selection?.kind === "table") {
-      scrollCanvasToKeepTableVisible(canvas, selection.tableId, horizontalScroll);
+    if (lastRevealRef.current !== session.revealNonce) {
+      lastRevealRef.current = session.revealNonce;
+      if (selection?.kind === "table") {
+        scrollCanvasToKeepTableVisible(canvas, selection.tableId, horizontalScroll);
+      }
     }
-  }, [activeSheetId, horizontalScroll, selection, session.revealNonce]);
+    setViewportLeadTableId(leadTableIdInCanvas(canvas) ?? sheet?.bands[0]?.tableId ?? null);
+  }, [activeSheetId, horizontalScroll, selection, session.revealNonce, setViewportLeadTableId, sheet?.bands]);
 
   if (!sheet) {
     return (
@@ -403,7 +410,11 @@ export function CustomSheetCanvas() {
       ref={canvasRef}
       className={`wk-canvas wk-table-canvases ${horizontalScroll === "sheet" ? "is-sheet-scroll-x" : "is-table-scroll-x"}`}
       aria-label={`${sheet.sheetName} tables`}
-      onScroll={(event) => clampCanvasScroll(event.currentTarget)}
+      onScroll={(event) => {
+        const canvas = event.currentTarget;
+        clampCanvasScroll(canvas);
+        setViewportLeadTableId(leadTableIdInCanvas(canvas));
+      }}
       onClick={(event) => {
         const node = event.target as HTMLElement | null;
         if (node?.closest("[data-table-id], #portal, .wk-overlay-editor, .wk-formula-bar, .wk-formula-suggest")) return;

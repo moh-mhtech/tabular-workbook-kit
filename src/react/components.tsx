@@ -1,6 +1,75 @@
+import { useEffect, useRef, useState, type DragEvent, type ReactNode, type TransitionEvent } from "react";
+import { selectedTableId } from "../model/types.js";
 import { selectedYearColumn } from "../model/yearColumns.js";
+import {
+  EXPLORER_SHEET_DRAG,
+  EXPLORER_TABLE_DRAG,
+  canDragTable,
+  dropHintForSheetRow,
+  dropHintForTable,
+  dropHintsEqual,
+  dropSheetOnSheet,
+  dropTableBeforeTable,
+  dropTableOnSheet,
+  readExplorerDrag,
+  type ExplorerDragPayload,
+  type ExplorerDropHint,
+} from "./explorerDrag.js";
 import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 import "./workbook.css";
+
+function allowExplorerDrop(event: DragEvent) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+}
+
+function ExplorerDropMarker({ active }: { active: boolean }) {
+  return <div className="wk-explorer-drop-marker" data-active={active ? "true" : "false"} role="presentation" />;
+}
+
+const EXPLORER_TABLES_MS = 220;
+
+function ExplorerSheetTables({ showTables, children }: { showTables: boolean; children: ReactNode }) {
+  const [expanded, setExpanded] = useState(showTables);
+  const [a11yHidden, setA11yHidden] = useState(!showTables);
+
+  useEffect(() => {
+    if (showTables) {
+      setA11yHidden(false);
+      setExpanded(false);
+      let inner = 0;
+      const outer = requestAnimationFrame(() => {
+        inner = requestAnimationFrame(() => setExpanded(true));
+      });
+      return () => {
+        cancelAnimationFrame(outer);
+        cancelAnimationFrame(inner);
+      };
+    }
+    setExpanded(false);
+  }, [showTables]);
+
+  useEffect(() => {
+    if (showTables || expanded) return;
+    const timer = window.setTimeout(() => setA11yHidden(true), EXPLORER_TABLES_MS + 40);
+    return () => clearTimeout(timer);
+  }, [showTables, expanded]);
+
+  const onTransitionEnd = (event: TransitionEvent<HTMLDivElement>) => {
+    if (event.propertyName !== "grid-template-rows" || showTables || expanded) return;
+    setA11yHidden(true);
+  };
+
+  return (
+    <div
+      className={expanded ? "wk-explorer-tables-wrap is-expanded" : "wk-explorer-tables-wrap"}
+      aria-hidden={a11yHidden ? true : undefined}
+      onTransitionEnd={onTransitionEnd}
+    >
+      {children}
+    </div>
+  );
+}
 
 export { PropertiesPanel } from "./PropertiesPanel.js";
 
@@ -26,12 +95,52 @@ function ExplorerFolderIcon() {
   );
 }
 
+function ExplorerChevron() {
+  return (
+    <svg className="wk-explorer-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+      <path
+        d="M4 2.5 8 6 4 9.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: boolean }) {
-  const { session, activeSheetId, setActiveSheetId } = useWorkbook();
+  const {
+    session,
+    activeSheetId,
+    setActiveSheetId,
+    collapsedSheetIds,
+    toggleSheetCollapsed,
+    viewportLeadTableId,
+  } = useWorkbook();
   const snapshot = useSnapshot();
+  const dragPayloadRef = useRef<ExplorerDragPayload | null>(null);
+  const [dropHint, setDropHint] = useState<ExplorerDropHint | null>(null);
+
+  useEffect(() => () => document.body.classList.remove("wk-explorer-dragging"), []);
+
+  const beginDrag = (payload: ExplorerDragPayload) => {
+    dragPayloadRef.current = payload;
+    document.body.classList.add("wk-explorer-dragging");
+  };
+
+  const endDrag = () => {
+    dragPayloadRef.current = null;
+    setDropHint(null);
+    document.body.classList.remove("wk-explorer-dragging");
+  };
+
+  const updateDropHint = (next: ExplorerDropHint | null) => {
+    setDropHint((prev) => (dropHintsEqual(prev, next) ? prev : next));
+  };
 
   return (
-    <nav className="wk-explorer" aria-label="Sheets">
+    <nav className="wk-explorer" aria-label="Sheets" onDragEnd={endDrag}>
       <button
         type="button"
         className="wk-explorer-group-btn wk-explorer-workbook"
@@ -40,30 +149,110 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
         {workbookFolderIcon ? <ExplorerFolderIcon /> : null}
         <span>{snapshot.name}</span>
       </button>
-      {snapshot.sheets.map((sheet) => (
+      {snapshot.sheets.map((sheet) => {
+        const isActiveSheet = sheet.id === activeSheetId;
+        const isCollapsed = collapsedSheetIds.has(sheet.id);
+        const showTables = !isCollapsed || isActiveSheet;
+        return (
         <div key={sheet.id} className="wk-explorer-group">
-          <button
-            type="button"
-            className={sheet.id === activeSheetId ? "wk-explorer-group-btn is-active" : "wk-explorer-group-btn"}
-            onClick={() => {
-              setActiveSheetId(sheet.id);
-              session.setSelection({ kind: "sheet", sheetId: sheet.id });
+          <ExplorerDropMarker
+            active={dropHint?.placement === "before-sheet" && dropHint.sheetId === sheet.id}
+          />
+          <div
+            className="wk-explorer-sheet-row"
+            onDragOver={(event) => {
+              allowExplorerDrop(event);
+              const payload = dragPayloadRef.current;
+              if (!payload) return;
+              updateDropHint(dropHintForSheetRow(payload, sheet.id));
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              const payload = readExplorerDrag(event.dataTransfer);
+              if (!payload) return;
+              tryCall(() => {
+                if (payload.kind === "sheet") dropSheetOnSheet(session, payload.id, sheet.id);
+                else dropTableOnSheet(session, payload.id, sheet.id);
+              });
+              endDrag();
             }}
           >
-            {sheet.name}
-          </button>
+            <button
+              type="button"
+              className={isActiveSheet ? "wk-explorer-group-btn is-active" : "wk-explorer-group-btn"}
+              draggable={!sheet.locked}
+              onDragStart={(event) => {
+                event.dataTransfer.setData(EXPLORER_SHEET_DRAG, sheet.id);
+                event.dataTransfer.effectAllowed = "move";
+                beginDrag({ kind: "sheet", id: sheet.id });
+              }}
+              onClick={() => {
+                setActiveSheetId(sheet.id);
+                const firstTableId = sheet.tableIds[0];
+                if (firstTableId) session.focusFirstDataCell(firstTableId);
+                else session.setSelection({ kind: "sheet", sheetId: sheet.id });
+              }}
+            >
+              {sheet.name}
+            </button>
+            <button
+              type="button"
+              className="wk-explorer-chevron-btn"
+              aria-label={isCollapsed ? `Expand ${sheet.name}` : `Collapse ${sheet.name}`}
+              aria-expanded={!isCollapsed}
+              onClick={() => toggleSheetCollapsed(sheet.id)}
+            >
+              <ExplorerChevron />
+            </button>
+          </div>
+          <ExplorerSheetTables showTables={showTables}>
           <ul className="wk-explorer-tables">
             {sheet.tableIds.map((tableId) => {
               const table = snapshot.tables.find((t) => t.id === tableId);
               if (!table) return null;
+              const isSelected = selectedTableId(session.selection) === table.id;
+              const isViewportLead =
+                isActiveSheet && !isSelected && viewportLeadTableId === table.id;
+              const tableClass = isSelected
+                ? "wk-explorer-table is-selected"
+                : isViewportLead
+                  ? "wk-explorer-table is-viewport-lead"
+                  : "wk-explorer-table";
               return (
                 <li key={table.id}>
+                  <ExplorerDropMarker
+                    active={
+                      dropHint?.placement === "before-table" &&
+                      dropHint.sheetId === sheet.id &&
+                      dropHint.tableId === table.id
+                    }
+                  />
                   <button
                     type="button"
-                    className="wk-explorer-table"
+                    className={tableClass}
+                    draggable={canDragTable(session, table.id)}
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData(EXPLORER_TABLE_DRAG, table.id);
+                      event.dataTransfer.effectAllowed = "move";
+                      beginDrag({ kind: "table", id: table.id });
+                    }}
+                    onDragOver={(event) => {
+                      allowExplorerDrop(event);
+                      const payload = dragPayloadRef.current;
+                      if (!payload) return;
+                      const hint = dropHintForTable(payload, sheet.id, table.id);
+                      if (hint) updateDropHint(hint);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const payload = readExplorerDrag(event.dataTransfer);
+                      if (!payload || payload.kind !== "table") return;
+                      tryCall(() => dropTableBeforeTable(session, payload.id, sheet.id, table.id));
+                      endDrag();
+                    }}
                     onClick={() => {
                       setActiveSheetId(sheet.id);
-                      session.revealTable(table.id);
+                      session.focusFirstDataCell(table.id);
                     }}
                   >
                     {table.name}
@@ -71,6 +260,11 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
                 </li>
               );
             })}
+            <li className="wk-explorer-table-append-marker">
+              <ExplorerDropMarker
+                active={dropHint?.placement === "append-tables" && dropHint.sheetId === sheet.id}
+              />
+            </li>
             <li>
               <button
                 type="button"
@@ -91,8 +285,10 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
               </button>
             </li>
           </ul>
+          </ExplorerSheetTables>
         </div>
-      ))}
+      );
+      })}
       <div className="wk-explorer-group">
         <button
           type="button"

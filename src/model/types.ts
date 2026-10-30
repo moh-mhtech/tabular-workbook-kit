@@ -141,6 +141,11 @@ export function selectedCellRefs(selection: Selection | null): CellRef[] {
   return [{ tableId: selection.tableId, rowId: selection.rowId, columnId: selection.columnId }];
 }
 
+export function selectedTableId(selection: Selection | null): string | null {
+  if (!selection || selection.kind === "workbook" || selection.kind === "sheet") return null;
+  return selection.tableId;
+}
+
 export function sharedOrStar(values: readonly string[]): string {
   if (!values.length) return "";
   return values.every((value) => value === values[0]) ? values[0]! : "*";

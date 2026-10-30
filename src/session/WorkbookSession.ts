@@ -77,8 +77,15 @@ import {
   uid,
   uniqueName,
 } from "../model/structure.js";
+import { PerfSpanBuffer, measureAsync } from "../perf/perfSpan.js";
 
-export type SessionChange = { viewOnly?: boolean };
+export type SessionChange = {
+  viewOnly?: true;
+  formulaEditOnly?: true;
+  /** Tables whose model cells changed in this notification (host maintenance scope). */
+  affectedTableNames?: string[];
+};
+
 export type SessionListener = (change?: SessionChange) => void;
 
 export type FormulaEditOrigin = { tableId: string; col: number; row: number };
@@ -113,15 +120,19 @@ function cloneSnapshot(snapshot: WorkbookSnapshot): WorkbookSnapshot {
 
 type EvalCache = { layout: ReturnType<typeof layoutWorkbook>; values: Record<string, SheetGrid> };
 
+type HistoryEntry = { snapshot: WorkbookSnapshot; view: WorkbookViewSnapshot };
+
 export class WorkbookSession {
   private snapshot: WorkbookSnapshot;
   private engine: FormulaEngine;
   private listeners = new Set<SessionListener>();
   private cache: EvalCache | null = null;
-  private computing: Promise<void> | null = null;
+  private recalcInFlight: Promise<void> | null = null;
   private generation = 0;
-  private history: WorkbookSnapshot[] = [];
-  private future: WorkbookSnapshot[] = [];
+  private readonly perf = new PerfSpanBuffer();
+  private txAffectedTableNames = new Set<string>();
+  private history: HistoryEntry[] = [];
+  private future: HistoryEntry[] = [];
   private txDepth = 0;
   private txDirty = false;
   selection: Selection | null = null;
@@ -146,25 +157,55 @@ export class WorkbookSession {
     return () => this.listeners.delete(listener);
   }
 
+  private noteTableMutation(tableName: string) {
+    this.txAffectedTableNames.add(tableName);
+  }
+
+  private dataChange(): SessionChange {
+    const names = [...this.txAffectedTableNames];
+    this.txAffectedTableNames.clear();
+    return names.length ? { affectedTableNames: names } : {};
+  }
+
   private emit(options?: { recalculate?: boolean; viewOnly?: boolean }) {
-    const change: SessionChange | undefined = options?.viewOnly ? { viewOnly: true } : undefined;
     if (this.txDepth > 0) {
       this.txDirty = true;
       return;
     }
+    if (options?.viewOnly) {
+      for (const listener of this.listeners) listener({ viewOnly: true });
+      return;
+    }
+    const change = this.dataChange();
     if (options?.recalculate === false) {
       for (const listener of this.listeners) listener(change);
       return;
     }
-    this.cache = null;
-    void this.recalculate().then(() => {
+    this.generation++;
+    void this.recalculateLoop().then(() => {
       for (const listener of this.listeners) listener(change);
     });
-    for (const listener of this.listeners) listener(change);
   }
 
   private notifyViewOnly() {
     for (const listener of this.listeners) listener({ viewOnly: true });
+  }
+
+  private notifyFormulaEditOnly() {
+    for (const listener of this.listeners) listener({ formulaEditOnly: true });
+  }
+
+  /** Test and diagnostics: recent synchronous recalc spans. */
+  getPerfSpans() {
+    return this.perf.peek();
+  }
+
+  drainPerfSpans() {
+    return this.perf.drain();
+  }
+
+  getRecalcGeneration(): number {
+    return this.generation;
   }
 
   private writeViewState(patch: Partial<WorkbookViewSnapshot>) {
@@ -212,13 +253,17 @@ export class WorkbookSession {
     this.notifyViewOnly();
   }
 
-  private checkpoint() {
-    if (this.txDepth > 0) return;
-    this.pushHistory(cloneSnapshot(this.snapshot));
+  private cloneViewState(): WorkbookViewSnapshot {
+    return structuredClone(this.viewState);
   }
 
-  private pushHistory(before: WorkbookSnapshot) {
-    this.history.push(before);
+  private checkpoint() {
+    if (this.txDepth > 0) return;
+    this.pushHistory(cloneSnapshot(this.snapshot), this.cloneViewState());
+  }
+
+  private pushHistory(before: WorkbookSnapshot, view: WorkbookViewSnapshot) {
+    this.history.push({ snapshot: before, view });
     if (this.history.length > HISTORY_LIMIT) this.history.shift();
     this.future.length = 0;
   }
@@ -227,6 +272,7 @@ export class WorkbookSession {
   transact<T>(fn: () => T): T {
     if (this.txDepth > 0) return fn();
     const before = cloneSnapshot(this.snapshot);
+    const beforeView = this.cloneViewState();
     this.txDepth++;
     this.txDirty = false;
     try {
@@ -234,7 +280,7 @@ export class WorkbookSession {
       this.txDepth--;
       if (this.txDirty) {
         this.txDirty = false;
-        this.pushHistory(before);
+        this.pushHistory(before, beforeView);
         this.emit();
       }
       return result;
@@ -282,8 +328,10 @@ export class WorkbookSession {
   undo(): boolean {
     const previous = this.history.pop();
     if (!previous) return false;
-    this.future.push(cloneSnapshot(this.snapshot));
-    this.snapshot = previous;
+    this.future.push({ snapshot: cloneSnapshot(this.snapshot), view: this.cloneViewState() });
+    this.snapshot = previous.snapshot;
+    this.viewState = previous.view;
+    this.selection = this.viewState.selection ?? null;
     this.formulaEdit = null;
     this.emit();
     return true;
@@ -292,22 +340,37 @@ export class WorkbookSession {
   redo(): boolean {
     const next = this.future.pop();
     if (!next) return false;
-    this.history.push(cloneSnapshot(this.snapshot));
-    this.snapshot = next;
+    this.history.push({ snapshot: cloneSnapshot(this.snapshot), view: this.cloneViewState() });
+    this.snapshot = next.snapshot;
+    this.viewState = next.view;
+    this.selection = this.viewState.selection ?? null;
     this.formulaEdit = null;
     this.emit();
     return true;
   }
 
   async recalculate(): Promise<void> {
-    const generation = ++this.generation;
-    const snapshot = cloneSnapshot(this.snapshot);
-    this.computing = (async () => {
-      const values = await Promise.resolve(this.engine.evaluate(snapshot));
-      if (generation !== this.generation) return;
-      this.cache = { layout: layoutWorkbook(snapshot), values };
-    })();
-    return this.computing;
+    this.generation++;
+    return this.recalculateLoop();
+  }
+
+  private recalculateLoop(): Promise<void> {
+    if (this.recalcInFlight) return this.recalcInFlight;
+    this.recalcInFlight = (async () => {
+      while (true) {
+        const gen = this.generation;
+        await measureAsync("recalculate", this.perf, async () => {
+          const snapshot = cloneSnapshot(this.snapshot);
+          const values = await Promise.resolve(this.engine.evaluate(snapshot));
+          if (gen !== this.generation) return;
+          this.cache = { layout: layoutWorkbook(this.snapshot), values };
+        });
+        if (gen === this.generation) return;
+      }
+    })().finally(() => {
+      this.recalcInFlight = null;
+    });
+    return this.recalcInFlight;
   }
 
   getSnapshot(): WorkbookSnapshot {
@@ -490,6 +553,7 @@ export class WorkbookSession {
       throw new Error("Cannot overlay or replace a formula cell with an input. Change the formula instead.");
     }
     this.checkpoint();
+    this.noteTableMutation(table.name);
     if (this.snapshot.activeScenarioId) {
       const scenario = this.snapshot.scenarios.find((s) => s.id === this.snapshot.activeScenarioId);
       if (!scenario) throw new Error("Active scenario missing");
@@ -501,9 +565,10 @@ export class WorkbookSession {
   }
 
   setFormula(tableName: string, rowKey: string, columnId: string, formula: string) {
-    const { row, colId } = this.findCell(tableName, rowKey, columnId);
+    const { table, row, colId } = this.findCell(tableName, rowKey, columnId);
     const existing = row.cells[colId];
     this.checkpoint();
+    this.noteTableMutation(table.name);
     row.cells[colId] = retainCellMeta(existing, {
       kind: "formula",
       formula: formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`,
@@ -513,6 +578,7 @@ export class WorkbookSession {
 
   writeCell(tableName: string, rowKey: string, columnId: string, raw: string) {
     const { table, row } = this.findCell(tableName, rowKey, columnId);
+    this.noteTableMutation(table.name);
     const periods = buildPeriods(this.snapshot.calendar);
     const periodIds = writePeriodIds(table, columnId, periods);
     const formula = looksLikeFormula(raw);
@@ -666,7 +732,7 @@ export class WorkbookSession {
       rangeAnchor: resetPoint ? undefined : this.formulaEdit.rangeAnchor,
     };
     if (draftChanged || keyChanged) {
-      for (const listener of this.listeners) listener();
+      this.notifyFormulaEditOnly();
     }
   }
 
@@ -699,7 +765,7 @@ export class WorkbookSession {
         ? (this.formulaEdit.rangeAnchor ?? targetCell ?? this.formulaEdit.targetCell)
         : (targetCell ?? this.formulaEdit.targetCell),
     };
-    for (const listener of this.listeners) listener();
+    this.notifyFormulaEditOnly();
   }
 
   beginFormulaEdit(
@@ -727,6 +793,7 @@ export class WorkbookSession {
       };
       if (next.editCell !== current.editCell || next.mode !== current.mode) {
         this.formulaEdit = next;
+        this.notifyFormulaEditOnly();
       }
       return;
     }
@@ -743,7 +810,7 @@ export class WorkbookSession {
       editCell: options?.editCell ?? (sameCell ? current.editCell : undefined),
       rangeAnchor: sameCell ? current?.rangeAnchor : undefined,
     };
-    for (const listener of this.listeners) listener();
+    this.notifyFormulaEditOnly();
   }
 
   setFormulaEditMode(mode: FormulaEditMode) {
@@ -752,7 +819,7 @@ export class WorkbookSession {
       ...this.formulaEdit,
       mode,
     };
-    for (const listener of this.listeners) listener();
+    this.notifyFormulaEditOnly();
   }
 
   commitFormulaEdit() {
@@ -760,14 +827,13 @@ export class WorkbookSession {
     if (!edit) return;
     const table = this.snapshot.tables.find((t) => t.id === edit.tableId);
     const row = table?.rows.find((r) => r.id === edit.rowId);
-    if (table && row) this.writeCell(table.name, row.key, edit.columnId, edit.draft);
     this.formulaEdit = null;
-    for (const listener of this.listeners) listener();
+    if (table && row) this.writeCell(table.name, row.key, edit.columnId, edit.draft);
   }
 
   cancelFormulaEdit() {
     this.formulaEdit = null;
-    for (const listener of this.listeners) listener();
+    this.notifyFormulaEditOnly();
   }
 
   setSelection(selection: Selection | null) {
@@ -778,8 +844,15 @@ export class WorkbookSession {
   }
 
   setGridFocus(focus: { tableId: string; col: number; row: number } | null) {
+    if (
+      this.gridFocus?.tableId === focus?.tableId &&
+      this.gridFocus?.col === focus?.col &&
+      this.gridFocus?.row === focus?.row
+    ) {
+      return;
+    }
     this.gridFocus = focus;
-    for (const listener of this.listeners) listener();
+    this.notifyViewOnly();
   }
 
   revealTable(tableId: string) {
@@ -1006,6 +1079,29 @@ export class WorkbookSession {
     this.emit({ recalculate: false, viewOnly: true });
   }
 
+  toggleTableHidden(tableId: string) {
+    const table = requireTable(this.snapshot, tableId);
+    table.hidden = !table.hidden;
+    if (table.hidden && this.selectionUsesTableData(table.id)) {
+      const next = { kind: "table" as const, tableId: table.id };
+      if (JSON.stringify(this.selection) !== JSON.stringify(next)) {
+        this.selection = next;
+        this.writeViewState({ selection: this.selection });
+      }
+    }
+    this.emit({ recalculate: false, viewOnly: true });
+  }
+
+  private selectionUsesTableData(tableId: string): boolean {
+    const selection = this.selection;
+    if (!selection) return false;
+    if (selection.kind === "cell" || selection.kind === "growth") return selection.tableId === tableId;
+    if (selection.kind === "row" || selection.kind === "column" || selection.kind === "corner") {
+      return selection.tableId === tableId;
+    }
+    return false;
+  }
+
   moveSheet(sheetId: string, toIndex: number) {
     const sheets = this.snapshot.sheets;
     const fromIndex = sheets.findIndex((sheet) => sheet.id === sheetId);
@@ -1152,7 +1248,7 @@ export class WorkbookSession {
         else delete table.columnFormats[id];
       }
     }
-    this.emit();
+    this.emit({ recalculate: false });
   }
 
   setCellFormat(tableIdOrName: string, rowIdOrKey: string, columnId: string, pattern: string) {
@@ -1166,7 +1262,7 @@ export class WorkbookSession {
       else delete cell.format;
       row.cells[id] = cell;
     }
-    this.emit();
+    this.emit({ recalculate: false });
   }
 
   setColumnStyle(tableIdOrName: string, columnId: string, patch: CellStyle) {
@@ -1183,7 +1279,7 @@ export class WorkbookSession {
         else delete table.columnStyles[id];
       }
     }
-    this.emit();
+    this.emit({ recalculate: false });
   }
 
   setCellStyle(tableIdOrName: string, rowIdOrKey: string, columnId: string, patch: CellStyle) {
@@ -1197,7 +1293,7 @@ export class WorkbookSession {
       else delete cell.style;
       row.cells[id] = cell;
     }
-    this.emit();
+    this.emit({ recalculate: false });
   }
 
   private findCell(tableName: string, rowKey: string, columnId: string) {

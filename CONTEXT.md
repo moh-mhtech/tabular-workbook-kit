@@ -72,6 +72,10 @@ _Avoid_: Parameter class, Params type (as a kit table kind)
 A Sheet or Table that cannot be deleted.
 _Avoid_: Read-only (cells on a locked Table can still be edited unless the host says otherwise)
 
+**Table hidden**:
+Table metadata: when set, the sheet canvas shows only the table title and a show control until the user shows the table again. Selecting a Cell (or row, column, or Growth cell) in that table temporarily expands the grid; leaving that table collapses it again while `hidden` stays set. Formulas and Explorer still reference the table. Toggling hidden is a view-only change (no recalc), like **Explorer collapsed**.
+_Avoid_: Explorer collapsed, deleted table, filtered rows
+
 **Growth**:
 The empty Growth row and optional Growth column on a Table’s edge, used for Auto-expansion.
 _Avoid_: Autofill handle, spill range
@@ -366,3 +370,7 @@ _Avoid_: Formula line, name box
 **Horizontal scroll**:
 Whether wide Tables on a Sheet scroll individually (**Per table**) or the whole Sheet scrolls together (**Sheet**, default). In Sheet mode, table grids do not show their own horizontal scrollbar.
 _Avoid_: Freeze panes, split view
+
+---
+
+Responsiveness and perf testing: [docs/responsiveness.md](docs/responsiveness.md) (not glossary).

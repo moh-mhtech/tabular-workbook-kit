@@ -8,6 +8,32 @@ import { WkAddIcon, WkExplorerChevronIcon, WkFolderIcon } from "./icons.js";
 import { SidePanelPinButton } from "./SidePanelPinButton.js";
 import "./workbook.css";
 
+export function TableVisibilityButton({
+  tableId,
+  tableName,
+  hidden,
+}: {
+  tableId: string;
+  tableName: string;
+  hidden: boolean;
+}) {
+  const { session } = useWorkbook();
+  return (
+    <button
+      type="button"
+      className="wk-table-visibility-btn"
+      aria-expanded={!hidden}
+      aria-label={hidden ? `Show ${tableName}` : `Hide ${tableName}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        session.toggleTableHidden(tableId);
+      }}
+    >
+      <WkExplorerChevronIcon />
+    </button>
+  );
+}
+
 function ExplorerDropMarker({ active }: { active: boolean }) {
   return <div className="wk-explorer-drop-marker" data-active={active ? "true" : "false"} role="presentation" />;
 }

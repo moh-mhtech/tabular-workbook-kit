@@ -7,6 +7,7 @@ import { expect, vi } from "vitest";
 import { HyperFormulaEngine } from "../engine/hyperformula.js";
 import { fitProjectedColumnWidths, fitProjectedRowHeights } from "../grid/columnFit.js";
 import { projectTable, selectionForProjectedCell } from "../grid/sheetProjection.js";
+import { applyGridPointerToFormulaEdit, canPointFromDraft } from "./customGridOverlay.js";
 import { layoutWorkbook } from "../model/layout.js";
 import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
 import type { WorkbookSnapshot } from "../model/types.js";
@@ -267,7 +268,21 @@ export async function typeEqualsOnProjectedCell(
 }
 
 export async function clickProjectedCell(session: WorkbookSession, tableId: string, col: number, row: number) {
+  const edit = session.formulaEdit;
+  if (edit && !canPointFromDraft(edit.draft)) {
+    const layout = layoutWorkbook(session.getSnapshot());
+    const projection = projectTable(layout, tableId);
+    if (!projection) throw new Error(`clickProjectedCell: no projection for ${tableId}`);
+    await act(async () => {
+      applyGridPointerToFormulaEdit(session, projection, layout, col, row);
+    });
+    return;
+  }
+  const { surface, clientX, clientY } = projectedCellPointer(session, tableId, col, row);
   await pointerOnProjectedCell(session, tableId, col, row, "pointerdown");
+  await act(async () => {
+    fireEvent.click(surface, { clientX, clientY, bubbles: true, cancelable: true });
+  });
 }
 
 export async function dragProjectedCell(session: WorkbookSession, tableId: string, col: number, row: number) {

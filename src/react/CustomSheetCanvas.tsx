@@ -65,7 +65,9 @@ import {
   scrollCanvasToKeepTableVisible,
 } from "./sheetScroll.js";
 import { arrowNavDirection, ctrlArrowNavTarget, focusAdjacentTable, shiftArrowNavTarget, sheetTableProjections } from "./tableArrowNav.js";
-import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
+import { showTableGrid } from "../model/tableHidden.js";
+import { TableVisibilityButton } from "./components.js";
+import { useFormulaEdit, useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 
 const EMPTY_SELECTION: GridSelection = {
   columns: CompactSelection.empty(),
@@ -184,20 +186,33 @@ function bucketComputed(
   return source?.value ?? null;
 }
 
+export function evaluatedCellsForTable(
+  session: ReturnType<typeof useWorkbook>["session"],
+  tableId: string,
+  tableName: string,
+): Map<string, EvaluatedCell> {
+  const result = new Map<string, EvaluatedCell>();
+  try {
+    for (const row of session.getTable(tableName).rows) {
+      for (const [columnId, cell] of Object.entries(row.cells)) {
+        result.set(`${tableId}\u001f${row.id}\u001f${columnId}`, cell);
+      }
+    }
+  } catch {
+    // The provider starts calculation asynchronously; source values remain available meanwhile.
+  }
+  return result;
+}
+
+/** Builds evaluated cell maps for every table (used in tests and column fit helpers). */
 export function evaluatedCells(
   session: ReturnType<typeof useWorkbook>["session"],
   snapshot: WorkbookSnapshot,
 ): Map<string, EvaluatedCell> {
   const result = new Map<string, EvaluatedCell>();
   for (const table of snapshot.tables) {
-    try {
-      for (const row of session.getTable(table.name).rows) {
-        for (const [columnId, cell] of Object.entries(row.cells)) {
-          result.set(`${table.id}\u001f${row.id}\u001f${columnId}`, cell);
-        }
-      }
-    } catch {
-      // The provider starts calculation asynchronously; source values remain available meanwhile.
+    for (const [key, cell] of evaluatedCellsForTable(session, table.id, table.name)) {
+      result.set(key, cell);
     }
   }
   return result;
@@ -337,6 +352,7 @@ const SCROLLBAR_GUTTER = 16;
 
 export function CustomSheetCanvas() {
   const { session, activeSheetId } = useWorkbook();
+  const formulaEdit = useFormulaEdit();
   const snapshot = useSnapshot();
   const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
   const sheet = layout.sheets.find((candidate) => candidate.sheetId === activeSheetId);
@@ -423,23 +439,39 @@ export function CustomSheetCanvas() {
       onClick={(event) => {
         const node = event.target as HTMLElement | null;
         if (node?.closest("[data-table-id], #portal, .wk-overlay-editor, .wk-formula-bar, .wk-formula-suggest")) return;
-        if (session.formulaEdit) session.commitFormulaEdit();
+        if (formulaEdit) session.commitFormulaEdit();
         session.setSelection({ kind: "sheet", sheetId: sheet.sheetId });
       }}
     >
       {sheet.bands.map((band) => {
         const table = snapshot.tables.find((candidate) => candidate.id === band.tableId);
         if (!table) return null;
+        const gridVisible = showTableGrid(table, selection);
         return (
-          <section className="wk-table-viewport-card" data-table-id={table.id} key={table.id}>
-            <button
-              type="button"
-              className="wk-table-viewport-title"
-              onClick={() => session.revealTable(table.id)}
-            >
-              {table.name}
-            </button>
-            <TableGrid tableId={table.id} />
+          <section
+            className={
+              table.hidden && !gridVisible
+                ? "wk-table-viewport-card is-table-hidden"
+                : "wk-table-viewport-card"
+            }
+            data-table-id={table.id}
+            key={table.id}
+          >
+            <div className="wk-table-viewport-head">
+              <button
+                type="button"
+                className="wk-table-viewport-title"
+                onClick={() => session.revealTable(table.id)}
+              >
+                {table.name}
+              </button>
+              <TableVisibilityButton
+                tableId={table.id}
+                tableName={table.name}
+                hidden={table.hidden === true}
+              />
+            </div>
+            {gridVisible ? <TableGrid tableId={table.id} /> : null}
           </section>
         );
       })}
@@ -449,11 +481,16 @@ export function CustomSheetCanvas() {
 }
 
 function TableGrid({ tableId }: { tableId: string }) {
-  const { session, setActiveSheetId, formulaEditPlacement } = useWorkbook();
+  const { session, setActiveSheetId, formulaEditPlacement, dataVersion } = useWorkbook();
+  const formulaEdit = useFormulaEdit();
   const snapshot = useSnapshot();
+  const tableName = snapshot.tables.find((table) => table.id === tableId)?.name ?? "";
   const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
   const projection = useMemo(() => projectTable(layout, tableId), [layout, tableId]);
-  const values = useMemo(() => evaluatedCells(session, snapshot), [session, snapshot]);
+  const values = useMemo(
+    () => evaluatedCellsForTable(session, tableId, tableName),
+    [session, tableId, tableName, dataVersion],
+  );
   const fittedColumns = useMemo(
     () => (projection ? fitProjectedColumnWidths(projection, layout, values) : []),
     [layout, projection, values],
@@ -485,8 +522,8 @@ function TableGrid({ tableId }: { tableId: string }) {
   });
   editorHostRef.current.projection = projection;
   editorHostRef.current.layout = layout;
-  const targetCell = session.formulaEdit?.targetCell;
-  const rangeAnchor = session.formulaEdit?.rangeAnchor;
+  const targetCell = formulaEdit?.targetCell;
+  const rangeAnchor = formulaEdit?.rangeAnchor;
   const hostRef = useRef<HTMLDivElement>(null);
   const horizontalScroll = resolveSheetHorizontalScroll(
     snapshot.sheets.find((sheet) => sheet.id === projection?.sheetId)?.horizontalScroll,
@@ -531,7 +568,7 @@ function TableGrid({ tableId }: { tableId: string }) {
   }, [tableId]);
 
   useEffect(() => {
-    if (!projection || overlayOpenRef.current || session.formulaEdit) return;
+    if (!projection || overlayOpenRef.current || formulaEdit) return;
     const revealed = revealSeenRef.current !== session.revealNonce;
     revealSeenRef.current = session.revealNonce;
     const focus = session.gridFocus;
@@ -584,7 +621,7 @@ function TableGrid({ tableId }: { tableId: string }) {
     }
     setGridSelection(rangeGridSelection(near, far));
     editingLocationRef.current = [origin[0], origin[1]];
-  }, [layout, projection, session.formulaEdit, session.gridFocus, session.revealNonce, session.selection, tableId]);
+  }, [layout, projection, formulaEdit, session.gridFocus, session.revealNonce, session.selection, tableId]);
 
   const getCellContent = useCallback(
     (location: Item): GridCell => {
@@ -598,7 +635,7 @@ function TableGrid({ tableId }: { tableId: string }) {
 
   const onGridSelectionChange = useCallback(
     (next: GridSelection) => {
-      if (!projection || overlayOpenRef.current || session.formulaEdit) return;
+      if (!projection || overlayOpenRef.current || formulaEdit) return;
       if (!acceptTableGridSelection(projection, next.current?.cell)) return;
       const active = next.current?.cell;
       if (!active) return;
@@ -663,7 +700,7 @@ function TableGrid({ tableId }: { tableId: string }) {
   const onCellClicked = useCallback(
     (location: Item) => {
       if (!projection) return;
-      if (session.formulaEdit) {
+      if (formulaEdit) {
         if (applyGridPointerToFormulaEdit(session, projection, layout, location[0], location[1], {
           extend: pointingDragRef.current,
         }) === "commit") {
@@ -782,7 +819,7 @@ function TableGrid({ tableId }: { tableId: string }) {
         event.cancel?.();
         return;
       }
-      if (overlayOpenRef.current || session.formulaEdit) return;
+      if (overlayOpenRef.current || formulaEdit) return;
       if (event.altKey) return;
       const direction = arrowNavDirection(event.key);
       if (!direction) return;
@@ -834,8 +871,8 @@ function TableGrid({ tableId }: { tableId: string }) {
       overlayStartModeRef.current = overlayModeForActivation("double-click");
       lastClickWasDoubleRef.current = false;
       const keepPointing =
-        session.formulaEdit &&
-        canPointFromDraft(session.formulaEdit.draft) &&
+        formulaEdit &&
+        canPointFromDraft(formulaEdit.draft) &&
         movement[0] === 0 &&
         movement[1] === 0;
       if (keepPointing) return;
@@ -886,8 +923,8 @@ function TableGrid({ tableId }: { tableId: string }) {
     rangeAnchor && rangeAnchor.tableId === tableId ? rangeAnchor : undefined,
   );
   const formulaMarks =
-    session.formulaEdit && canPointFromDraft(session.formulaEdit.draft)
-      ? formulaRefGridMarks(session.formulaEdit.draft, layout, projection, session.formulaEdit.editCell)
+    formulaEdit && canPointFromDraft(formulaEdit.draft)
+      ? formulaRefGridMarks(formulaEdit.draft, layout, projection, formulaEdit.editCell)
       : [];
   const highlightRegions = [
     ...formulaMarks.map((mark) => ({ color: `${mark.color}48`, range: mark.range })),
@@ -915,14 +952,14 @@ function TableGrid({ tableId }: { tableId: string }) {
         if (projection) {
           const location = gridLocationFromPointer(event.currentTarget, event.clientX, event.clientY, columnWidths, fittedRows);
           cornerPointerRef.current = Boolean(location && isTableCorner(projection, location[0], location[1]));
-          if (cornerPointerRef.current && !session.formulaEdit && !(event.detail >= 2)) {
+          if (cornerPointerRef.current && !formulaEdit && !(event.detail >= 2)) {
             onGridSelectionChange(cellGridSelection(location!));
             event.preventDefault();
             event.stopPropagation();
             return;
           }
         }
-        if (!session.formulaEdit || !projection) return;
+        if (!formulaEdit || !projection) return;
         if ((event.target as HTMLElement | null)?.closest(".wk-overlay-editor-host, .wk-overlay-editor, .wk-formula-bar, .wk-formula-suggest")) {
           return;
         }
@@ -940,7 +977,7 @@ function TableGrid({ tableId }: { tableId: string }) {
         }
       }}
       onPointerMoveCapture={(event) => {
-        if (!pointingDragRef.current || !session.formulaEdit || !projection || event.buttons === 0) return;
+        if (!pointingDragRef.current || !formulaEdit || !projection || event.buttons === 0) return;
         const location = gridLocationFromPointer(event.currentTarget, event.clientX, event.clientY, columnWidths, fittedRows);
         if (!location) return;
         if (applyGridPointerToFormulaEdit(session, projection, layout, location[0], location[1], { extend: true }) === "ignore") {

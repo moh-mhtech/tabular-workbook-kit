@@ -21,7 +21,7 @@ import {
   toggleOverlayNavMode,
 } from "./customGridOverlay.js";
 import { SidePanelPinButton } from "./SidePanelPinButton.js";
-import { useSnapshot, useWorkbook } from "./WorkbookProvider.js";
+import { useFormulaEdit, useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 import { WorkbookInspector } from "./inspectors/WorkbookInspector.js";
 import { SheetInspector } from "./inspectors/SheetInspector.js";
 import { TableInspector } from "./inspectors/TableInspector.js";
@@ -55,6 +55,7 @@ function tryCall(fn: () => void) {
 
 export function PropertiesPanel({ hostInspectors }: { hostInspectors?: HostInspectors }) {
   const { session } = useWorkbook();
+  const formulaEdit = useFormulaEdit();
   const snapshot = useSnapshot();
   const selection = session.selection;
   return (
@@ -64,7 +65,7 @@ export function PropertiesPanel({ hostInspectors }: { hostInspectors?: HostInspe
         <SidePanelPinButton side="properties" label="Properties" />
       </div>
       {selection?.kind === "corner" ? null : <h2>{selectionTitle(selection)}</h2>}
-      {(selection?.kind === "cell" && inspectorRefsAreData(selectedCellRefs(selection))) || session.formulaEdit ? (
+      {(selection?.kind === "cell" && inspectorRefsAreData(selectedCellRefs(selection))) || formulaEdit ? (
         <>
           {selection?.kind === "cell" ? (
             <CellNameField tableId={selection.tableId} rowId={selection.rowId} columnId={selection.columnId} />
@@ -72,7 +73,7 @@ export function PropertiesPanel({ hostInspectors }: { hostInspectors?: HostInspe
           <FormulaField />
         </>
       ) : null}
-      {selection?.kind === "growth" && !session.formulaEdit ? <GrowthValueField /> : null}
+      {selection?.kind === "growth" && !formulaEdit ? <GrowthValueField /> : null}
       {!selection || selection.kind === "workbook" ? (
         <>
           <WorkbookInspector />
@@ -129,9 +130,9 @@ function cellEvaluated(session: ReturnType<typeof useWorkbook>["session"], snaps
 }
 
 function FormulaField() {
-  const { session, version, setActiveSheetId } = useWorkbook();
+  const { session, dataVersion, formulaEditVersion, setActiveSheetId } = useWorkbook();
   const snapshot = useSnapshot();
-  const edit = session.formulaEdit;
+  const edit = useFormulaEdit();
   const selection = session.selection;
   const cellSel = isCellSelection(selection) ? selection : null;
   const refs = selectedCellRefs(selection);
@@ -144,7 +145,7 @@ function FormulaField() {
   const evaluated = refs.length ? sharedOrStar(evaluatedValues) : undefined;
   const errorReason = cellErrorReason(session, snapshot, refs[0]);
   const display = edit?.draft ?? committed;
-  const resetKey = `${refs.map((ref) => `${ref.tableId}:${ref.rowId}:${ref.columnId}`).join(",")}:${version}:${committed}`;
+  const resetKey = `${refs.map((ref) => `${ref.tableId}:${ref.rowId}:${ref.columnId}`).join(",")}:${dataVersion}:${formulaEditVersion}:${committed}`;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -213,7 +214,6 @@ function FormulaField() {
       onCommit={(next, movement) => {
         if (next === "*" && committed === "*") return;
         tryCall(() => {
-          const edit = session.formulaEdit;
           if (edit) {
             const sheet = snapshot.sheets.find((item) => item.tableIds.includes(edit.tableId));
             if (sheet) setActiveSheetId(sheet.id);
@@ -243,7 +243,6 @@ function FormulaField() {
         });
       }}
       onCancel={() => {
-        const edit = session.formulaEdit;
         const sheet = edit ? snapshot.sheets.find((item) => item.tableIds.includes(edit.tableId)) : undefined;
         if (sheet) setActiveSheetId(sheet.id);
         session.cancelFormulaEdit();
@@ -292,6 +291,7 @@ function FormulaDraft({
   onCancel: () => void;
 }) {
   const { session } = useWorkbook();
+  const edit = useFormulaEdit();
   const snapshot = useSnapshot();
   const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
   const [draft, setDraft] = useState(committed);
@@ -300,7 +300,7 @@ function FormulaDraft({
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const caret = areaRef.current?.selectionStart ?? draft.length;
   const suggestions = suggestOpen ? suggestFormula(draft, caret, layout) : [];
-  const mode = session.formulaEdit?.mode ?? "edit";
+  const mode = edit?.mode ?? "edit";
   useEffect(() => {
     setDraft(committed);
   }, [committed, resetKey]);
@@ -313,6 +313,7 @@ function FormulaDraft({
       area.style.height = `${Math.max(area.scrollHeight, 38)}px`;
     };
     fitHeight();
+    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(fitHeight);
     observer.observe(area);
     const field = area.closest(".wk-outlined");
@@ -329,7 +330,6 @@ function FormulaDraft({
   useLayoutEffect(() => {
     const area = areaRef.current;
     if (!area) return;
-    const edit = session.formulaEdit;
     if (edit?.mode === "edit") return;
     const start = edit?.selectionStart ?? pendingCaretRef.current.start;
     const end = edit?.selectionEnd ?? start;
@@ -348,7 +348,7 @@ function FormulaDraft({
   const placeCaretInFormulaText = (event: { target: EventTarget | null }) => {
     if (event.target instanceof Element && event.target.closest(".wk-formula-suggest")) return;
     setSuggestOpen(false);
-    if (session.formulaEdit) session.setFormulaEditMode("edit");
+    if (edit) session.setFormulaEditMode("edit");
     const area = areaRef.current;
     if (area && event.target !== area) area.focus();
   };
@@ -356,7 +356,7 @@ function FormulaDraft({
   return (
     <div className="wk-formula-bar click-outside-ignore" onPointerDown={placeCaretInFormulaText}>
       <OutlinedField label="Value" endLabel={evaluated || undefined}>
-        <FormulaColoredText draft={draft} active={Boolean(session.formulaEdit && canPointFromDraft(draft))} />
+        <FormulaColoredText draft={draft} active={Boolean(edit && canPointFromDraft(draft))} />
         <textarea
           ref={areaRef}
           rows={1}
@@ -365,7 +365,7 @@ function FormulaDraft({
           placeholder={disabled ? "Select a cell" : " "}
           value={draft}
           style={
-            session.formulaEdit && canPointFromDraft(draft)
+            edit && canPointFromDraft(draft)
               ? { color: "transparent", caretColor: "#1e3a5f" }
               : undefined
           }
@@ -380,28 +380,29 @@ function FormulaDraft({
             setSuggestOpen(true);
             setActiveSuggest(0);
             onChange(e.target.value);
-            if (session.formulaEdit) session.syncFormulaEditCursor(e.target.value, start, end);
+            if (edit) session.syncFormulaEditCursor(e.target.value, start, end);
           }}
           onSelect={(e) => {
             const area = e.currentTarget;
             if (applyingCaretRef.current) return;
-            if (session.formulaEdit && area.value !== session.formulaEdit.draft) return;
+            if (edit && area.value !== edit.draft) return;
             const start = area.selectionStart ?? 0;
             const end = area.selectionEnd ?? start;
             pendingCaretRef.current = { start, end };
-            if (session.formulaEdit) session.syncFormulaEditCursor(area.value, start, end);
+            if (edit) session.syncFormulaEditCursor(area.value, start, end);
           }}
           onBlur={() => {
             window.setTimeout(() => {
-              if (!session.formulaEdit) return;
-              if (session.formulaEdit.mode === "point") return;
+              const liveEdit = session.formulaEdit;
+              if (!liveEdit) return;
+              if (liveEdit.mode === "point") return;
               const active = document.activeElement;
               if (active instanceof Element && active.closest(".wk-overlay-editor, .wk-formula-bar, #portal")) return;
-              onCommit(session.formulaEdit.draft);
+              onCommit(liveEdit.draft);
             }, 0);
           }}
           onKeyDown={(e) => {
-            const liveMode = session.formulaEdit?.mode ?? mode;
+            const liveMode = edit?.mode ?? mode;
             const action = formulaKeyAction(liveMode, e, {
               suggestVisible: suggestions.length > 0,
               isFormula: canPointFromDraft(draft),
@@ -439,7 +440,6 @@ function FormulaDraft({
             }
             if (action === "cycle-lock") {
               e.preventDefault();
-              const edit = session.formulaEdit;
               const tableId =
                 edit?.tableId ??
                 (session.selection && "tableId" in session.selection ? session.selection.tableId : undefined);
@@ -453,7 +453,7 @@ function FormulaDraft({
               e.preventDefault();
               const applied = applyFormulaOperator(
                 e.currentTarget.value,
-                session.formulaEdit?.activeFormulaRef ?? null,
+                edit?.activeFormulaRef ?? null,
                 e.currentTarget.selectionStart ?? draft.length,
                 e.currentTarget.selectionEnd ?? draft.length,
                 e.key,
@@ -463,7 +463,6 @@ function FormulaDraft({
               return;
             }
             if (action === "point-cell" || action === "extend-range") {
-              const edit = session.formulaEdit;
               const tableId = edit?.tableId ?? (session.selection && "tableId" in session.selection ? session.selection.tableId : undefined);
               if (!edit || !tableId) return;
               const projection = projectTable(layout, tableId);
@@ -475,8 +474,8 @@ function FormulaDraft({
                 extend: action === "extend-range",
               });
               if (!pointed) return;
-              const next = session.formulaEdit?.draft ?? draft;
-              const span = session.formulaEdit?.activeFormulaRef;
+              const next = edit?.draft ?? draft;
+              const span = edit?.activeFormulaRef;
               applyDraft(next, span?.end ?? next.length);
               return;
             }

@@ -115,7 +115,9 @@ describe("grid formatting UI", () => {
     });
     expect(session.getSnapshot().tables[0]!.rows[0]!.cells.Value!.style?.fillColor).toBe("#ffcc00");
     expect(readGridCell().themeOverride?.bgCell).toBe("#ffcc00");
-    expect(fillBtn.querySelector("rect")?.getAttribute("fill")).toBe("#ffcc00");
+    expect((fillBtn.querySelector(".wk-color-icon-bar") as HTMLElement | null)?.style.backgroundColor).toBe(
+      "rgb(255, 204, 0)",
+    );
 
     const textBtn = screen.getByRole("button", { name: "Text color" });
     await act(async () => {
@@ -126,7 +128,9 @@ describe("grid formatting UI", () => {
       fireEvent.change(text, { target: { value: "#112233" } });
     });
     expect(readGridCell().themeOverride?.textDark).toBe("#112233");
-    expect(textBtn.querySelector("rect")?.getAttribute("fill")).toBe("#112233");
+    expect((textBtn.querySelector(".wk-color-icon-bar") as HTMLElement | null)?.style.backgroundColor).toBe(
+      "rgb(17, 34, 51)",
+    );
 
     const fontSize = screen.getByLabelText("Font size") as HTMLInputElement;
     expect(fontSize.type).toBe("number");

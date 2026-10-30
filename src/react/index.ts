@@ -1,4 +1,4 @@
-export { WorkbookProvider, useWorkbook, useSnapshot } from "./WorkbookProvider.js";
+export { WorkbookProvider, useWorkbook, useSnapshot, useFormulaEdit } from "./WorkbookProvider.js";
 export {
   Explorer,
   FormulaBar,
@@ -15,6 +15,12 @@ export {
   type UiCaptureMetrics,
   type UiCaptureScenarioId,
 } from "./uiCaptureScenarios.js";
+export {
+  measureUiPerfScenario,
+  runUiPerfScenario,
+  type UiPerfMetrics,
+  type UiPerfScenarioId,
+} from "./uiPerfScenarios.js";
 export { WkSettingsIcon } from "./icons.js";
 export { PropertiesPanel } from "./PropertiesPanel.js";
 export type { HostInspectors } from "./PropertiesPanel.js";

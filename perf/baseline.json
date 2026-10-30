@@ -1,0 +1,9 @@
+{
+  "sample": {
+    "getSnapshotMs": 12,
+    "recalculateMs": 450,
+    "evaluatedCellsAllMs": 35,
+    "evaluatedCellsOneTableMs": 12,
+    "cellCommitRecalcMs": 500
+  }
+}

@@ -46,6 +46,7 @@ export type { GridExpansion, SheetView, TableBand } from "./model/sheetView.js";
 export { buildPeriods, formatValue, parseMonthId } from "./model/calendar.js";
 export { compileFormula } from "./formula/compile.js";
 export { WorkbookSession } from "./session/WorkbookSession.js";
+export type { SessionChange } from "./session/WorkbookSession.js";
 export { HyperFormulaEngine } from "./engine/hyperformula.js";
 export type { HyperFormulaEngineOptions } from "./engine/hyperformula.js";
 export type { FormulaEngine } from "./engine/types.js";

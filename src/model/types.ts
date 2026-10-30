@@ -61,6 +61,8 @@ export interface TableSnapshot {
   columnFormats?: Record<string, string>;
   /** Styles for period (or other non-attribute) columns. */
   columnStyles?: Record<string, CellStyle>;
+  /** When true, the sheet shows only the table title until the user shows the table again. */
+  hidden?: boolean;
 }
 
 export type SheetHorizontalScroll = "table" | "sheet";

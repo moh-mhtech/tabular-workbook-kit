@@ -23,12 +23,14 @@ export interface HyperFormulaEngineOptions {
 /**
  * Headless FormulaEngine backed by HyperFormula.
  *
- * The prototype defaults to HyperFormula's explicit GPLv3 license token.
- * Production/proprietary hosts must pass their commercial key in the
- * constructor or expose it as HYPERFORMULA_LICENSE_KEY.
+ * Keeps a live engine instance and patches cell contents when workbook structure
+ * is unchanged; rebuilds when sheet layout or band geometry changes.
  */
 export class HyperFormulaEngine implements FormulaEngine {
   private readonly licenseKey: string;
+  private hf: HyperFormula | null = null;
+  private structureKey = "";
+  private cellCache = new Map<string, RawCellContent>();
 
   constructor(options: HyperFormulaEngineOptions = {}) {
     this.licenseKey = options.licenseKey ?? environmentLicenseKey() ?? "gpl-v3";
@@ -37,10 +39,28 @@ export class HyperFormulaEngine implements FormulaEngine {
   evaluate(snapshot: WorkbookSnapshot): Record<string, SheetGrid> {
     const layout = layoutWorkbook(snapshot);
     const sheets = buildSheets(snapshot, layout);
+    const nextStructureKey = structureFingerprint(layout);
     const namedExpressions = buildNamedExpressions(layout);
-    let engine: HyperFormula;
+
+    if (!this.hf || nextStructureKey !== this.structureKey) {
+      this.rebuildEngine(sheets, namedExpressions);
+      this.structureKey = nextStructureKey;
+      this.seedCellCache(sheets);
+    } else {
+      this.patchEngine(sheets);
+    }
+
+    return this.readAllSheetValues(layout);
+  }
+
+  private rebuildEngine(
+    sheets: Record<string, RawCellContent[][]>,
+    namedExpressions: { name: string; expression: string }[],
+  ) {
+    this.hf?.destroy();
+    this.cellCache.clear();
     try {
-      engine = HyperFormula.buildFromSheets(
+      this.hf = HyperFormula.buildFromSheets(
         sheets,
         {
           licenseKey: this.licenseKey,
@@ -49,34 +69,90 @@ export class HyperFormulaEngine implements FormulaEngine {
         namedExpressions,
       );
     } catch {
-      engine = HyperFormula.buildFromSheets(sheets, {
+      this.hf = HyperFormula.buildFromSheets(sheets, {
         licenseKey: this.licenseKey,
         smartRounding: false,
       });
     }
+  }
 
-    try {
-      const values: Record<string, SheetGrid> = {};
-      for (const view of layout.sheets) {
-        const size = engineSheetSize(layout, view.sheetId);
-        const sheetId = engine.getSheetId(view.sheetName);
-        const grid: SheetGrid = Array.from({ length: size.rowCount }, () =>
-          Array<string | number | boolean | null>(size.colCount).fill(null),
-        );
-        if (sheetId !== undefined) {
-          for (let row = 0; row < size.rowCount; row++) {
-            for (let col = 0; col < size.colCount; col++) {
-              grid[row][col] = normalize(engine.getCellValue({ sheet: sheetId, row, col }));
-            }
-          }
+  private seedCellCache(sheets: Record<string, RawCellContent[][]>) {
+    for (const [sheetName, grid] of Object.entries(sheets)) {
+      for (let row = 0; row < grid.length; row++) {
+        const line = grid[row]!;
+        for (let col = 0; col < line.length; col++) {
+          this.cellCache.set(cellCacheKey(sheetName, row, col), line[col] ?? null);
         }
-        values[view.sheetName] = grid;
       }
-      return values;
-    } finally {
-      engine.destroy();
     }
   }
+
+  private patchEngine(sheets: Record<string, RawCellContent[][]>) {
+    const engine = this.hf;
+    if (!engine) return;
+    for (const [sheetName, grid] of Object.entries(sheets)) {
+      const sheetId = engine.getSheetId(sheetName);
+      if (sheetId === undefined) continue;
+      for (let row = 0; row < grid.length; row++) {
+        const line = grid[row]!;
+        for (let col = 0; col < line.length; col++) {
+          const content = line[col] ?? null;
+          const key = cellCacheKey(sheetName, row, col);
+          if (cellContentEqual(this.cellCache.get(key), content)) continue;
+          engine.setCellContents({ sheet: sheetId, row, col }, [[content]]);
+          this.cellCache.set(key, content);
+        }
+      }
+    }
+  }
+
+  private readAllSheetValues(layout: WorkbookLayout): Record<string, SheetGrid> {
+    const engine = this.hf;
+    if (!engine) return {};
+    const values: Record<string, SheetGrid> = {};
+    for (const view of layout.sheets) {
+      const size = engineSheetSize(layout, view.sheetId);
+      const sheetId = engine.getSheetId(view.sheetName);
+      const grid: SheetGrid = Array.from({ length: size.rowCount }, () =>
+        Array<string | number | boolean | null>(size.colCount).fill(null),
+      );
+      if (sheetId !== undefined) {
+        for (let row = 0; row < size.rowCount; row++) {
+          for (let col = 0; col < size.colCount; col++) {
+            grid[row][col] = normalize(engine.getCellValue({ sheet: sheetId, row, col }));
+          }
+        }
+      }
+      values[view.sheetName] = grid;
+    }
+    return values;
+  }
+}
+
+function structureFingerprint(layout: WorkbookLayout): string {
+  const promoted = promotedNames(layout.snapshot)
+    .map((item) => item.name)
+    .sort()
+    .join("\u001f");
+  const sheets = layout.sheets
+    .map((view) => {
+      const size = engineSheetSize(layout, view.sheetId);
+      const bands = view.bands.map((band) => `${band.tableId}@${band.originRow},${band.originCol}`).join(";");
+      const loose = Object.keys(view.looseCells ?? {}).sort().join(",");
+      return `${view.sheetName}:${size.rowCount}x${size.colCount}:${bands}:${loose}`;
+    })
+    .join("|");
+  return `${sheets}|names:${promoted}`;
+}
+
+function cellCacheKey(sheetName: string, row: number, col: number): string {
+  return `${sheetName}\u001f${row}\u001f${col}`;
+}
+
+function cellContentEqual(a: RawCellContent | undefined, b: RawCellContent): boolean {
+  if (a === b) return true;
+  if (a === undefined) return b === null || b === "";
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function buildSheets(snapshot: WorkbookSnapshot, layout: WorkbookLayout): Record<string, RawCellContent[][]> {

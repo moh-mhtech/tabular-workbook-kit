@@ -7,11 +7,22 @@ export type UiPerfScenarioId = "perf-cell-edit-budget";
 
 export type UiPerfMetrics = {
   scenario: UiPerfScenarioId;
-  /** Session-only: one writeCell + await recalculate (ms). */
+  /** Session-only: one writeCell through emit (ms until data notification). */
   commitRecalcMs: number;
   /** Session-only: twenty formula-edit cursor syncs (ms total). */
   formulaEditCursorMs: number;
 };
+
+function waitForDataNotification(session: WorkbookSession): Promise<void> {
+  return new Promise((resolve) => {
+    const unsub = session.subscribe((change) => {
+      if (!change?.viewOnly && !change?.formulaEditOnly) {
+        unsub();
+        resolve();
+      }
+    });
+  });
+}
 
 function selectInputCell(session: WorkbookSession, tableName: string, rowKey: string, columnId: string): void {
   const snapshot = session.getSnapshot();
@@ -67,8 +78,9 @@ export async function measureUiPerfScenario(session: WorkbookSession, scenario: 
   session.cancelFormulaEdit();
 
   const commitStart = performance.now();
+  const wait = waitForDataNotification(session);
   session.writeCell("Omsætning", cell.rowKey, cell.columnId, "42");
-  await session.recalculate();
+  await wait;
   const commitRecalcMs = performance.now() - commitStart;
 
   return { scenario, commitRecalcMs, formulaEditCursorMs };

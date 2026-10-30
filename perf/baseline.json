@@ -1,9 +1,30 @@
 {
+  "baselineVersion": 1,
   "sample": {
-    "getSnapshotMs": 12,
-    "recalculateMs": 450,
-    "evaluatedCellsAllMs": 35,
-    "evaluatedCellsOneTableMs": 12,
-    "cellCommitRecalcMs": 500
+    "getSnapshotMs": 1,
+    "recalculateMs": 7,
+    "evaluatedCellsAllMs": 2,
+    "evaluatedCellsOneTableMs": 1,
+    "cellCommitRecalcMs": 9
+  },
+  "budget": {
+    "getSnapshotMs": 3,
+    "recalculateMs": 49,
+    "evaluatedCellsAllMs": 5,
+    "evaluatedCellsOneTableMs": 1,
+    "cellCommitEmitMs": 78,
+    "firstCommitRecalcMs": 78,
+    "secondCommitRecalcMs": 73,
+    "evalScalingRatioMax": 0.35,
+    "maintainFullMs": 4000,
+    "maintainScopedMs": 1500
+  },
+  "ui": {
+    "budget": {
+      "formulaEditCursorMs": 16,
+      "commitRecalcMs": 3000,
+      "keystrokeToPaintMs": 150,
+      "enterToDisplayMs": 800
+    }
   }
 }

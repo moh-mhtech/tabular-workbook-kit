@@ -10,11 +10,14 @@
     "./postgres": "./src/persist/postgres/index.ts",
     "./pglite": "./src/persist/pglite/index.ts",
     "./testing": "./src/react/canvasTest.tsx",
-    "./sample": "./sample/createSampleWorkbook.ts"
+    "./sample": "./sample/createSampleWorkbook.ts",
+    "./sample/budget-perf": "./sample/loadBudgetPerfFixture.ts",
+    "./perf": "./src/perf/readBaseline.ts"
   },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "perf:baseline:update": "vitest run --config vitest.perf-update.config.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

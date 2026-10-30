@@ -7,6 +7,13 @@ export const MIN_PROPERTIES_WIDTH = 180;
 export const MIN_CANVAS_WIDTH = 280;
 export const COLUMN_RESIZER_WIDTH = 6;
 
+export const COLUMN_RESIZE_BODY_CLASS = "wk-column-resize-active";
+
+function setColumnResizeActive(active: boolean) {
+  if (typeof document === "undefined") return;
+  document.body.classList.toggle(COLUMN_RESIZE_BODY_CLASS, active);
+}
+
 export function clampColumnWidth(width: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(width)));
 }
@@ -50,6 +57,7 @@ export function useViewportWidth(): number {
 }
 
 export function ColumnResizeHandle({
+  className,
   label,
   value,
   min,
@@ -59,6 +67,7 @@ export function ColumnResizeHandle({
   onChange,
   onDragChange,
 }: {
+  className?: string;
   label: string;
   value: number;
   min: number;
@@ -71,6 +80,7 @@ export function ColumnResizeHandle({
   const drag = useRef<{ x: number; width: number } | null>(null);
   const live = useRef({ invert, min, max, onChange, onDragChange });
   live.current = { invert, min, max, onChange, onDragChange };
+  const detachWindowRef = useRef<(() => void) | null>(null);
   const [dragging, setDragging] = useState(false);
 
   const applyDelta = (deltaX: number, origin: number) => {
@@ -78,45 +88,76 @@ export function ColumnResizeHandle({
     setWidth(clampColumnWidth(origin + (flipped ? -deltaX : deltaX), low, high));
   };
 
-  useEffect(() => {
-    if (!dragging) return;
-    const onMove = (event: globalThis.PointerEvent) => {
-      if (!drag.current) return;
-      applyDelta(event.clientX - drag.current.x, drag.current.width);
-    };
-    const onUp = () => {
-      drag.current = null;
-      setDragging(false);
-      live.current.onDragChange?.(false);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-    };
-  }, [dragging]);
+  const stopWindowDrag = () => {
+    detachWindowRef.current?.();
+    detachWindowRef.current = null;
+  };
+
+  const finishDrag = (target: HTMLDivElement, pointerId: number) => {
+    try {
+      if (target.hasPointerCapture(pointerId)) {
+        target.releasePointerCapture(pointerId);
+      }
+    } catch {
+      /* unsupported in some environments */
+    }
+    stopWindowDrag();
+    drag.current = null;
+    setDragging(false);
+    setColumnResizeActive(false);
+    live.current.onDragChange?.(false);
+  };
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+    if ((event.button ?? 0) !== 0) return;
     event.preventDefault();
-    drag.current = { x: event.clientX, width: value };
+    event.stopPropagation();
+    const target = event.currentTarget;
+    try {
+      target.setPointerCapture(event.pointerId);
+    } catch {
+      /* unsupported in some environments */
+    }
+    const startX = typeof event.clientX === "number" && Number.isFinite(event.clientX) ? event.clientX : 0;
+    drag.current = { x: startX, width: value };
     setDragging(true);
+    setColumnResizeActive(true);
     onDragChange?.(true);
+
+    const onMove = (moveEvent: globalThis.PointerEvent) => {
+      moveEvent.preventDefault();
+      if (!drag.current) return;
+      const x = typeof moveEvent.clientX === "number" && Number.isFinite(moveEvent.clientX) ? moveEvent.clientX : drag.current.x;
+      applyDelta(x - drag.current.x, drag.current.width);
+    };
+    const onUp = (upEvent: globalThis.PointerEvent) => {
+      upEvent.preventDefault();
+      finishDrag(target, upEvent.pointerId);
+    };
+
+    stopWindowDrag();
+    const moveOpts = { passive: false } as const;
+    window.addEventListener("pointermove", onMove, moveOpts);
+    window.addEventListener("pointerup", onUp, moveOpts);
+    window.addEventListener("pointercancel", onUp, moveOpts);
+    detachWindowRef.current = () => {
+      window.removeEventListener("pointermove", onMove, moveOpts);
+      window.removeEventListener("pointerup", onUp, moveOpts);
+      window.removeEventListener("pointercancel", onUp, moveOpts);
+    };
   };
+
+  useEffect(() => {
+    return () => {
+      stopWindowDrag();
+      setColumnResizeActive(false);
+    };
+  }, []);
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!drag.current) return;
-    applyDelta(event.clientX - drag.current.x, drag.current.width);
-  };
-
-  const endDrag = () => {
-    if (!drag.current && !dragging) return;
-    drag.current = null;
-    setDragging(false);
-    onDragChange?.(false);
+    const x = typeof event.clientX === "number" && Number.isFinite(event.clientX) ? event.clientX : drag.current.x;
+    applyDelta(x - drag.current.x, drag.current.width);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -146,11 +187,15 @@ export function ColumnResizeHandle({
       aria-valuemax={max}
       tabIndex={0}
       title="Drag to resize"
-      className={dragging ? "wk-col-resizer is-active" : "wk-col-resizer"}
+      className={
+        dragging
+          ? `wk-col-resizer is-active${className ? ` ${className}` : ""}`
+          : `wk-col-resizer${className ? ` ${className}` : ""}`
+      }
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
+      onPointerUp={(event) => finishDrag(event.currentTarget, event.pointerId)}
+      onPointerCancel={(event) => finishDrag(event.currentTarget, event.pointerId)}
       onDoubleClick={() => onChange(defaultValue)}
       onKeyDown={onKeyDown}
     />

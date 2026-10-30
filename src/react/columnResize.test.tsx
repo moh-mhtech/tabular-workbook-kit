@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { useState } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   COLUMN_RESIZER_WIDTH,
   ColumnResizeHandle,
@@ -14,6 +14,16 @@ import {
 } from "./columnResize.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+beforeEach(() => {
+  if (!HTMLElement.prototype.setPointerCapture) {
+    HTMLElement.prototype.setPointerCapture = function () {};
+    HTMLElement.prototype.releasePointerCapture = function () {};
+    HTMLElement.prototype.hasPointerCapture = function () {
+      return false;
+    };
+  }
+});
 
 afterEach(() => cleanup());
 
@@ -77,5 +87,24 @@ describe("ColumnResizeHandle", () => {
     expect(screen.getByTestId("width").textContent).toBe("400");
     fireEvent.doubleClick(handle);
     expect(screen.getByTestId("width").textContent).toBe("200");
+  });
+
+  it("widens from the window pointermove listener attached on pointerdown", () => {
+    render(<Host />);
+    const handle = screen.getByRole("separator", { name: "Resize explorer" });
+    const spy = vi.spyOn(window, "addEventListener");
+    act(() => {
+      const down = new Event("pointerdown", { bubbles: true }) as PointerEvent;
+      Object.assign(down, { button: 0, clientX: 100, pointerId: 1 });
+      handle.dispatchEvent(down);
+    });
+    const moveCall = spy.mock.calls.find((call) => call[0] === "pointermove");
+    expect(moveCall).toBeTruthy();
+    const onMove = moveCall![1] as (event: { clientX: number }) => void;
+    act(() => {
+      onMove({ clientX: 132 });
+    });
+    expect(screen.getByTestId("width").textContent).toBe("232");
+    spy.mockRestore();
   });
 });

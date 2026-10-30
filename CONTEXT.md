@@ -116,6 +116,30 @@ _Avoid_: Spill, insert copied cells
 Repeating a Cell’s Input or Formula into adjacent Cells via the fill handle. Distinct from Auto-expansion, which adds rows or columns.
 _Avoid_: Autofill (when you mean Growth), flash fill
 
+**Total row**:
+An optional structural row immediately above the Growth row. Its Cells are Computed from the data rows in each column; they are referenceable in Formulas but not Inputs and not Scenario overlays. Default row key `Total` (renameable like any Row key). When enabled, adding a data row moves the Total row down so it stays above Growth.
+_Avoid_: Subtotal row (manual formulas), Grain total (that is time rollup on one row)
+
+**Total column**:
+An optional structural column immediately left of the Growth column. Its Cells are Computed from the data columns in each row; they are referenceable but not Inputs or overlays. Default header `Total` (renameable like any attribute header). Key-value Tables do not use a Total column.
+_Avoid_: Running balance column, manual SUM column
+
+**Table corner total**:
+The Cell where Total row meets Total column when both are enabled. Same Total aggregation over the data rectangle. Referenceable like any other total Cell (e.g. row key and header both `Total`).
+_Avoid_: Table corner (selection), Grain total
+
+**Total aggregation**:
+How Total row, Total column, and Table corner total Computed values are derived from included data Cells. **Empty** means Blank. **Numeric** means a number Computed value. **Non-numeric** means text or boolean. Evaluate in order (first match wins): (1) any included Cell is Error → Error; (2) all included Cells are empty or non-numeric → Blank; (3) all included Cells are numeric or empty → Calculate (sum numerics; Blank counts as zero); (4) otherwise → Error. Text-only attribute columns are out of scope for numeric totals (those total Cells stay Blank).
+_Avoid_: Grain total, lenient sum, partial sum when text is present
+
+**Total default style**:
+Total row and Total column Cells are bold by default. **Cell style** and **Column format** apply like any other Cell; Clear formatting removes overrides.
+_Avoid_: Locked formatting, theme-only totals
+
+**Total range**:
+Optional row-key or column-header filter when enabling Total row or Total column. Blank means every data row or column in scope. A single key or header name, a comma-separated list, or an inclusive `From:To` range on the table’s row-key or header order. Only included indexes contribute to Total aggregation; excluded Cells are ignored as if absent.
+_Avoid_: A1 range, partial column by period id
+
 ### Cells
 
 **Cell**:

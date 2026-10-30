@@ -9,8 +9,10 @@ import {
 } from "../model/layout.js";
 import { canRegisterDefinedName, promotedNames } from "../model/names.js";
 import { parseLooseCellKey, type Primitive, type WorkbookSnapshot } from "../model/types.js";
+import { applyTotalPatches, collectTotalCellPatches } from "./applyTableTotals.js";
 import { effectiveCell } from "./compileWorkbook.js";
 import type { FormulaEngine, SheetGrid } from "./types.js";
+import { isTotalRowId, TOTAL_COLUMN_ID } from "../model/tableTotals.js";
 
 export interface HyperFormulaEngineOptions {
   /**
@@ -60,7 +62,31 @@ export class HyperFormulaEngine implements FormulaEngine {
       this.patchEngine(sheets);
     }
 
-    return this.readAllSheetValues(layout);
+    let values = this.readAllSheetValues(layout);
+    return this.reconcileTableTotals(snapshot, layout, values);
+  }
+
+  private reconcileTableTotals(
+    snapshot: WorkbookSnapshot,
+    layout: WorkbookLayout,
+    values: Record<string, SheetGrid>,
+  ): Record<string, SheetGrid> {
+    const engine = this.hf;
+    if (!engine) return values;
+    for (let pass = 0; pass < 2; pass++) {
+      const patches = collectTotalCellPatches(snapshot, layout, values);
+      if (!applyTotalPatches(values, patches)) break;
+      for (const patch of patches) {
+        const sheetId = engine.getSheetId(patch.sheetName);
+        if (sheetId === undefined) continue;
+        const content = patch.value === null ? null : patch.value;
+        engine.setCellContents({ sheet: sheetId, row: patch.row, col: patch.col }, [[content]]);
+        this.cellCache.set(cellCacheKey(patch.sheetName, patch.row, patch.col), content);
+        this.dirtyValueSheets.add(patch.sheetName);
+      }
+      values = this.readAllSheetValues(layout);
+    }
+    return values;
   }
 
   private rebuildEngine(
@@ -218,6 +244,10 @@ function buildSheets(snapshot: WorkbookSnapshot, layout: WorkbookLayout): Record
         grid[row.rowIndex][table.columns[0].colIndex] = row.key;
         for (const col of table.columns) {
           if (col.kind === "key") continue;
+          if (isTotalRowId(row.id) || col.id === TOTAL_COLUMN_ID) {
+            grid[row.rowIndex][col.colIndex] = null;
+            continue;
+          }
           const effective = effectiveCell(snapshot, table.table.id, row.id, col.id);
           grid[row.rowIndex][col.colIndex] =
             effective.kind === "formula" && effective.formula

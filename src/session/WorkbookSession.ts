@@ -36,6 +36,7 @@ import {
   type TableBand,
 } from "../model/sheetView.js";
 import {
+  bandCellKey,
   KEY_COLUMN_ID,
   looseCellKey,
   overlayKey,
@@ -53,6 +54,15 @@ import {
   type WorkbookSnapshot,
 } from "../model/types.js";
 import { looksLikeFormula } from "../formula/compile.js";
+import {
+  isTotalColumnId,
+  isTotalRowId,
+  resolveTotalsRange,
+  tableHasTotalsColumn,
+  tableHasTotalsRow,
+  totalRowKey,
+  TOTAL_ROW_ID,
+} from "../model/tableTotals.js";
 import {
   calendarCoveringYear,
   defaultYearColumn,
@@ -568,23 +578,30 @@ export class WorkbookSession {
         periodIds: c.periodId ? [c.periodId] : [],
       }));
 
-    const rows = tableLayout.table.rows.map((row) => {
+    const rows = tableLayout.rows.map((laidRow) => {
       const cells: Record<string, EvaluatedCell> = {};
       for (const col of tableLayout.columns) {
         if (col.kind === "key") continue;
-        const laid = tableLayout.rows.find((r) => r.id === row.id);
-        const effective = effectiveCell(this.snapshot, tableLayout.table.id, row.id, col.id);
         let computed: Primitive = null;
         let error: string | undefined;
-        if (laid) {
-          const raw = readComputed(values, tableLayout.sheetName, laid.rowIndex, col.colIndex);
-          if (typeof raw === "string" && raw.startsWith("#")) {
-            error = raw;
-            computed = raw;
-          } else {
-            computed = normalizeComputed(raw);
-          }
+        const raw = readComputed(values, tableLayout.sheetName, laidRow.rowIndex, col.colIndex);
+        if (typeof raw === "string" && raw.startsWith("#")) {
+          error = raw;
+          computed = raw;
+        } else {
+          computed = normalizeComputed(raw);
         }
+        if (isTotalRowId(laidRow.id) || isTotalColumnId(col.id)) {
+          cells[col.id] = {
+            kind: "formula",
+            input: null,
+            overlay: false,
+            computed,
+            error,
+          };
+          continue;
+        }
+        const effective = effectiveCell(this.snapshot, tableLayout.table.id, laidRow.id, col.id);
         cells[col.id] = {
           kind: effective.kind,
           formula: effective.formula,
@@ -594,7 +611,7 @@ export class WorkbookSession {
           error,
         };
       }
-      return { id: row.id, key: row.key, cells };
+      return { id: laidRow.id, key: laidRow.key, cells };
     });
 
     if (grain === "month" || !hasTimeColumns(tableLayout.table)) {
@@ -984,6 +1001,21 @@ export class WorkbookSession {
 
   renameRow(tableIdOrName: string, rowIdOrKey: string, key: string) {
     const table = requireTable(this.snapshot, tableIdOrName);
+    if (isTotalRowId(rowIdOrKey) || (tableHasTotalsRow(table) && rowIdOrKey === totalRowKey(table))) {
+      const next = key.trim();
+      if (!next) throw new Error("Row key cannot be empty.");
+      if (table.rows.some((r) => r.key.toLowerCase() === next.toLowerCase())) {
+        throw new Error(`Row key "${next}" is already used.`);
+      }
+      this.checkpoint();
+      const previous = totalRowKey(table);
+      table.totalRowKey = next;
+      rewriteFormulas(this.snapshot, (formula) =>
+        rewriteRowKey(formula, table.name, previous, next, false),
+      );
+      this.emit();
+      return;
+    }
     const row = table.rows.find((r) => r.id === rowIdOrKey || r.key === rowIdOrKey);
     if (!row) throw new Error(`Unknown row "${rowIdOrKey}"`);
     const next = table.promoteRowKeys
@@ -1172,6 +1204,52 @@ export class WorkbookSession {
     this.emit({ recalculate: false, viewOnly: true, persistSnapshot: true });
   }
 
+  setTableTotalsRow(tableId: string, enabled: boolean) {
+    const table = requireTable(this.snapshot, tableId);
+    if (table.promoteRowKeys) throw new Error("Key-value tables cannot use a total row.");
+    if (Boolean(table.totalsRow) === enabled) return;
+    const key = totalRowKey(table);
+    if (enabled && table.rows.some((r) => r.key.toLowerCase() === key.toLowerCase())) {
+      throw new Error(`Row key "${key}" is already used. Rename or remove that row first.`);
+    }
+    this.checkpoint();
+    table.totalsRow = enabled;
+    this.emit();
+  }
+
+  setTableTotalsColumn(tableId: string, enabled: boolean) {
+    const table = requireTable(this.snapshot, tableId);
+    if (table.promoteRowKeys) throw new Error("Key-value tables cannot use a total column.");
+    if (Boolean(table.totalsColumn) === enabled) return;
+    this.checkpoint();
+    table.totalsColumn = enabled;
+    this.emit();
+  }
+
+  setTableTotalsRowRange(tableId: string, range: string) {
+    const table = requireTable(this.snapshot, tableId);
+    if (!table.totalsRow) throw new Error("Total row is not enabled.");
+    const labels = table.rows.map((row) => row.key);
+    resolveTotalsRange(range, labels);
+    this.checkpoint();
+    table.totalsRowRange = range.trim() || undefined;
+    this.emit();
+  }
+
+  setTableTotalsColumnRange(tableId: string, range: string) {
+    const table = requireTable(this.snapshot, tableId);
+    if (!table.totalsColumn) throw new Error("Total column is not enabled.");
+    const layout = layoutWorkbook(this.snapshot).tables.get(table.id);
+    if (!layout) throw new Error("Unknown table layout.");
+    const labels = layout.columns
+      .filter((col) => col.kind !== "key" && !isTotalColumnId(col.id))
+      .map((col) => col.name);
+    resolveTotalsRange(range, labels);
+    this.checkpoint();
+    table.totalsColumnRange = range.trim() || undefined;
+    this.emit();
+  }
+
   toggleTableHidden(tableId: string) {
     const table = requireTable(this.snapshot, tableId);
     table.hidden = !table.hidden;
@@ -1345,6 +1423,7 @@ export class WorkbookSession {
   }
 
   setCellFormat(tableIdOrName: string, rowIdOrKey: string, columnId: string, pattern: string) {
+    if (this.trySetBandCellFormat(tableIdOrName, rowIdOrKey, columnId, pattern)) return;
     const { table, row } = this.findCell(tableIdOrName, rowIdOrKey, columnId);
     const next = pattern.trim();
     const ids = writePeriodIds(table, columnId, buildPeriods(this.snapshot.calendar));
@@ -1376,6 +1455,7 @@ export class WorkbookSession {
   }
 
   setCellStyle(tableIdOrName: string, rowIdOrKey: string, columnId: string, patch: CellStyle) {
+    if (this.trySetBandCellStyle(tableIdOrName, rowIdOrKey, columnId, patch)) return;
     const { table, row } = this.findCell(tableIdOrName, rowIdOrKey, columnId);
     const ids = writePeriodIds(table, columnId, buildPeriods(this.snapshot.calendar));
     this.checkpoint();
@@ -1389,14 +1469,108 @@ export class WorkbookSession {
     this.emit({ recalculate: false });
   }
 
+  private trySetBandCellStyle(
+    tableIdOrName: string,
+    rowIdOrKey: string,
+    columnId: string,
+    patch: CellStyle,
+  ): boolean {
+    const table = requireTable(this.snapshot, tableIdOrName);
+    const rowId = this.resolveRowId(table, rowIdOrKey);
+    if (!rowId) return false;
+    const layout = layoutWorkbook(this.snapshot).tables.get(table.id);
+    const colId =
+      columnId === KEY_COLUMN_ID
+        ? KEY_COLUMN_ID
+        : layout?.columns.find(
+            (c) =>
+              c.id === columnId ||
+              c.name.toLowerCase() === columnId.toLowerCase() ||
+              c.periodId === columnId,
+          )?.id ?? columnId;
+    const isBand =
+      columnId === KEY_COLUMN_ID ||
+      (tableHasTotalsRow(table) && isTotalRowId(rowId) && colId !== KEY_COLUMN_ID) ||
+      (tableHasTotalsColumn(table) && isTotalColumnId(colId) && !isTotalRowId(rowId));
+    if (!isBand) return false;
+    this.checkpoint();
+    table.bandCellStyles ??= {};
+    const key = bandCellKey(rowId, colId);
+    const next = mergeStyle(table.bandCellStyles[key], patch);
+    if (next) table.bandCellStyles[key] = next;
+    else delete table.bandCellStyles[key];
+    this.emit({ recalculate: false });
+    return true;
+  }
+
+  private trySetBandCellFormat(
+    tableIdOrName: string,
+    rowIdOrKey: string,
+    columnId: string,
+    pattern: string,
+  ): boolean {
+    const table = requireTable(this.snapshot, tableIdOrName);
+    const rowId = this.resolveRowId(table, rowIdOrKey);
+    if (!rowId) return false;
+    const layout = layoutWorkbook(this.snapshot).tables.get(table.id);
+    const colId =
+      columnId === KEY_COLUMN_ID
+        ? KEY_COLUMN_ID
+        : layout?.columns.find(
+            (c) =>
+              c.id === columnId ||
+              c.name.toLowerCase() === columnId.toLowerCase() ||
+              c.periodId === columnId,
+          )?.id ?? columnId;
+    const isBand =
+      columnId === KEY_COLUMN_ID ||
+      (tableHasTotalsRow(table) && isTotalRowId(rowId)) ||
+      (tableHasTotalsColumn(table) && isTotalColumnId(colId) && !isTotalRowId(rowId));
+    if (!isBand) return false;
+    this.checkpoint();
+    table.bandCellFormats ??= {};
+    const key = bandCellKey(rowId, colId);
+    const next = pattern.trim();
+    if (next) table.bandCellFormats[key] = next;
+    else delete table.bandCellFormats[key];
+    this.emit({ recalculate: false });
+    return true;
+  }
+
+  private resolveRowId(table: TableSnapshot, rowIdOrKey: string): string | null {
+    const row = table.rows.find((r) => r.id === rowIdOrKey || r.key === rowIdOrKey);
+    if (row) return row.id;
+    if (tableHasTotalsRow(table) && (rowIdOrKey === totalRowKey(table) || rowIdOrKey === TOTAL_ROW_ID)) {
+      return TOTAL_ROW_ID;
+    }
+    return null;
+  }
+
   private findCell(tableName: string, rowKey: string, columnId: string) {
     const table = this.snapshot.tables.find(
       (t) => t.name.toLowerCase() === tableName.toLowerCase() || t.id === tableName,
     );
     if (!table) throw new Error(`Unknown table "${tableName}"`);
+    if (
+      tableHasTotalsRow(table) &&
+      (rowKey === totalRowKey(table) || rowKey === TOTAL_ROW_ID) &&
+      columnId !== KEY_COLUMN_ID
+    ) {
+      throw new Error("Total row cells are computed and cannot be edited.");
+    }
+    const layout = layoutWorkbook(this.snapshot).tables.get(table.id);
+    const colIdResolved =
+      layout?.columns.find(
+        (c) =>
+          c.id === columnId ||
+          c.name.toLowerCase() === columnId.toLowerCase() ||
+          c.periodId === columnId,
+      )?.id ?? columnId;
+    if (isTotalColumnId(colIdResolved) && rowKey !== totalRowKey(table) && rowKey !== TOTAL_ROW_ID) {
+      throw new Error("Total column cells are computed and cannot be edited.");
+    }
     const row = table.rows.find((r) => r.key === rowKey || r.id === rowKey);
     if (!row) throw new Error(`Unknown row "${rowKey}"`);
-    const layout = layoutWorkbook(this.snapshot).tables.get(table.id);
     const col =
       layout?.columns.find(
         (c) =>

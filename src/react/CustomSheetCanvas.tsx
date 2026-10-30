@@ -12,6 +12,7 @@ import DataEditor, {
 } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { effectiveCell } from "../engine/compileWorkbook.js";
+import { isTotalColumnId, isTotalRowId } from "../model/tableTotals.js";
 import { fitProjectedColumnWidths, fitProjectedRowHeights, TABLE_ROW_HEIGHT } from "../grid/columnFit.js";
 import {
   TABLE_DATA_COLUMN_WIDTH,
@@ -303,10 +304,46 @@ export function gridCell(
     });
   }
   if (hit.kind === "key") {
-    const tableRow = tableLayout.table.rows.find((candidate) => candidate.id === hit.rowId);
+    const tableRow = tableLayout.rows.find((candidate) => candidate.id === hit.rowId);
+    const style = resolveCellStyle(tableLayout.table, KEY_COLUMN_ID, undefined, hit.rowId);
     return textCell(tableRow?.key ?? "", {
       contentAlign: "left",
-      themeOverride: CELL_THEME.header,
+      themeOverride: {
+        ...CELL_THEME.header,
+        ...(style?.fillColor ? { bgCell: style.fillColor } : {}),
+        ...(style?.textColor ? { textDark: style.textColor, textLight: style.textColor } : {}),
+        ...(styleFont(style) ? { baseFontStyle: styleFont(style) } : {}),
+      },
+    });
+  }
+
+  if (isTotalRowId(hit.rowId) || isTotalColumnId(hit.columnId)) {
+    let values: Array<EvaluatedCell | undefined>;
+    if (isTotalColumnId(hit.columnId)) {
+      values = [evaluated.get(`${hit.tableId}\u001f${hit.rowId}\u001f${hit.columnId}`)];
+    } else {
+      const periodIds = writePeriodIds(tableLayout.table, hit.columnId, layout.periods);
+      values = periodIds.map((id) => evaluated.get(`${hit.tableId}\u001f${hit.rowId}\u001f${id}`));
+    }
+    const computed = bucketComputed(values, []);
+    const pattern = resolveCellFormat(tableLayout.table, hit.columnId, undefined, hit.rowId);
+    const style = resolveCellStyle(tableLayout.table, hit.columnId, undefined, hit.rowId);
+    const boldDefault = style?.bold !== false;
+    const cell = values[0];
+    return textCell("", {
+      displayData: applyStrikethrough(formatDisplayValue(computed, pattern), style),
+      contentAlign: typeof computed === "number" ? "right" : "left",
+      allowOverlay: false,
+      editable: false,
+      readonly: true,
+      themeOverride: {
+        ...(values.some((item) => item?.error) ? CELL_THEME.error : CELL_THEME.formula),
+        ...(style?.fillColor ? { bgCell: style.fillColor } : {}),
+        ...(style?.textColor ? { textDark: style.textColor, textLight: style.textColor } : {}),
+        ...(styleFont(style) ?? (boldDefault ? "bold 12px" : undefined)
+          ? { baseFontStyle: styleFont(style) ?? "bold 12px" }
+          : {}),
+      },
     });
   }
 
@@ -427,7 +464,7 @@ export function CustomSheetCanvas() {
             const table = session.getSnapshot().tables.find((candidate) => candidate.id === ref.tableId);
             const row = table?.rows.find((candidate) => candidate.id === ref.rowId);
             const current = table
-              ? resolveCellStyle(table, ref.columnId, row?.cells[ref.columnId])
+              ? resolveCellStyle(table, ref.columnId, row?.cells[ref.columnId], ref.rowId)
               : undefined;
             session.setCellStyle(ref.tableId, ref.rowId, ref.columnId, { [flag]: !current?.[flag] });
           }

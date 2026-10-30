@@ -3,6 +3,7 @@ import { applySuggestion, suggestFormula } from "../formula/formulaSuggest.js";
 import { formulaErrorReason } from "../formula/formulaError.js";
 import { layoutWorkbook } from "../model/layout.js";
 import { formatDisplayValue, resolveCellFormat } from "../model/numberFormat.js";
+import { isTotalColumnId, isTotalRowId } from "../model/tableTotals.js";
 import { HEADER_ROW_ID, KEY_COLUMN_ID, isCellSelection, selectedCellRefs, sharedOrStar, type CellRef, type Selection } from "../model/types.js";
 import { projectTable, projectedLocationForRef } from "../grid/sheetProjection.js";
 import { blurOnEnter } from "./blurOnEnter.js";
@@ -41,8 +42,21 @@ function selectionTitle(selection: Selection | null): string {
   return kind.charAt(0).toUpperCase() + kind.slice(1);
 }
 
-function inspectorRefsAreData(refs: readonly CellRef[]): boolean {
-  return refs.length > 0 && refs.every((ref) => ref.columnId !== KEY_COLUMN_ID && ref.rowId !== HEADER_ROW_ID);
+function inspectorRefsAreFormulaEditable(refs: readonly CellRef[]): boolean {
+  return (
+    refs.length > 0 &&
+    refs.every(
+      (ref) =>
+        ref.columnId !== KEY_COLUMN_ID &&
+        ref.rowId !== HEADER_ROW_ID &&
+        !isTotalRowId(ref.rowId) &&
+        !isTotalColumnId(ref.columnId),
+    )
+  );
+}
+
+function inspectorRefsShowFormat(refs: readonly CellRef[]): boolean {
+  return refs.length > 0 && refs.every((ref) => ref.rowId !== HEADER_ROW_ID);
 }
 
 function tryCall(fn: () => void) {
@@ -65,7 +79,7 @@ export function PropertiesPanel({ hostInspectors }: { hostInspectors?: HostInspe
         <SidePanelPinButton side="properties" label="Properties" />
       </div>
       {selection?.kind === "corner" ? null : <h2>{selectionTitle(selection)}</h2>}
-      {(selection?.kind === "cell" && inspectorRefsAreData(selectedCellRefs(selection))) || formulaEdit ? (
+      {(selection?.kind === "cell" && inspectorRefsAreFormulaEditable(selectedCellRefs(selection))) || formulaEdit ? (
         <>
           {selection?.kind === "cell" ? (
             <CellNameField tableId={selection.tableId} rowId={selection.rowId} columnId={selection.columnId} />
@@ -94,7 +108,7 @@ export function PropertiesPanel({ hostInspectors }: { hostInspectors?: HostInspe
       ) : null}
       {selection?.kind === "column" ? <ColumnInspector tableId={selection.tableId} columnId={selection.columnId} /> : null}
       {selection?.kind === "row" ? <RowInspector tableId={selection.tableId} rowId={selection.rowId} /> : null}
-      {selection?.kind === "cell" && inspectorRefsAreData(selectedCellRefs(selection)) ? (
+      {selection?.kind === "cell" && inspectorRefsShowFormat(selectedCellRefs(selection)) ? (
         <CellInspector tableId={selection.tableId} rowId={selection.rowId} columnId={selection.columnId} />
       ) : null}
       {!selection ? <p className="wk-muted">Select a sheet, table, or cell.</p> : null}

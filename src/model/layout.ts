@@ -1,5 +1,13 @@
 import { buildPeriods, resolvePeriodToken, type Period } from "./calendar.js";
 import { layoutSheets, type TableBand } from "./sheetView.js";
+import {
+  tableHasTotalsColumn,
+  tableHasTotalsRow,
+  totalColumnName,
+  totalRowKey,
+  TOTAL_COLUMN_ID,
+  TOTAL_ROW_ID,
+} from "./tableTotals.js";
 import { KEY_COLUMN_ID, type TableSnapshot, type WorkbookSnapshot } from "./types.js";
 import { tableYearColumns } from "./yearColumns.js";
 
@@ -101,11 +109,27 @@ function buildTableLayout(
       });
     });
   }
+  if (tableHasTotalsColumn(table)) {
+    columns.push({
+      id: TOTAL_COLUMN_ID,
+      name: totalColumnName(table),
+      kind: "attribute",
+      colIndex: band.startCol + columns.length,
+    });
+  }
   const rows: LaidOutRow[] = table.rows.map((row, i) => ({
     id: row.id,
     key: row.key,
     rowIndex: band.headerRow + 1 + i,
   }));
+  if (tableHasTotalsRow(table)) {
+    const key = totalRowKey(table);
+    rows.push({
+      id: TOTAL_ROW_ID,
+      key,
+      rowIndex: band.headerRow + 1 + table.rows.length,
+    });
+  }
   const layout: TableLayout = {
     table,
     sheetId,

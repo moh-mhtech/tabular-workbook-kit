@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { SIDE_REVEAL_TAB_WIDTH } from "../model/sidePanelPin.js";
 import { SideRevealTab } from "./SideRevealTab.js";
 import {
@@ -58,16 +58,20 @@ function WorkbookShellBody({
   const [explorerWidth, setExplorerWidth] = useState(DEFAULT_EXPLORER_WIDTH);
   const [propertiesWidth, setPropertiesWidth] = useState(DEFAULT_PROPERTIES_WIDTH);
   const [resizing, setResizing] = useState(false);
+  const sideWidthsRef = useRef({ explorerWidth, propertiesWidth });
+  sideWidthsRef.current = { explorerWidth, propertiesWidth };
   const explorerPinned = session.isExplorerPinned();
   const propertiesPinned = session.isPropertiesPinned();
   const explorerMax = maxSideWidth(propertiesWidth, viewportWidth, MIN_EXPLORER_WIDTH);
   const propertiesMax = maxSideWidth(explorerWidth, viewportWidth, MIN_PROPERTIES_WIDTH);
 
+  /** Rebalance only when the viewport changes — not when one panel is dragged (canvas flex absorbs). */
   useEffect(() => {
-    const fitted = fitSideWidths(explorerWidth, propertiesWidth, viewportWidth);
-    if (fitted.explorerWidth !== explorerWidth) setExplorerWidth(fitted.explorerWidth);
-    if (fitted.propertiesWidth !== propertiesWidth) setPropertiesWidth(fitted.propertiesWidth);
-  }, [explorerWidth, propertiesWidth, viewportWidth]);
+    const { explorerWidth: ew, propertiesWidth: pw } = sideWidthsRef.current;
+    const fitted = fitSideWidths(ew, pw, viewportWidth);
+    if (fitted.explorerWidth !== ew) setExplorerWidth(fitted.explorerWidth);
+    if (fitted.propertiesWidth !== pw) setPropertiesWidth(fitted.propertiesWidth);
+  }, [viewportWidth]);
 
   useEffect(() => {
     if (explorerPinned) setExplorerRevealed(false);
@@ -129,6 +133,7 @@ function WorkbookShellBody({
       </div>
       {explorerPinned ? (
         <ColumnResizeHandle
+          className="wk-col-resizer-explorer"
           label="Resize explorer"
           value={explorerWidth}
           min={MIN_EXPLORER_WIDTH}
@@ -143,6 +148,7 @@ function WorkbookShellBody({
       <CustomSheetCanvas />
       {propertiesPinned ? (
         <ColumnResizeHandle
+          className="wk-col-resizer-properties"
           label="Resize properties"
           value={propertiesWidth}
           min={MIN_PROPERTIES_WIDTH}

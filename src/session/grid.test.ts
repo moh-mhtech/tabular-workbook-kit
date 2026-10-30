@@ -107,15 +107,16 @@ describe("auto-expansion against table invariants", () => {
     const session = sampleSession();
     const sheetId = sheetIdOf(session, "Assumptions");
 
-    // Lines is 4 rows plus a header, and 1 key column plus 12 periods.
+    // Lines is 3 data rows, a total row, and a header; 1 key column plus 12 periods.
     session.writeGridCell(sheetId, 1, 13, "x");
     expect(table(session, "Lines").attributeColumns).toHaveLength(0);
     expect(looseCells(session, sheetId)["1:13"]).toEqual({ kind: "input", value: "x" });
 
     session.writeGridCell(sheetId, 5, 1, "999");
     const lines = table(session, "Lines");
-    expect(lines.rows).toHaveLength(5);
-    expect(lines.rows[4].cells["2025-01"]).toEqual({ kind: "input", value: 999 });
+    expect(lines.totalsRow).toBe(true);
+    expect(lines.rows).toHaveLength(4);
+    expect(lines.rows[3].cells["2025-01"]).toEqual({ kind: "input", value: 999 });
   });
 
   it("keeps a promoteRowKeys table at one data column and allocates a promotable key", () => {

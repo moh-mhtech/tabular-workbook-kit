@@ -7,6 +7,7 @@ import {
   type SheetView,
 } from "../model/sheetView.js";
 import { overlayKey, HEADER_ROW_ID, KEY_COLUMN_ID, type CellRef, type Selection } from "../model/types.js";
+import { tableHasTotalsColumn, totalColumnName, TOTAL_COLUMN_ID } from "../model/tableTotals.js";
 import { hideGrowthColumn, visibleTimeSlots } from "../model/yearColumns.js";
 
 export const TABLE_KEY_COLUMN_WIDTH = 48;
@@ -91,6 +92,9 @@ export function projectTable(layout: WorkbookLayout, tableId: string): SheetGrid
       title: slot.name,
       width: TABLE_DATA_COLUMN_WIDTH,
     })),
+    ...(tableHasTotalsColumn(tableLayout.table)
+      ? [{ id: TOTAL_COLUMN_ID, title: totalColumnName(tableLayout.table), width: TABLE_DATA_COLUMN_WIDTH }]
+      : []),
   ];
   const growthColumn = !hideGrowthColumn(tableLayout.table);
   const columns = growthColumn

@@ -63,6 +63,26 @@ export interface TableSnapshot {
   columnStyles?: Record<string, CellStyle>;
   /** When true, the sheet shows only the table title until the user shows the table again. */
   hidden?: boolean;
+  /** Structural total row above Growth; Computed via Total aggregation. */
+  totalsRow?: boolean;
+  /** Structural total column left of Growth; Computed via Total aggregation. */
+  totalsColumn?: boolean;
+  /** Row key for totalsRow (default Total). */
+  totalRowKey?: string;
+  /** Header name for totalsColumn (default Total). */
+  totalColumnName?: string;
+  /** Row keys included in Total row aggregation (`Red:Channel`, comma list, or blank for all). */
+  totalsRowRange?: string;
+  /** Column headers included in Total column aggregation (blank for all). */
+  totalsColumnRange?: string;
+  /** Styles for total-band and key cells (`rowId\u001fcolumnId`). */
+  bandCellStyles?: Record<string, CellStyle>;
+  /** Number formats for total-band and key cells (`rowId\u001fcolumnId`). */
+  bandCellFormats?: Record<string, string>;
+}
+
+export function bandCellKey(rowId: string, columnId: string): string {
+  return `${rowId}\u001f${columnId}`;
 }
 
 export type SheetHorizontalScroll = "table" | "sheet";

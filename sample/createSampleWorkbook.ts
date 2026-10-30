@@ -62,6 +62,7 @@ export function createSampleWorkbook(): WorkbookSnapshot {
       {
         id: "tbl-lines",
         name: "Lines",
+        totalsRow: true,
         yearColumns: [{ id: "yc-2025", year: 2025, grain: "month" }],
         attributeColumns: [],
         rows: [
@@ -91,11 +92,6 @@ export function createSampleWorkbook(): WorkbookSnapshot {
                 ? formula("=Params[Start]*Params[LastShare]")
                 : formula("=[@-1][@]*(1+Params[Growth])"),
             ),
-          },
-          {
-            id: "row-total",
-            key: "Total",
-            cells: months(() => formula("=Lines[@][Red]+Lines[@][Secondary]+Lines[@][Channel]")),
           },
         ],
       },

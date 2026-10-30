@@ -1,12 +1,15 @@
-import type { Primitive, TableSnapshot } from "./types.js";
+import { bandCellKey, type Primitive, type TableSnapshot } from "./types.js";
 
 /** Cell format wins, then the attribute column, then period/columnFormats. */
 export function resolveCellFormat(
   table: TableSnapshot,
   columnId: string,
   cell?: { format?: string },
+  rowId?: string,
 ): string | undefined {
   if (cell?.format) return cell.format;
+  const band = rowId ? table.bandCellFormats?.[bandCellKey(rowId, columnId)] : undefined;
+  if (band) return band;
   const attr = table.attributeColumns.find((column) => column.id === columnId);
   return attr?.format ?? table.columnFormats?.[columnId];
 }

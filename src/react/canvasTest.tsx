@@ -26,6 +26,13 @@ function boxSize(element: HTMLElement, axis: "width" | "height"): number {
 }
 
 export function installGridDom() {
+  if (!HTMLElement.prototype.setPointerCapture) {
+    HTMLElement.prototype.setPointerCapture = function () {};
+    HTMLElement.prototype.releasePointerCapture = function () {};
+    HTMLElement.prototype.hasPointerCapture = function () {
+      return false;
+    };
+  }
   class ResizeObserverMock {
     observe() {}
     unobserve() {}

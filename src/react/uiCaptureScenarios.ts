@@ -4,7 +4,8 @@ import type { WorkbookSession } from "../session/WorkbookSession.js";
 
 export type UiCaptureScenarioId =
   | "properties-cell-multiline-formula"
-  | "properties-budget-unpinned-reveal";
+  | "properties-budget-unpinned-reveal"
+  | "properties-table-inspector";
 
 export type UiCaptureMetrics = {
   scenario: UiCaptureScenarioId;
@@ -58,7 +59,47 @@ export function runUiCaptureScenario(session: WorkbookSession, scenario: UiCaptu
     return;
   }
 
+  if (scenario === "properties-table-inspector") {
+    session.setExplorerPinned(true);
+    session.setPropertiesPinned(true);
+    session.setTableTotalsRow("tbl-lines", true);
+    session.setTableTotalsColumn("tbl-lines", true);
+    session.setSelection({ kind: "table", tableId: "tbl-lines" });
+    return;
+  }
+
   throw new Error(`Unknown ui capture scenario: ${scenario}`);
+}
+
+export type TableInspectorCaptureMetrics = {
+  scenario: "properties-table-inspector";
+  checkRowCount: number;
+  firstCheckRowFlexDirection: string;
+  checkboxAboveLabelCenterPx: number;
+  propertiesHasVerticalScroll: boolean;
+};
+
+export function measureTableInspectorPanel(): TableInspectorCaptureMetrics {
+  const properties = document.querySelector<HTMLElement>(".wk-properties");
+  if (!properties) throw new Error("ui capture: properties panel missing");
+  const checkRows = [...properties.querySelectorAll<HTMLElement>(".wk-check-row")];
+  if (checkRows.length < 2) throw new Error("ui capture: expected table inspector check rows");
+  const first = checkRows[0]!;
+  const box = first.getBoundingClientRect();
+  const checkbox = first.querySelector("input[type=checkbox]");
+  const label = first.querySelector("span");
+  if (!checkbox || !label) throw new Error("ui capture: check row structure missing");
+  const cbBox = checkbox.getBoundingClientRect();
+  const labelBox = label.getBoundingClientRect();
+  const checkboxCenterY = cbBox.top + cbBox.height / 2;
+  const labelCenterY = labelBox.top + labelBox.height / 2;
+  return {
+    scenario: "properties-table-inspector",
+    checkRowCount: checkRows.length,
+    firstCheckRowFlexDirection: getComputedStyle(first).flexDirection,
+    checkboxAboveLabelCenterPx: labelCenterY - checkboxCenterY,
+    propertiesHasVerticalScroll: properties.scrollHeight > properties.clientHeight + 1,
+  };
 }
 
 export function measurePropertiesValueField(scenario: UiCaptureScenarioId): UiCaptureMetrics {

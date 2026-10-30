@@ -1,14 +1,16 @@
-import type { CellStyle, TableSnapshot } from "./types.js";
+import { bandCellKey, type CellStyle, type TableSnapshot } from "./types.js";
 
 export function resolveCellStyle(
   table: TableSnapshot,
   columnId: string,
   cell?: { style?: CellStyle },
+  rowId?: string,
 ): CellStyle | undefined {
   const attr = table.attributeColumns.find((column) => column.id === columnId);
   const column = attr?.style ?? table.columnStyles?.[columnId];
-  if (!cell?.style && !column) return undefined;
-  return { ...column, ...cell?.style };
+  const band = rowId ? table.bandCellStyles?.[bandCellKey(rowId, columnId)] : undefined;
+  if (!cell?.style && !column && !band) return undefined;
+  return { ...column, ...cell?.style, ...band };
 }
 
 export function toggleStyleFlag(style: CellStyle | undefined, flag: "bold" | "italic" | "strikethrough"): CellStyle {

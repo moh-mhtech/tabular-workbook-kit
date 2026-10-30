@@ -8,6 +8,12 @@ import {
   type TableSnapshot,
   type WorkbookSnapshot,
 } from "./types.js";
+import {
+  tableHasTotalsColumn,
+  tableHasTotalsRow,
+  TOTAL_COLUMN_ID,
+  TOTAL_ROW_ID,
+} from "./tableTotals.js";
 
 export const TABLE_GAP_ROWS = 2;
 export const START_COL = 0;
@@ -48,15 +54,22 @@ export type GridExpansion =
   | { direction: "right"; tableId: string; rowId: string | null };
 
 function columnCount(table: TableSnapshot, periods: Period[]): number {
-  return 1 + table.attributeColumns.length + visibleTimeColCount(table, periods);
+  let count = 1 + table.attributeColumns.length + visibleTimeColCount(table, periods);
+  if (tableHasTotalsColumn(table)) count += 1;
+  return count;
 }
 
 function columnIdAt(table: TableSnapshot, periods: Period[], offset: number): string | null {
   if (offset === 0) return "__key__";
-  const attr = table.attributeColumns[offset - 1];
-  if (attr) return attr.id;
-  const slot = visibleTimeSlots(table, periods)[offset - 1 - table.attributeColumns.length];
-  return slot?.id ?? null;
+  const attrCount = table.attributeColumns.length;
+  const timeCount = visibleTimeColCount(table, periods);
+  if (offset <= attrCount) return table.attributeColumns[offset - 1]?.id ?? null;
+  const timeOffset = offset - 1 - attrCount;
+  if (timeOffset < timeCount) {
+    return visibleTimeSlots(table, periods)[timeOffset]?.id ?? null;
+  }
+  if (tableHasTotalsColumn(table) && offset === 1 + attrCount + timeCount) return TOTAL_COLUMN_ID;
+  return null;
 }
 
 function stackBands(tables: TableSnapshot[], periods: Period[]): TableBand[] {
@@ -67,7 +80,7 @@ function stackBands(tables: TableSnapshot[], periods: Period[]): TableBand[] {
       startRow: row,
       startCol: START_COL,
       headerRow: row,
-      rowCount: 1 + table.rows.length,
+      rowCount: 1 + table.rows.length + (tableHasTotalsRow(table) ? 1 : 0),
       colCount: columnCount(table, periods),
     };
     row += band.rowCount + TABLE_GAP_ROWS;
@@ -148,9 +161,16 @@ export function hitTest(
       return { kind: "header", tableId: table.id, columnId };
     }
     const dataIndex = row - band.headerRow - 1;
+    if (tableHasTotalsRow(table) && dataIndex === table.rows.length) {
+      if (columnId === "__key__") return { kind: "key", tableId: table.id, rowId: TOTAL_ROW_ID };
+      return { kind: "cell", tableId: table.id, rowId: TOTAL_ROW_ID, columnId };
+    }
     const dataRow = table.rows[dataIndex];
     if (!dataRow) return { kind: "gap" };
     if (columnId === "__key__") return { kind: "key", tableId: table.id, rowId: dataRow.id };
+    if (columnId === TOTAL_COLUMN_ID) {
+      return { kind: "cell", tableId: table.id, rowId: dataRow.id, columnId: TOTAL_COLUMN_ID };
+    }
     return { kind: "cell", tableId: table.id, rowId: dataRow.id, columnId };
   }
   return { kind: "outside" };

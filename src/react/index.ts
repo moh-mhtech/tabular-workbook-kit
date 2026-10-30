@@ -11,7 +11,9 @@ export { CustomSheetCanvas } from "./CustomSheetCanvas.js";
 export { WorkbookShell } from "./WorkbookShell.js";
 export {
   measurePropertiesValueField,
+  measureTableInspectorPanel,
   runUiCaptureScenario,
+  type TableInspectorCaptureMetrics,
   type UiCaptureMetrics,
   type UiCaptureScenarioId,
 } from "./uiCaptureScenarios.js";

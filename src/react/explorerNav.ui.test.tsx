@@ -44,19 +44,17 @@ describe("Explorer navigation", () => {
     });
   });
 
-  it("shows grey viewport-lead and blue selected highlights, with selected winning", async () => {
+  it("shows a selected highlight on the table of the current selection", async () => {
     const { session } = await renderWorkbookCanvas({ chrome: true });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
     });
     const lines = within(sheetGroup("Assumptions")).getByRole("button", { name: "Lines" });
     expect(lines.classList.contains("is-selected")).toBe(true);
-    expect(lines.classList.contains("is-viewport-lead")).toBe(false);
 
     await act(async () => {
       session.setSelection({ kind: "sheet", sheetId: "sheet-assumptions" });
     });
-    expect(lines.classList.contains("is-viewport-lead")).toBe(true);
     expect(lines.classList.contains("is-selected")).toBe(false);
   });
 });

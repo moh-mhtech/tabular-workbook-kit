@@ -10,10 +10,7 @@ interface WorkbookContextValue {
   setActiveSheetId: (id: string) => void;
   formulaEditPlacement: FormulaEditPlacement;
   setFormulaEditPlacement: (placement: FormulaEditPlacement) => void;
-  collapsedSheetIds: ReadonlySet<string>;
   toggleSheetCollapsed: (sheetId: string) => void;
-  viewportLeadTableId: string | null;
-  setViewportLeadTableId: (tableId: string | null) => void;
 }
 
 const WorkbookContext = createContext<WorkbookContextValue | null>(null);
@@ -31,15 +28,8 @@ export function WorkbookProvider({
   const snapshot = session.getSnapshot();
   const [activeSheetId, setActiveSheetId] = useState(snapshot.sheets[0]?.id ?? "");
   const [formulaEditPlacement, setFormulaEditPlacement] = useState<FormulaEditPlacement>(initialPlacement);
-  const [collapsedSheetIds, setCollapsedSheetIds] = useState<ReadonlySet<string>>(() => new Set());
-  const [viewportLeadTableId, setViewportLeadTableId] = useState<string | null>(null);
   const toggleSheetCollapsed = (sheetId: string) => {
-    setCollapsedSheetIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(sheetId)) next.delete(sheetId);
-      else next.add(sheetId);
-      return next;
-    });
+    session.toggleSheetExplorerCollapsed(sheetId);
   };
   useEffect(() => session.subscribe(() => setVersion((v) => v + 1)), [session]);
   useEffect(() => {
@@ -54,12 +44,9 @@ export function WorkbookProvider({
       setActiveSheetId,
       formulaEditPlacement,
       setFormulaEditPlacement,
-      collapsedSheetIds,
       toggleSheetCollapsed,
-      viewportLeadTableId,
-      setViewportLeadTableId,
     }),
-    [session, version, activeSheetId, formulaEditPlacement, collapsedSheetIds, viewportLeadTableId],
+    [session, version, activeSheetId, formulaEditPlacement],
   );
 
   return <WorkbookContext.Provider value={value}>{children}</WorkbookContext.Provider>;

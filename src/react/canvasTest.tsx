@@ -1,4 +1,6 @@
 /** Shared jsdom harness for CustomSheetCanvas + HyperFormula UI tests. */
+export { createExplorerDataTransfer, performExplorerDragDrop } from "./explorerDragHarness.js";
+export type { ExplorerDragGesture } from "./explorerDragHarness.js";
 import { act, fireEvent, render, waitFor, type ReactNode } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, vi } from "vitest";

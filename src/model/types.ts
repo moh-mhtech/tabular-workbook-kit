@@ -74,6 +74,8 @@ export interface SheetSnapshot {
   horizontalScroll?: SheetHorizontalScroll;
   /** Values typed on the grid outside every table band, keyed by `looseCellKey`. */
   looseCells?: Record<string, CellSnapshot>;
+  /** When true, Explorer hides this Sheet's tables until the Sheet is viewed on the canvas. */
+  explorerCollapsed?: boolean;
 }
 
 export interface ScenarioSnapshot {

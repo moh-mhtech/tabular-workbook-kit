@@ -41,6 +41,17 @@ describe("explorer reorder", () => {
     ]);
   });
 
+  it("inserts before a lower table without landing one slot too low", async () => {
+    const session = await open();
+    session.addTable("sheet-assumptions", { name: "Notes", yearColumns: false });
+    session.addTable("sheet-assumptions", { name: "Extra", yearColumns: false });
+    const before = session.getSnapshot().sheets.find((sheet) => sheet.id === "sheet-assumptions")!;
+    const extraIndex = before.tableIds.indexOf(before.tableIds.at(-1)!);
+    session.moveTable("tbl-lines", "sheet-assumptions", extraIndex);
+    const after = session.getSnapshot().sheets.find((sheet) => sheet.id === "sheet-assumptions")!;
+    expect(after.tableIds).toEqual([before.tableIds[1], "tbl-lines", before.tableIds[2]]);
+  });
+
   it("rewrites sheet-qualified refs when a table moves to another sheet", async () => {
     const session = await open();
     session.setFormula("Result", "Usage", "2025-01", "=Assumptions.Lines[2025-01][Total]");
@@ -53,8 +64,9 @@ describe("explorer reorder", () => {
     expect(session.getCell("Result", "Usage", "2025-01").computed).toBeTruthy();
   });
 
-  it("rejects moving a locked table", async () => {
+  it("reorders a locked table in the explorer", async () => {
     const session = await open();
-    expect(() => session.moveTable("tbl-params", "sheet-assumptions", 0)).toThrow(/cannot be moved/);
+    session.moveTable("tbl-params", "sheet-assumptions", 0);
+    expect(session.getSnapshot().sheets.find((item) => item.id === "sheet-assumptions")!.tableIds[0]).toBe("tbl-params");
   });
 });

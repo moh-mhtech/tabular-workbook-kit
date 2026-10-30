@@ -54,7 +54,6 @@ import {
 import { formulaRefGridMarks } from "../formula/formulaRefColors.js";
 import {
   clampCanvasScroll,
-  leadTableIdInCanvas,
   scrollCanvasToKeepCellVisible,
   scrollCanvasToKeepTableVisible,
 } from "./sheetScroll.js";
@@ -330,7 +329,7 @@ function ensureOverlayPortal() {
 const SCROLLBAR_GUTTER = 16;
 
 export function CustomSheetCanvas() {
-  const { session, activeSheetId, setViewportLeadTableId } = useWorkbook();
+  const { session, activeSheetId } = useWorkbook();
   const snapshot = useSnapshot();
   const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
   const sheet = layout.sheets.find((candidate) => candidate.sheetId === activeSheetId);
@@ -394,8 +393,7 @@ export function CustomSheetCanvas() {
         scrollCanvasToKeepTableVisible(canvas, selection.tableId, horizontalScroll);
       }
     }
-    setViewportLeadTableId(leadTableIdInCanvas(canvas) ?? sheet?.bands[0]?.tableId ?? null);
-  }, [activeSheetId, horizontalScroll, selection, session.revealNonce, setViewportLeadTableId, sheet?.bands]);
+  }, [activeSheetId, horizontalScroll, selection, session.revealNonce]);
 
   if (!sheet) {
     return (
@@ -411,9 +409,7 @@ export function CustomSheetCanvas() {
       className={`wk-canvas wk-table-canvases ${horizontalScroll === "sheet" ? "is-sheet-scroll-x" : "is-table-scroll-x"}`}
       aria-label={`${sheet.sheetName} tables`}
       onScroll={(event) => {
-        const canvas = event.currentTarget;
-        clampCanvasScroll(canvas);
-        setViewportLeadTableId(leadTableIdInCanvas(canvas));
+        clampCanvasScroll(event.currentTarget);
       }}
       onClick={(event) => {
         const node = event.target as HTMLElement | null;

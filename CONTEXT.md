@@ -324,6 +324,10 @@ _Avoid_: Block, region, current region (Excel’s name)
 The left column: Sheets and the Tables on each Sheet. Clicking a Table name Reveals that Table. Creating a Table from New table switches to that Sheet and Reveals the Table.
 _Avoid_: Folder tree, sheet tabs (when you mean this list)
 
+**Explorer collapsed**:
+Sheet metadata: when set, Explorer hides that Sheet’s table list until the Sheet is the one viewed on the canvas. Persisted on the Sheet in the Workbook snapshot.
+_Avoid_: UI-only fold state, session-only collapse
+
 **Reveal**:
 Selecting a Table from Explorer and scrolling the viewport to that Table’s start. Distinct from keeping the moving Cell in view while Arrow navigation, Ctrl+arrow, Shift+arrow, or Shift+Ctrl+arrow extends a Cell range.
 _Avoid_: Jump, scroll-into-view, follow selection

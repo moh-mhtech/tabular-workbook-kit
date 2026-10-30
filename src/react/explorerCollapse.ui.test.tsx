@@ -19,7 +19,7 @@ function sheetGroup(name: string) {
 
 describe("Explorer sheet collapse", () => {
   it("collapses a sheet from the chevron and hides its tables until that sheet is viewed", async () => {
-    await renderWorkbookCanvas({ chrome: true });
+    const { session } = await renderWorkbookCanvas({ chrome: true });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
     });
@@ -29,6 +29,7 @@ describe("Explorer sheet collapse", () => {
     await act(async () => {
       fireEvent.click(within(parameters).getByRole("button", { name: "Collapse Parameters" }));
     });
+    expect(session.getSnapshot().sheets.find((sheet) => sheet.id === "sheet-params")!.explorerCollapsed).toBe(true);
     await waitFor(() => {
       expect(within(parameters).queryByRole("button", { name: "Params" })).toBeNull();
     });

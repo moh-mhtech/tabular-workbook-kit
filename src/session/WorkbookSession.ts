@@ -132,9 +132,13 @@ export class WorkbookSession {
     return () => this.listeners.delete(listener);
   }
 
-  private emit() {
+  private emit(options?: { recalculate?: boolean }) {
     if (this.txDepth > 0) {
       this.txDirty = true;
+      return;
+    }
+    if (options?.recalculate === false) {
+      for (const listener of this.listeners) listener();
       return;
     }
     this.cache = null;
@@ -928,6 +932,13 @@ export class WorkbookSession {
     this.emit();
   }
 
+  toggleSheetExplorerCollapsed(sheetId: string) {
+    const sheet = this.snapshot.sheets.find((item) => item.id === sheetId);
+    if (!sheet) throw new Error(`Unknown sheet "${sheetId}"`);
+    sheet.explorerCollapsed = !sheet.explorerCollapsed;
+    this.emit({ recalculate: false });
+  }
+
   moveSheet(sheetId: string, toIndex: number) {
     const sheets = this.snapshot.sheets;
     const fromIndex = sheets.findIndex((sheet) => sheet.id === sheetId);
@@ -945,7 +956,6 @@ export class WorkbookSession {
   moveTable(tableId: string, toSheetId: string, toIndex: number) {
     return this.restack(() => {
       const table = requireTable(this.snapshot, tableId);
-      if (table.locked) throw new Error("The table cannot be moved.");
       const fromSheet = this.snapshot.sheets.find((sheet) => sheet.tableIds.includes(tableId));
       const toSheet = this.snapshot.sheets.find((sheet) => sheet.id === toSheetId);
       if (!fromSheet) throw new Error(`Table "${table.name}" is not on a sheet.`);
@@ -955,7 +965,11 @@ export class WorkbookSession {
       this.checkpoint();
       const previousSheetName = fromSheet.name;
       fromSheet.tableIds.splice(fromIndex, 1);
-      const insertAt = Math.max(0, Math.min(toIndex, toSheet.tableIds.length));
+      let insertAt = toIndex;
+      if (fromSheet.id === toSheet.id && fromIndex < toIndex && toIndex - fromIndex > 1) {
+        insertAt -= 1;
+      }
+      insertAt = Math.max(0, Math.min(insertAt, toSheet.tableIds.length));
       toSheet.tableIds.splice(insertAt, 0, tableId);
       if (fromSheet.id !== toSheet.id) {
         rewriteFormulas(this.snapshot, (formula) =>

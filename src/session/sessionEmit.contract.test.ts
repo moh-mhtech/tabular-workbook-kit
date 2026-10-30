@@ -55,4 +55,16 @@ describe("session emit contracts (C2 C5 T1 T2)", () => {
     expect(formulaNotifications).toBeGreaterThan(0);
     recalcSpy.mockRestore();
   });
+
+  it("formula edit cursor sync does not call getSnapshot (T5 C1)", async () => {
+    const session = new WorkbookSession(createSampleWorkbook());
+    await session.recalculate();
+    const getSnapshotSpy = vi.spyOn(session, "getSnapshot");
+    session.beginFormulaEdit("tbl-params", "row-annual", "Value", "=1", { pointing: true });
+    for (let i = 0; i < 20; i++) {
+      session.syncFormulaEditCursor(`=1+${i}`, 3, 3);
+    }
+    expect(getSnapshotSpy.mock.calls.length).toBe(0);
+    getSnapshotSpy.mockRestore();
+  });
 });

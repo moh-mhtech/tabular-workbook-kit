@@ -14,6 +14,19 @@ export type PerfBaseline = {
   ui: {
     budget: PerfBaselineProfile;
   };
+  /** CI regression ceilings; when present, preferred over legacy `ui.budget` for Playwright probes. */
+  regression?: {
+    ui?: {
+      budget?: PerfBaselineProfile;
+    };
+    budget?: PerfBaselineProfile;
+  };
+  /** Stretch targets logged separately; not used as default CI ceilings. */
+  slo?: {
+    ui?: {
+      budget?: PerfBaselineProfile;
+    };
+  };
 };
 
 export function readBaselineFile(): PerfBaseline {
@@ -32,4 +45,13 @@ export function profileCeiling(profile: PerfBaselineProfile, key: string): numbe
   const raw = profile[key];
   if (raw === undefined) throw new Error(`perf baseline missing ${key}`);
   return perfCeiling(raw);
+}
+
+export function uiBudgetRegressionCeiling(key: string): number {
+  const baseline = readBaselineFile();
+  const regression = baseline.regression?.ui?.budget?.[key];
+  if (regression !== undefined) return perfCeiling(regression);
+  const legacy = baseline.ui.budget[key];
+  if (legacy === undefined) throw new Error(`perf baseline missing ui.budget.${key}`);
+  return perfCeiling(legacy);
 }

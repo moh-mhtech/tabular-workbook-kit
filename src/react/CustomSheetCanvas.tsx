@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import DataEditor, {
   CompactSelection,
   GridCellKind,
@@ -67,6 +67,8 @@ import {
 import { arrowNavDirection, ctrlArrowNavTarget, focusAdjacentTable, shiftArrowNavTarget, sheetTableProjections } from "./tableArrowNav.js";
 import { showTableGrid } from "../model/tableHidden.js";
 import { TableVisibilityButton } from "./components.js";
+import { TableGridCollapse } from "./TableGridCollapse.js";
+import { tableNeedsValuesRefresh } from "./tableDisplayRefresh.js";
 import { useFormulaEdit, useSnapshot, useWorkbook } from "./WorkbookProvider.js";
 
 const EMPTY_SELECTION: GridSelection = {
@@ -471,7 +473,9 @@ export function CustomSheetCanvas() {
                 hidden={table.hidden === true}
               />
             </div>
-            {gridVisible ? <TableGrid tableId={table.id} /> : null}
+            <TableGridCollapse open={gridVisible}>
+              <TableGrid tableId={table.id} />
+            </TableGridCollapse>
           </section>
         );
       })}
@@ -480,17 +484,30 @@ export function CustomSheetCanvas() {
   );
 }
 
-function TableGrid({ tableId }: { tableId: string }) {
-  const { session, setActiveSheetId, formulaEditPlacement, dataVersion } = useWorkbook();
+const TableGrid = memo(function TableGrid({ tableId }: { tableId: string }) {
+  const {
+    session,
+    setActiveSheetId,
+    formulaEditPlacement,
+    dataVersion,
+    lastAffectedTableNames,
+    tableDisplayDependents,
+  } = useWorkbook();
   const formulaEdit = useFormulaEdit();
   const snapshot = useSnapshot();
   const tableName = snapshot.tables.find((table) => table.id === tableId)?.name ?? "";
   const layout = useMemo(() => layoutWorkbook(snapshot), [snapshot]);
   const projection = useMemo(() => projectTable(layout, tableId), [layout, tableId]);
-  const values = useMemo(
-    () => evaluatedCellsForTable(session, tableId, tableName),
-    [session, tableId, tableName, dataVersion],
-  );
+  const valuesCacheRef = useRef<{ version: number; values: ReturnType<typeof evaluatedCellsForTable> } | null>(null);
+  const values = useMemo(() => {
+    const refresh = tableNeedsValuesRefresh(tableName, lastAffectedTableNames, tableDisplayDependents);
+    if (!refresh && valuesCacheRef.current?.version === dataVersion) {
+      return valuesCacheRef.current.values;
+    }
+    const next = evaluatedCellsForTable(session, tableId, tableName);
+    valuesCacheRef.current = { version: dataVersion, values: next };
+    return next;
+  }, [session, tableId, tableName, dataVersion, lastAffectedTableNames, tableDisplayDependents]);
   const fittedColumns = useMemo(
     () => (projection ? fitProjectedColumnWidths(projection, layout, values) : []),
     [layout, projection, values],
@@ -1090,4 +1107,4 @@ function TableGrid({ tableId }: { tableId: string }) {
       />
     </div>
   );
-}
+});

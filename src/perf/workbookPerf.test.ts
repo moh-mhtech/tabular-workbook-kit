@@ -130,6 +130,32 @@ describe("workbook performance probes", () => {
     expect(secondMs, "incremental engine should not regress vs first commit").toBeLessThanOrEqual(firstMs * 1.15);
   });
 
+  it("budget recalc after multi-table commit stays within multi-sheet budget (C3)", async () => {
+    const baseline = readBaselineFile();
+    const regressionMs = baseline.regression?.budget?.recalculateMultiSheetMs;
+    if (regressionMs === undefined) return;
+    const session = new WorkbookSession(loadBudgetPerfWorkbook());
+    await session.recalculate();
+    const oms = session.getSnapshot().tables.find((t) => t.name === "Omsætning")!;
+    const row = oms.rows[0]!;
+    const periodId = buildPeriods(session.getSnapshot().calendar)[0]!.id;
+
+    const recalcMs = await medianMsAsync(async () => {
+      session.drainPerfSpans();
+      const wait = waitForDataNotification(session);
+      session.writeCell("Omsætning", row.key, periodId, "501");
+      await wait;
+      const spans = session.drainPerfSpans().filter((s) => s.name === "recalculate");
+      return spans[0]?.ms ?? 0;
+    }, 3);
+
+    assertWithinBudget(
+      "budget recalculateMultiSheet",
+      recalcMs,
+      profileCeiling(baseline.regression!.budget!, "recalculateMultiSheetMs"),
+    );
+  });
+
   it("scoped table eval scales vs all-table eval (T4)", () => {
     const baseline = readBaselineFile().budget;
     const session = new WorkbookSession(loadBudgetPerfWorkbook());

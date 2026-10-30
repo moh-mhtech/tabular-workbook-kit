@@ -88,6 +88,12 @@ export type SessionChange = {
 
 export type SessionListener = (change?: SessionChange) => void;
 
+export type HostRecalcPhaseContext = {
+  affectedTableNames: string[];
+};
+
+export type HostRecalcPhaseListener = (session: WorkbookSession, context: HostRecalcPhaseContext) => void;
+
 export type FormulaEditOrigin = { tableId: string; col: number; row: number };
 
 export type { FormulaEditMode };
@@ -135,6 +141,10 @@ export class WorkbookSession {
   private future: HistoryEntry[] = [];
   private txDepth = 0;
   private txDirty = false;
+  private hostRecalcPhaseDepth = 0;
+  private onBeforeEvaluate: HostRecalcPhaseListener | null = null;
+  private tableEvalReadClosure: Readonly<Record<string, readonly string[]>> | null = null;
+  private pendingNotifyChange: SessionChange | undefined;
   selection: Selection | null = null;
   formulaEdit: FormulaEdit | null = null;
   revealNonce = 0;
@@ -157,6 +167,52 @@ export class WorkbookSession {
     return () => this.listeners.delete(listener);
   }
 
+  /** Host policy (e.g. budget shadow tables) applied once before engine evaluate — no extra emit/recalc. */
+  setOnBeforeEvaluate(listener: HostRecalcPhaseListener | null) {
+    this.onBeforeEvaluate = listener;
+  }
+
+  /** Tables whose sheets must be re-read when `source` tables change (multi-sheet partial HF read). */
+  setTableEvalReadClosure(closure: Readonly<Record<string, readonly string[]>> | null) {
+    this.tableEvalReadClosure = closure;
+  }
+
+  private engineReadSheetNames(affectedTableNames: string[] | undefined): string[] | undefined {
+    if (!affectedTableNames?.length) return undefined;
+    const tableNames = new Set(affectedTableNames);
+    if (this.tableEvalReadClosure) {
+      for (const name of affectedTableNames) {
+        for (const dep of this.tableEvalReadClosure[name] ?? []) tableNames.add(dep);
+      }
+    }
+    const layout = layoutWorkbook(this.snapshot);
+    const sheetNames = new Set<string>();
+    for (const name of tableNames) {
+      const laid = layout.tablesByName.get(name.toLowerCase());
+      if (laid) sheetNames.add(laid.sheetName);
+    }
+    return sheetNames.size ? [...sheetNames] : undefined;
+  }
+
+  private applyEngineReadHint(affectedTableNames: string[] | undefined) {
+    const engine = this.engine as { setEvaluateReadSheetNames?: (names: readonly string[] | undefined) => void };
+    const names = this.tableEvalReadClosure ? this.engineReadSheetNames(affectedTableNames) : undefined;
+    engine.setEvaluateReadSheetNames?.(names);
+  }
+
+  runInHostRecalcPhase<T>(fn: () => T): T {
+    this.hostRecalcPhaseDepth++;
+    try {
+      return fn();
+    } finally {
+      this.hostRecalcPhaseDepth--;
+    }
+  }
+
+  isHostRecalcPhase(): boolean {
+    return this.hostRecalcPhaseDepth > 0;
+  }
+
   private noteTableMutation(tableName: string) {
     this.txAffectedTableNames.add(tableName);
   }
@@ -168,6 +224,9 @@ export class WorkbookSession {
   }
 
   private emit(options?: { recalculate?: boolean; viewOnly?: boolean }) {
+    if (this.hostRecalcPhaseDepth > 0) {
+      return;
+    }
     if (this.txDepth > 0) {
       this.txDirty = true;
       return;
@@ -182,8 +241,11 @@ export class WorkbookSession {
       return;
     }
     this.generation++;
+    this.pendingNotifyChange = change;
     void this.recalculateLoop().then(() => {
-      for (const listener of this.listeners) listener(change);
+      const notify = this.pendingNotifyChange;
+      this.pendingNotifyChange = undefined;
+      for (const listener of this.listeners) listener(notify);
     });
   }
 
@@ -360,8 +422,18 @@ export class WorkbookSession {
       while (true) {
         const gen = this.generation;
         await measureAsync("recalculate", this.perf, async () => {
-          const snapshot = cloneSnapshot(this.snapshot);
+          const affected = this.pendingNotifyChange?.affectedTableNames;
+          if (this.onBeforeEvaluate && affected?.length) {
+            await measureAsync("recalculate.hostPhase", this.perf, async () => {
+              this.runInHostRecalcPhase(() => {
+                this.onBeforeEvaluate!(this, { affectedTableNames: affected });
+              });
+            });
+          }
+          const snapshot = this.readSnapshotForEvaluate();
+          this.applyEngineReadHint(affected);
           const values = await Promise.resolve(this.engine.evaluate(snapshot));
+          this.applyEngineReadHint(undefined);
           if (gen !== this.generation) return;
           this.cache = { layout: layoutWorkbook(this.snapshot), values };
         });
@@ -371,6 +443,11 @@ export class WorkbookSession {
       this.recalcInFlight = null;
     });
     return this.recalcInFlight;
+  }
+
+  /** Engine read path — no deep clone; host must not mutate snapshot during evaluate. */
+  readSnapshotForEvaluate(): WorkbookSnapshot {
+    return attachViewToSnapshot(this.snapshot, this.viewState);
   }
 
   getSnapshot(): WorkbookSnapshot {
@@ -552,6 +629,16 @@ export class WorkbookSession {
     if (existing?.kind === "formula") {
       throw new Error("Cannot overlay or replace a formula cell with an input. Change the formula instead.");
     }
+    if (this.hostRecalcPhaseDepth > 0) {
+      if (this.snapshot.activeScenarioId) {
+        const scenario = this.snapshot.scenarios.find((s) => s.id === this.snapshot.activeScenarioId);
+        if (!scenario) throw new Error("Active scenario missing");
+        scenario.overlays[overlayKey(table.id, row.id, colId)] = value;
+      } else {
+        row.cells[colId] = retainCellMeta(existing, { kind: "input", value });
+      }
+      return;
+    }
     this.checkpoint();
     this.noteTableMutation(table.name);
     if (this.snapshot.activeScenarioId) {
@@ -567,12 +654,14 @@ export class WorkbookSession {
   setFormula(tableName: string, rowKey: string, columnId: string, formula: string) {
     const { table, row, colId } = this.findCell(tableName, rowKey, columnId);
     const existing = row.cells[colId];
+    const text = formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`;
+    if (this.hostRecalcPhaseDepth > 0) {
+      row.cells[colId] = retainCellMeta(existing, { kind: "formula", formula: text });
+      return;
+    }
     this.checkpoint();
     this.noteTableMutation(table.name);
-    row.cells[colId] = retainCellMeta(existing, {
-      kind: "formula",
-      formula: formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`,
-    });
+    row.cells[colId] = retainCellMeta(existing, { kind: "formula", formula: text });
     this.emit();
   }
 

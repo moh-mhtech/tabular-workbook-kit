@@ -13,6 +13,7 @@
     "evaluatedCellsAllMs": 5,
     "evaluatedCellsOneTableMs": 1,
     "cellCommitEmitMs": 78,
+    "commitWithMaintainMs": 200,
     "firstCommitRecalcMs": 78,
     "secondCommitRecalcMs": 73,
     "evalScalingRatioMax": 0.35,
@@ -25,6 +26,29 @@
       "commitRecalcMs": 3000,
       "keystrokeToPaintMs": 150,
       "enterToDisplayMs": 800
+    }
+  },
+  "regression": {
+    "ui": {
+      "budget": {
+        "formulaEditCursorMs": 16,
+        "commitRecalcMs": 3000,
+        "keystrokeToPaintMs": 90,
+        "enterToDisplayMs": 400,
+        "commitWithMaintainDisplayMs": 350
+      }
+    },
+    "budget": {
+      "recalculateMultiSheetMs": 55
+    }
+  },
+  "slo": {
+    "ui": {
+      "budget": {
+        "keystrokeToPaintMs": 16,
+        "enterToDisplayMs": 100,
+        "commitWithMaintainDisplayMs": 100
+      }
     }
   }
 }

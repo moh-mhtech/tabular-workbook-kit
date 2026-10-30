@@ -1482,6 +1482,35 @@ body.wk-explorer-dragging .wk-explorer-table {
   margin-bottom: 0;
 }
 
+.wk-table-grid-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 220ms ease,
+    opacity 220ms ease;
+}
+
+.wk-table-grid-collapse.is-expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.wk-table-grid-collapse:not(.is-expanded) {
+  pointer-events: none;
+}
+
+.wk-table-grid-collapse-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wk-table-grid-collapse {
+    transition: none;
+  }
+}
+
 .wk-table-viewport-title {
   display: block;
   flex: 0 1 auto;

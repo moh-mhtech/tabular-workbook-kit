@@ -31,9 +31,17 @@ export class HyperFormulaEngine implements FormulaEngine {
   private hf: HyperFormula | null = null;
   private structureKey = "";
   private cellCache = new Map<string, RawCellContent>();
+  private committedValues: Record<string, SheetGrid> | null = null;
+  private dirtyValueSheets = new Set<string>();
+  /** When set on multi-sheet workbooks, enables partial value read for these sheets (plus patched sheets). */
+  private evaluateReadSheetNames: Set<string> | null = null;
 
   constructor(options: HyperFormulaEngineOptions = {}) {
     this.licenseKey = options.licenseKey ?? environmentLicenseKey() ?? "gpl-v3";
+  }
+
+  setEvaluateReadSheetNames(sheetNames: readonly string[] | undefined) {
+    this.evaluateReadSheetNames = sheetNames?.length ? new Set(sheetNames) : null;
   }
 
   evaluate(snapshot: WorkbookSnapshot): Record<string, SheetGrid> {
@@ -46,6 +54,8 @@ export class HyperFormulaEngine implements FormulaEngine {
       this.rebuildEngine(sheets, namedExpressions);
       this.structureKey = nextStructureKey;
       this.seedCellCache(sheets);
+      this.committedValues = null;
+      this.dirtyValueSheets.clear();
     } else {
       this.patchEngine(sheets);
     }
@@ -101,6 +111,7 @@ export class HyperFormulaEngine implements FormulaEngine {
           if (cellContentEqual(this.cellCache.get(key), content)) continue;
           engine.setCellContents({ sheet: sheetId, row, col }, [[content]]);
           this.cellCache.set(key, content);
+          this.dirtyValueSheets.add(sheetName);
         }
       }
     }
@@ -109,24 +120,58 @@ export class HyperFormulaEngine implements FormulaEngine {
   private readAllSheetValues(layout: WorkbookLayout): Record<string, SheetGrid> {
     const engine = this.hf;
     if (!engine) return {};
+    const sheetsToRead = new Set(this.dirtyValueSheets);
+    if (this.evaluateReadSheetNames) {
+      for (const name of this.evaluateReadSheetNames) sheetsToRead.add(name);
+    }
+    const canPartial =
+      this.committedValues !== null &&
+      sheetsToRead.size > 0 &&
+      sheetsToRead.size < layout.sheets.length &&
+      (layout.sheets.length === 1 || this.evaluateReadSheetNames !== null);
+    if (canPartial) {
+      const values = cloneSheetGrids(this.committedValues!);
+      for (const view of layout.sheets) {
+        if (!sheetsToRead.has(view.sheetName)) continue;
+        values[view.sheetName] = this.readOneSheetValues(layout, view.sheetName, view.sheetId);
+      }
+      this.dirtyValueSheets.clear();
+      this.committedValues = values;
+      return values;
+    }
     const values: Record<string, SheetGrid> = {};
     for (const view of layout.sheets) {
-      const size = engineSheetSize(layout, view.sheetId);
-      const sheetId = engine.getSheetId(view.sheetName);
-      const grid: SheetGrid = Array.from({ length: size.rowCount }, () =>
-        Array<string | number | boolean | null>(size.colCount).fill(null),
-      );
-      if (sheetId !== undefined) {
-        for (let row = 0; row < size.rowCount; row++) {
-          for (let col = 0; col < size.colCount; col++) {
-            grid[row][col] = normalize(engine.getCellValue({ sheet: sheetId, row, col }));
-          }
-        }
-      }
-      values[view.sheetName] = grid;
+      values[view.sheetName] = this.readOneSheetValues(layout, view.sheetName, view.sheetId);
     }
+    this.dirtyValueSheets.clear();
+    this.committedValues = values;
     return values;
   }
+
+  private readOneSheetValues(layout: WorkbookLayout, sheetName: string, sheetId: string): SheetGrid {
+    const engine = this.hf;
+    const size = engineSheetSize(layout, sheetId);
+    const grid: SheetGrid = Array.from({ length: size.rowCount }, () =>
+      Array<string | number | boolean | null>(size.colCount).fill(null),
+    );
+    const hfSheetId = engine?.getSheetId(sheetName);
+    if (engine && hfSheetId !== undefined) {
+      for (let row = 0; row < size.rowCount; row++) {
+        for (let col = 0; col < size.colCount; col++) {
+          grid[row][col] = normalize(engine.getCellValue({ sheet: hfSheetId, row, col }));
+        }
+      }
+    }
+    return grid;
+  }
+}
+
+function cloneSheetGrids(source: Record<string, SheetGrid>): Record<string, SheetGrid> {
+  const next: Record<string, SheetGrid> = {};
+  for (const [name, grid] of Object.entries(source)) {
+    next[name] = grid.map((row) => [...row]);
+  }
+  return next;
 }
 
 function structureFingerprint(layout: WorkbookLayout): string {

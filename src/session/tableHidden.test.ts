@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createSampleWorkbook } from "../../sample/createSampleWorkbook.js";
+import { MemoryPersistence } from "../persist/index.js";
 import { WorkbookSession } from "./WorkbookSession.js";
 
 async function open() {
@@ -15,6 +16,16 @@ describe("Table hidden", () => {
     expect(session.getSnapshot().tables.find((table) => table.id === "tbl-lines")!.hidden).toBe(true);
     const reloaded = new WorkbookSession(session.getSnapshot());
     expect(reloaded.getSnapshot().tables.find((table) => table.id === "tbl-lines")!.hidden).toBe(true);
+  });
+
+  it("notifies persistSnapshot when toggling hidden", async () => {
+    const session = await open();
+    let persistSnapshot = false;
+    session.subscribe((change) => {
+      persistSnapshot = change?.persistSnapshot === true;
+    });
+    session.toggleTableHidden("tbl-lines");
+    expect(persistSnapshot).toBe(true);
   });
 
   it("does not recalculate when toggling hidden and notifies view-only", async () => {

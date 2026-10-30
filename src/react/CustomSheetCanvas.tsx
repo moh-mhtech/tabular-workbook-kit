@@ -38,8 +38,10 @@ import {
   selectedCellRefs,
   type EvaluatedCell,
   type Primitive,
+  type TableSnapshot,
   type WorkbookSnapshot,
 } from "../model/types.js";
+import type { WorkbookSession } from "../session/WorkbookSession.js";
 import { writePeriodIds } from "../model/yearColumns.js";
 import {
   applyCustomGridClear,
@@ -352,6 +354,41 @@ function ensureOverlayPortal() {
 
 const SCROLLBAR_GUTTER = 16;
 
+function TableViewportSection({
+  table,
+  gridVisible,
+  session,
+}: {
+  table: TableSnapshot;
+  gridVisible: boolean;
+  session: WorkbookSession;
+}) {
+  const [collapseSettled, setCollapseSettled] = useState(() => !gridVisible);
+
+  useEffect(() => {
+    if (gridVisible) setCollapseSettled(false);
+  }, [gridVisible]);
+
+  const showHiddenChrome = table.hidden === true && !gridVisible && collapseSettled;
+
+  return (
+    <section
+      className={showHiddenChrome ? "wk-table-viewport-card is-table-hidden" : "wk-table-viewport-card"}
+      data-table-id={table.id}
+    >
+      <div className="wk-table-viewport-head">
+        <button type="button" className="wk-table-viewport-title" onClick={() => session.revealTable(table.id)}>
+          {table.name}
+        </button>
+        <TableVisibilityButton tableId={table.id} tableName={table.name} hidden={table.hidden === true} />
+      </div>
+      <TableGridCollapse open={gridVisible} onCollapsed={() => setCollapseSettled(true)}>
+        <TableGrid tableId={table.id} />
+      </TableGridCollapse>
+    </section>
+  );
+}
+
 export function CustomSheetCanvas() {
   const { session, activeSheetId } = useWorkbook();
   const formulaEdit = useFormulaEdit();
@@ -450,33 +487,7 @@ export function CustomSheetCanvas() {
         if (!table) return null;
         const gridVisible = showTableGrid(table, selection);
         return (
-          <section
-            className={
-              table.hidden && !gridVisible
-                ? "wk-table-viewport-card is-table-hidden"
-                : "wk-table-viewport-card"
-            }
-            data-table-id={table.id}
-            key={table.id}
-          >
-            <div className="wk-table-viewport-head">
-              <button
-                type="button"
-                className="wk-table-viewport-title"
-                onClick={() => session.revealTable(table.id)}
-              >
-                {table.name}
-              </button>
-              <TableVisibilityButton
-                tableId={table.id}
-                tableName={table.name}
-                hidden={table.hidden === true}
-              />
-            </div>
-            <TableGridCollapse open={gridVisible}>
-              <TableGrid tableId={table.id} />
-            </TableGridCollapse>
-          </section>
+          <TableViewportSection key={table.id} table={table} gridVisible={gridVisible} session={session} />
         );
       })}
       {!sheet.bands.length && <div className="wk-empty-sheet">This sheet has no tables.</div>}

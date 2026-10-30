@@ -20,4 +20,16 @@ describe("persistence", () => {
     expect(restored.getCell("Params", "Growth", "Value").computed).toBe(0.04);
     expect(restored.getCell("Params", "Growth", "Value").overlay).toBe(true);
   }, 60_000);
+
+  it("round-trips table hidden through persistence", async () => {
+    const persist = new MemoryPersistence();
+    const session = new WorkbookSession(createSampleWorkbook());
+    await session.recalculate();
+    session.toggleTableHidden("tbl-lines");
+    await persist.save(session.getSnapshot());
+    const loaded = await persist.load();
+    expect(loaded?.tables.find((table) => table.id === "tbl-lines")?.hidden).toBe(true);
+    const restored = new WorkbookSession(loaded!);
+    expect(restored.getSnapshot().tables.find((table) => table.id === "tbl-lines")?.hidden).toBe(true);
+  });
 });

@@ -35,11 +35,79 @@ describe("workbook chrome", () => {
     expect(project.querySelector(".wk-explorer-folder-icon")).toBeTruthy();
   });
 
-  it("styles New sheet as a prominent action", async () => {
+  it("styles New sheet as a sheet row action", async () => {
     await renderWorkbookCanvas({ chrome: true });
     const newSheet = screen.getByRole("button", { name: "New sheet" });
     expect(newSheet.classList.contains("wk-explorer-new-sheet")).toBe(true);
     expect(newSheet.classList.contains("wk-explorer-new")).toBe(false);
+    expect(newSheet.closest(".wk-explorer-sheet-row")).toBeTruthy();
+    expect(newSheet.closest(".wk-explorer-new-sheet-group")?.querySelector(".wk-explorer-drop-marker")).toBeTruthy();
+    const referenceSheet = screen.getByRole("button", { name: "Assumptions" });
+    const newRow = newSheet.closest(".wk-explorer-sheet-row")!;
+    const refRow = referenceSheet.closest(".wk-explorer-sheet-row")!;
+    expect(newRow.querySelector(".wk-explorer-sheet-row-spacer")).toBeTruthy();
+    expect(newRow.getBoundingClientRect().height).toBe(refRow.getBoundingClientRect().height);
+
+    const explorer = screen.getByRole("navigation", { name: "Sheets" });
+    const sheetGroups = [...explorer.querySelectorAll<HTMLElement>("[data-explorer-sheet-id]")];
+    if (sheetGroups.length >= 2) {
+      const rowBottom = (group: HTMLElement) =>
+        group.querySelector(".wk-explorer-sheet-row")!.getBoundingClientRect().bottom;
+      const rowTop = (group: HTMLElement) =>
+        group.querySelector(".wk-explorer-sheet-row")!.getBoundingClientRect().top;
+      const referenceGap = rowTop(sheetGroups[1]!) - rowBottom(sheetGroups[0]!);
+      const newSheetGroup = newSheet.closest(".wk-explorer-new-sheet-group")!;
+      const gapBeforeNewSheet = rowTop(newSheetGroup) - rowBottom(sheetGroups.at(-1)!);
+      expect(gapBeforeNewSheet).toBe(referenceGap);
+    }
+  });
+
+  it("lists New table after sheet tables in the same explorer list", async () => {
+    await renderWorkbookCanvas({ chrome: true });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Assumptions" }));
+    });
+    const explorer = screen.getByRole("navigation", { name: "Sheets" });
+    const assumptionsGroup = explorer.querySelector('[data-explorer-sheet-id="sheet-assumptions"]') as HTMLElement;
+    const list = assumptionsGroup.querySelector(".wk-explorer-tables")!;
+    const linesLi = list.querySelector('[data-explorer-table-id="tbl-lines"]');
+    const newTable = list.querySelector(".wk-explorer-new") as HTMLElement;
+    const lines = list.querySelector('[data-explorer-table-id="tbl-lines"] .wk-explorer-table') as HTMLElement;
+    expect(newTable).toBeTruthy();
+    expect(newTable.classList.contains("wk-explorer-table")).toBe(true);
+    expect(newTable.querySelector(".wk-explorer-table-label")?.textContent).toBe("New table");
+    expect(linesLi?.nextElementSibling?.querySelector(".wk-explorer-new")).toBe(newTable);
+    expect(newTable.querySelector(".wk-explorer-table-gutter")).toBeTruthy();
+    expect(getComputedStyle(newTable).paddingTop).toBe(getComputedStyle(lines).paddingTop);
+    expect(getComputedStyle(newTable).paddingBottom).toBe(getComputedStyle(lines).paddingBottom);
+    expect(getComputedStyle(newTable).paddingRight).toBe(getComputedStyle(lines).paddingRight);
+    expect(newTable.closest("li")?.querySelector(".wk-explorer-drop-marker")).toBeTruthy();
+
+    const tableRows = [...list.querySelectorAll<HTMLElement>("[data-explorer-table-id]")];
+    if (tableRows.length >= 2) {
+      const gapBetweenTables = (row: HTMLElement, next: HTMLElement) => {
+        const a = row.querySelector(".wk-explorer-table")!.getBoundingClientRect();
+        const b = next.querySelector(".wk-explorer-table")!.getBoundingClientRect();
+        return b.top - a.bottom;
+      };
+      const referenceGap = gapBetweenTables(tableRows.at(-2)!, tableRows.at(-1)!);
+      const lastTableRow = tableRows.at(-1)!;
+      const gapBeforeNewTable =
+        newTable.getBoundingClientRect().top - lastTableRow.querySelector(".wk-explorer-table")!.getBoundingClientRect().bottom;
+      expect(gapBeforeNewTable).toBe(referenceGap);
+    }
+  });
+
+  it("aligns New sheet glyph with label", async () => {
+    await renderWorkbookCanvas({ chrome: true });
+    const newSheet = screen.getByRole("button", { name: "New sheet" });
+    const glyph = newSheet.querySelector(".wk-explorer-new-glyph") as HTMLElement;
+    const label = newSheet.querySelector(".wk-explorer-new-sheet-label") as HTMLElement;
+    expect(label).toBeTruthy();
+    expect(newSheet.querySelector(".wk-explorer-new-sheet-label")?.textContent).toBe("New sheet");
+    const glyphMid = glyph.getBoundingClientRect().top + glyph.getBoundingClientRect().height / 2;
+    const labelMid = label.getBoundingClientRect().top + label.getBoundingClientRect().height / 2;
+    expect(Math.abs(glyphMid - labelMid)).toBeLessThan(2);
   });
 
   it("toggles Formula-edit placement between Popup and Inline", async () => {

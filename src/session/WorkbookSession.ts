@@ -82,6 +82,8 @@ import { PerfSpanBuffer, measureAsync } from "../perf/perfSpan.js";
 export type SessionChange = {
   viewOnly?: true;
   formulaEditOnly?: true;
+  /** Stored snapshot changed; persist even when `viewOnly` (e.g. table hidden). */
+  persistSnapshot?: true;
   /** Tables whose model cells changed in this notification (host maintenance scope). */
   affectedTableNames?: string[];
 };
@@ -223,7 +225,7 @@ export class WorkbookSession {
     return names.length ? { affectedTableNames: names } : {};
   }
 
-  private emit(options?: { recalculate?: boolean; viewOnly?: boolean }) {
+  private emit(options?: { recalculate?: boolean; viewOnly?: boolean; persistSnapshot?: boolean }) {
     if (this.hostRecalcPhaseDepth > 0) {
       return;
     }
@@ -232,7 +234,9 @@ export class WorkbookSession {
       return;
     }
     if (options?.viewOnly) {
-      for (const listener of this.listeners) listener({ viewOnly: true });
+      const change: SessionChange = { viewOnly: true };
+      if (options.persistSnapshot) change.persistSnapshot = true;
+      for (const listener of this.listeners) listener(change);
       return;
     }
     const change = this.dataChange();
@@ -1165,7 +1169,7 @@ export class WorkbookSession {
     const sheet = this.snapshot.sheets.find((item) => item.id === sheetId);
     if (!sheet) throw new Error(`Unknown sheet "${sheetId}"`);
     sheet.explorerCollapsed = !sheet.explorerCollapsed;
-    this.emit({ recalculate: false, viewOnly: true });
+    this.emit({ recalculate: false, viewOnly: true, persistSnapshot: true });
   }
 
   toggleTableHidden(tableId: string) {
@@ -1178,7 +1182,7 @@ export class WorkbookSession {
         this.writeViewState({ selection: this.selection });
       }
     }
-    this.emit({ recalculate: false, viewOnly: true });
+    this.emit({ recalculate: false, viewOnly: true, persistSnapshot: true });
   }
 
   private selectionUsesTableData(tableId: string): boolean {

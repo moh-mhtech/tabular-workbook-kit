@@ -47,6 +47,7 @@ describe("Table hidden", () => {
     await act(async () => {
       fireEvent.click(within(card).getByRole("button", { name: "Hide Lines" }));
     });
+    expect(card.classList.contains("is-table-hidden")).toBe(false);
     await waitFor(
       () => {
         expect(document.querySelector(`[data-table-id="${table.id}"] .wk-table-spreadsheet`)).toBeNull();
@@ -54,6 +55,7 @@ describe("Table hidden", () => {
       { timeout: 800 },
     );
     expect(wrap()).toBeNull();
+    expect(card.classList.contains("is-table-hidden")).toBe(true);
 
     await act(async () => {
       fireEvent.click(within(card).getByRole("button", { name: "Show Lines" }));

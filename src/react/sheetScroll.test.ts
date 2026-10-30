@@ -1,27 +1,41 @@
 /** @vitest-environment jsdom */
 import { describe, expect, it } from "vitest";
-import { leadTableIdInCanvas } from "./sheetScroll.js";
+import { cellGridMetrics, scrollCanvasToKeepCellVisible } from "./sheetScroll.js";
 
-describe("leadTableIdInCanvas", () => {
-  it("returns the table whose band top matches the canvas scroll position", () => {
+describe("scrollCanvasToKeepCellVisible", () => {
+  it("scrolls the table scroller horizontally in per-table scroll mode", () => {
     const canvas = document.createElement("main");
-    canvas.style.paddingTop = "0";
-    Object.defineProperty(canvas, "scrollTop", { value: 120, writable: true });
-    Object.defineProperty(canvas, "clientHeight", { value: 400 });
+    canvas.className = "wk-canvas wk-table-canvases is-table-scroll-x";
+    Object.defineProperty(canvas, "clientWidth", { value: 800 });
+    Object.defineProperty(canvas, "clientHeight", { value: 600 });
+    Object.defineProperty(canvas, "scrollWidth", { value: 800 });
+    Object.defineProperty(canvas, "scrollTop", { value: 0, writable: true });
+    Object.defineProperty(canvas, "scrollLeft", { value: 0, writable: true });
 
-    canvas.getBoundingClientRect = () => ({ top: 0, left: 0, width: 800, height: 400, right: 800, bottom: 400, x: 0, y: 0, toJSON: () => ({}) });
+    const card = document.createElement("section");
+    card.dataset.tableId = "tbl-a";
+    const spreadsheet = document.createElement("div");
+    spreadsheet.className = "wk-table-spreadsheet";
+    const scroller = document.createElement("div");
+    scroller.className = "dvn-scroller";
+    Object.defineProperty(scroller, "clientWidth", { value: 120 });
+    Object.defineProperty(scroller, "scrollWidth", { value: 640 });
+    let scrollLeft = 0;
+    Object.defineProperty(scroller, "scrollLeft", {
+      get: () => scrollLeft,
+      set: (value: number) => {
+        scrollLeft = value;
+      },
+    });
+    spreadsheet.append(scroller);
+    card.append(spreadsheet);
+    canvas.append(card);
+    document.body.append(canvas);
 
-    const first = document.createElement("section");
-    first.dataset.tableId = "tbl-a";
-    first.getBoundingClientRect = () => ({ top: -100, left: 0, width: 100, height: 80, right: 100, bottom: -20, x: 0, y: -100, toJSON: () => ({}) });
-    Object.defineProperty(first, "offsetHeight", { value: 80 });
-
-    const second = document.createElement("section");
-    second.dataset.tableId = "tbl-b";
-    second.getBoundingClientRect = () => ({ top: -10, left: 0, width: 100, height: 200, right: 100, bottom: 190, x: 0, y: -10, toJSON: () => ({}) });
-    Object.defineProperty(second, "offsetHeight", { value: 200 });
-    canvas.append(first, second);
-
-    expect(leadTableIdInCanvas(canvas)).toBe("tbl-b");
+    const columnWidths = [48, 48, 48, 48, 48];
+    const { x, width } = cellGridMetrics(columnWidths, 4, 1, 24);
+    scrollCanvasToKeepCellVisible(canvas, "tbl-a", 4, 1, columnWidths, 24, "table");
+    expect(scrollLeft).toBeGreaterThan(0);
+    expect(x + width).toBeLessThanOrEqual(scrollLeft + scroller.clientWidth);
   });
 });

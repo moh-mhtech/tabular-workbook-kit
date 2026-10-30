@@ -260,16 +260,11 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
                 </li>
               );
             })}
-            {showTables ? (
-              <li className="wk-explorer-table-append-marker" onDragOver={allowExplorerDrop}>
-                <ExplorerDropMarker
-                  active={dropHint?.placement === "append-tables" && dropHint.sheetId === sheet.id}
-                />
-              </li>
-            ) : null}
             <li>
-              <button
-                type="button"
+              <ExplorerDropMarker active={false} />
+              <div
+                role="button"
+                tabIndex={0}
                 className="wk-explorer-table wk-explorer-new"
                 aria-label="New table"
                 onClick={() =>
@@ -279,16 +274,50 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
                     session.revealTable(table.id);
                   })
                 }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    tryCall(() => {
+                      const table = session.addTable(sheet.id);
+                      setActiveSheetId(sheet.id);
+                      session.revealTable(table.id);
+                    });
+                  }
+                }}
               >
-                <WkAddIcon />
-                New table
-              </button>
+                <span className="wk-explorer-table-gutter" aria-hidden="true">
+                  <WkAddIcon />
+                </span>
+                <span className="wk-explorer-table-label">New table</span>
+              </div>
             </li>
+            {showTables ? (
+              <li className="wk-explorer-table-append-marker" onDragOver={allowExplorerDrop}>
+                <ExplorerDropMarker
+                  active={dropHint?.placement === "append-tables" && dropHint.sheetId === sheet.id}
+                />
+              </li>
+            ) : null}
           </ul>
           </ExplorerSheetTables>
         </div>
       );
       })}
+      <div className="wk-explorer-group wk-explorer-new-sheet-group">
+        <ExplorerDropMarker active={false} />
+        <div className="wk-explorer-sheet-row">
+          <button
+            type="button"
+            className="wk-explorer-group-btn wk-explorer-new-sheet"
+            aria-label="New sheet"
+            onClick={() => tryCall(() => session.addSheet())}
+          >
+            <WkAddIcon />
+            <span className="wk-explorer-new-sheet-label">New sheet</span>
+          </button>
+          <span className="wk-explorer-chevron-btn wk-explorer-sheet-row-spacer" aria-hidden="true" />
+        </div>
+      </div>
       {lastSheetId ? (
         <div
           className="wk-explorer-sheet-append-target"
@@ -298,17 +327,6 @@ export function Explorer({ workbookFolderIcon = false }: { workbookFolderIcon?: 
           <ExplorerDropMarker active={dropHint?.placement === "after-sheet"} />
         </div>
       ) : null}
-      <div className="wk-explorer-group">
-        <button
-          type="button"
-          className="wk-explorer-group-btn wk-explorer-new-sheet"
-          aria-label="New sheet"
-          onClick={() => tryCall(() => session.addSheet())}
-        >
-          <WkAddIcon />
-          New sheet
-        </button>
-      </div>
     </nav>
   );
 }

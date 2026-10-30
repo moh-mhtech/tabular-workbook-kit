@@ -173,16 +173,29 @@ export function scrollCanvasToKeepCellVisible(
     Math.max(0, sheetBottom(canvas) - canvas.clientHeight),
   );
 
-  if (horizontalScroll !== "sheet") return;
-  const cellLeft = contentOffsetX(spreadsheet, canvas) + x;
-  canvas.scrollLeft = scrollToKeepRangeInView(
-    canvas.scrollLeft,
-    canvas.clientWidth,
-    cellLeft,
-    cellLeft + width,
-    insets.left,
-    insets.right,
-    Math.max(0, canvas.scrollWidth - canvas.clientWidth),
+  if (horizontalScroll === "sheet") {
+    const cellLeft = contentOffsetX(spreadsheet, canvas) + x;
+    canvas.scrollLeft = scrollToKeepRangeInView(
+      canvas.scrollLeft,
+      canvas.clientWidth,
+      cellLeft,
+      cellLeft + width,
+      insets.left,
+      insets.right,
+      Math.max(0, canvas.scrollWidth - canvas.clientWidth),
+    );
+    return;
+  }
+  const scroller = spreadsheet.querySelector(".dvn-scroller");
+  if (!(scroller instanceof HTMLElement)) return;
+  scroller.scrollLeft = scrollToKeepRangeInView(
+    scroller.scrollLeft,
+    scroller.clientWidth,
+    x,
+    x + width,
+    16,
+    16,
+    Math.max(0, scroller.scrollWidth - scroller.clientWidth),
   );
 }
 
@@ -200,6 +213,9 @@ export function scrollCanvasToTable(container: HTMLElement, tableId: string) {
 export function clampCanvasScroll(container: HTMLElement) {
   const maxScroll = Math.max(0, sheetBottom(container) - container.clientHeight);
   if (container.scrollTop > maxScroll) container.scrollTop = maxScroll;
+  const maxScrollX = Math.max(0, container.scrollWidth - container.clientWidth);
+  if (container.scrollLeft > maxScrollX) container.scrollLeft = maxScrollX;
+  if (container.scrollLeft < 0) container.scrollLeft = 0;
 }
 
 /** Table band at the top of the canvas scrollport (sticky section lead). */

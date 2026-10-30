@@ -31,9 +31,16 @@ import {
 import { layoutWorkbook, type WorkbookLayout } from "../model/layout.js";
 import { applyStrikethrough, resolveCellStyle, styleFont } from "../model/cellStyle.js";
 import { formatDisplayValue, rawEditValue, resolveCellFormat } from "../model/numberFormat.js";
-import { HEADER_ROW_ID, KEY_COLUMN_ID, selectedCellRefs, type Primitive } from "../model/types.js";
+import {
+  HEADER_ROW_ID,
+  KEY_COLUMN_ID,
+  resolveSheetHorizontalScroll,
+  selectedCellRefs,
+  type EvaluatedCell,
+  type Primitive,
+  type WorkbookSnapshot,
+} from "../model/types.js";
 import { writePeriodIds } from "../model/yearColumns.js";
-import type { EvaluatedCell, WorkbookSnapshot } from "../model/types.js";
 import {
   applyCustomGridClear,
   applyCustomGridEdits,
@@ -376,7 +383,9 @@ export function CustomSheetCanvas() {
     return () => window.removeEventListener("keydown", onKey);
   }, [session]);
 
-  const horizontalScroll = snapshot.sheets.find((candidate) => candidate.id === activeSheetId)?.horizontalScroll ?? "table";
+  const horizontalScroll = resolveSheetHorizontalScroll(
+    snapshot.sheets.find((candidate) => candidate.id === activeSheetId)?.horizontalScroll,
+  );
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -479,7 +488,9 @@ function TableGrid({ tableId }: { tableId: string }) {
   const targetCell = session.formulaEdit?.targetCell;
   const rangeAnchor = session.formulaEdit?.rangeAnchor;
   const hostRef = useRef<HTMLDivElement>(null);
-  const horizontalScroll = snapshot.sheets.find((sheet) => sheet.id === projection?.sheetId)?.horizontalScroll ?? "table";
+  const horizontalScroll = resolveSheetHorizontalScroll(
+    snapshot.sheets.find((sheet) => sheet.id === projection?.sheetId)?.horizontalScroll,
+  );
 
   const selectedGridCell = gridSelection.current?.cell;
   const growthCellSelected = Boolean(
@@ -883,7 +894,8 @@ function TableGrid({ tableId }: { tableId: string }) {
     ...(pointedRange ? [{ color: "rgba(42, 111, 151, 0.28)", range: pointedRange }] : []),
   ];
   const gridWidth = fittedColumns.reduce((sum, column) => sum + column.width, 0) + 2;
-  const gridHeight = fittedRows.reduce((sum, height) => sum + height, 0) + SCROLLBAR_GUTTER;
+  const scrollbarGutter = horizontalScroll === "sheet" ? 0 : SCROLLBAR_GUTTER;
+  const gridHeight = fittedRows.reduce((sum, height) => sum + height, 0) + scrollbarGutter;
 
   return (
     <div
@@ -1010,7 +1022,7 @@ function TableGrid({ tableId }: { tableId: string }) {
             ? { horizontalBorderColor: "transparent" }
             : undefined
         }
-        experimental={{ scrollbarWidthOverride: SCROLLBAR_GUTTER }}
+        experimental={{ scrollbarWidthOverride: scrollbarGutter }}
         initialSize={[gridWidth, gridHeight]}
         rowMarkers="none"
         headerHeight={0}

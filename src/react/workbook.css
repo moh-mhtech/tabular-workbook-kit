@@ -1270,6 +1270,12 @@ body.wk-explorer-dragging .wk-explorer-table {
 
 .wk-table-canvases.is-sheet-scroll-x .wk-table-spreadsheet .dvn-scroller {
   overflow-x: hidden !important;
+  scrollbar-width: none;
+}
+
+.wk-table-canvases.is-sheet-scroll-x .wk-table-spreadsheet .dvn-scroller::-webkit-scrollbar {
+  display: none;
+  height: 0;
 }
 
 .wk-table-spreadsheet-host,

@@ -65,12 +65,16 @@ export interface TableSnapshot {
 
 export type SheetHorizontalScroll = "table" | "sheet";
 
+export function resolveSheetHorizontalScroll(mode?: SheetHorizontalScroll): SheetHorizontalScroll {
+  return mode === "table" ? "table" : "sheet";
+}
+
 export interface SheetSnapshot {
   id: string;
   name: string;
   tableIds: string[];
   locked?: boolean;
-  /** Wide tables scroll inside each table, or the whole sheet scrolls. Omitted means per table. */
+  /** Wide tables scroll inside each table (`table`), or the whole sheet scrolls (`sheet`). Omitted means sheet. */
   horizontalScroll?: SheetHorizontalScroll;
   /** Values typed on the grid outside every table band, keyed by `looseCellKey`. */
   looseCells?: Record<string, CellSnapshot>;

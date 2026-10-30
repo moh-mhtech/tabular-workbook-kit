@@ -132,11 +132,11 @@ describe("workbook chrome", () => {
       fireEvent.blur(name);
     });
     expect(session.getSnapshot().sheets.find((sheet) => sheet.id === "sheet-assumptions")?.name).toBe("Forecast");
-    const scroll = screen.getByDisplayValue("Per table") as HTMLSelectElement;
+    const scroll = screen.getByDisplayValue("Sheet") as HTMLSelectElement;
     await act(async () => {
-      fireEvent.change(scroll, { target: { value: "sheet" } });
+      fireEvent.change(scroll, { target: { value: "table" } });
     });
-    expect(session.getSnapshot().sheets.find((sheet) => sheet.id === "sheet-assumptions")?.horizontalScroll).toBe("sheet");
+    expect(session.getSnapshot().sheets.find((sheet) => sheet.id === "sheet-assumptions")?.horizontalScroll).toBe("table");
   });
 
   it("renames the workbook and shrinking the calendar leaves orphan December cells", async () => {

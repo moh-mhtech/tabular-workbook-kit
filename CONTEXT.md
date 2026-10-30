@@ -357,5 +357,5 @@ The Value field for the selected Cell’s Stored value (Input or Formula text). 
 _Avoid_: Formula line, name box
 
 **Horizontal scroll**:
-Whether wide Tables on a Sheet scroll individually (default) or the whole Sheet scrolls together.
+Whether wide Tables on a Sheet scroll individually (**Per table**) or the whole Sheet scrolls together (**Sheet**, default). In Sheet mode, table grids do not show their own horizontal scrollbar.
 _Avoid_: Freeze panes, split view

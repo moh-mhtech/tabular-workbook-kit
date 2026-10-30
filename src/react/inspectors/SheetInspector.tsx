@@ -2,6 +2,7 @@ import { MixedTextInput } from "../MixedTextInput.js";
 import { OutlinedField } from "../OutlinedField.js";
 import { useSnapshot, useWorkbook } from "../WorkbookProvider.js";
 import { invalidGlobalName } from "../../model/names.js";
+import { resolveSheetHorizontalScroll } from "../../model/types.js";
 
 function tryCall(fn: () => void) {
   try {
@@ -27,7 +28,7 @@ export function SheetInspector({ sheetId }: { sheetId: string }) {
       </OutlinedField>
       <OutlinedField label="Horizontal scroll">
         <select
-          value={sheet.horizontalScroll ?? "table"}
+          value={resolveSheetHorizontalScroll(sheet.horizontalScroll)}
           onChange={(e) =>
             tryCall(() => session.setSheetHorizontalScroll(sheet.id, e.target.value === "sheet" ? "sheet" : "table"))
           }

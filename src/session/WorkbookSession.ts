@@ -1091,10 +1091,11 @@ export class WorkbookSession {
   setSheetHorizontalScroll(sheetId: string, mode: SheetHorizontalScroll) {
     const sheet = this.snapshot.sheets.find((s) => s.id === sheetId);
     if (!sheet) throw new Error(`Unknown sheet "${sheetId}"`);
-    const next = mode === "sheet" ? "sheet" : undefined;
-    if (sheet.horizontalScroll === next) return;
+    const perTable = mode === "table";
+    if (perTable && sheet.horizontalScroll === "table") return;
+    if (!perTable && sheet.horizontalScroll !== "table") return;
     this.checkpoint();
-    if (next) sheet.horizontalScroll = next;
+    if (perTable) sheet.horizontalScroll = "table";
     else delete sheet.horizontalScroll;
     this.emit();
   }

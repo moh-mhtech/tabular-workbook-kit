@@ -89,13 +89,13 @@ describe("table structure editing", () => {
     expect(session.getTable("Params").rows.some((r) => r.key === "Note")).toBe(false);
   });
 
-  it("stores sheet horizontal scroll only when it is not the per-table default", async () => {
+  it("stores per-table horizontal scroll explicitly and omits the sheet default", async () => {
     const session = await open();
     const sheet = session.getSnapshot().sheets[1];
     expect(sheet.horizontalScroll).toBeUndefined();
-    session.setSheetHorizontalScroll(sheet.id, "sheet");
-    expect(session.getSnapshot().sheets[1].horizontalScroll).toBe("sheet");
     session.setSheetHorizontalScroll(sheet.id, "table");
+    expect(session.getSnapshot().sheets[1].horizontalScroll).toBe("table");
+    session.setSheetHorizontalScroll(sheet.id, "sheet");
     expect(session.getSnapshot().sheets[1].horizontalScroll).toBeUndefined();
   });
 

@@ -31,6 +31,7 @@ export {
   parseLooseCellKey,
   selectedCellRefs,
   sharedOrStar,
+  resolveSheetHorizontalScroll,
 } from "./model/types.js";
 export {
   assertGlobalName,
